@@ -29,7 +29,25 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: Avoid writing any logic between createServerClient and
   // supabase.auth.getUser(). A simple mistake could cause session desync.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isProtectedPath = pathname.startsWith('/dashboard') || pathname.startsWith('/profile');
+  const isAuthPath = pathname.startsWith('/login') || pathname.startsWith('/signup');
+
+  if (isProtectedPath && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
+  }
+
+  if (isAuthPath && user) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }
