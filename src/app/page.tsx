@@ -1,203 +1,265 @@
 import Link from 'next/link';
+import Navbar from '@/components/landing/Navbar';
+import QuickTestFunnel from '@/components/landing/QuickTestFunnel';
+import { createClient } from '@/utils/supabase/server';
 
-export default function Home() {
+/**
+ * Landing page — instant career acceleration with the visitor Quick Test
+ * funnel front and center (docs/product/mvp.md §2). "Light & Gold" aesthetic.
+ */
+
+const SERVICES = [
+  {
+    title: 'Analyse IA de CV',
+    description:
+      'Un diagnostic instantané : score global, points forts, points faibles et recommandations concrètes pour passer au niveau supérieur.',
+    locked: false,
+  },
+  {
+    title: 'Matching offre d’emploi',
+    description:
+      'Confrontez votre CV à une offre cible et découvrez votre score d’adéquation, les mots-clés manquants et les écarts à combler.',
+    locked: true,
+  },
+  {
+    title: 'Simulations d’entretien',
+    description:
+      'Entraînez-vous à l’oral avec un coach IA : questions comportementales et techniques, évaluées en temps réel.',
+    locked: true,
+  },
+  {
+    title: 'Bibliothèque & progression',
+    description:
+      'Gérez plusieurs versions de votre CV, suivez vos analyses dans le temps et mesurez vos progrès.',
+    locked: true,
+  },
+] as const;
+
+export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
-    <div className="flex min-h-screen flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-50">
-      {/* Navigation Header */}
-      <header className="sticky top-0 z-50 border-b border-neutral-200/80 bg-white/80 backdrop-blur-md dark:border-neutral-800/80 dark:bg-neutral-950/80">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </div>
-            <Link href="/" className="text-lg font-bold tracking-tight">
-              AI Career Coach
-            </Link>
-          </div>
+    <div className="flex min-h-screen flex-col bg-[#FAFAFA] text-slate-900">
+      <Navbar />
 
-          <nav className="flex items-center gap-3 sm:gap-6">
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/login"
-              className="text-sm font-medium text-neutral-600 transition-colors hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center rounded-lg bg-neutral-900 px-3.5 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
-            >
-              Get Started
-            </Link>
-          </nav>
-        </div>
-      </header>
-
-      {/* Hero Section */}
       <main className="flex-1">
-        <section className="relative overflow-hidden px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:px-8">
-          <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-medium text-neutral-700 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
-              Next-Gen Career Acceleration
+        {/* Hero — direct value proposition + Quick Test funnel */}
+        <section id="accueil" className="relative overflow-hidden">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-40 right-0 h-96 w-96 rounded-full bg-gold-100/60 blur-3xl"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-24 top-40 h-72 w-72 rounded-full bg-gold-50 blur-3xl"
+          />
+          <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-2 lg:gap-16 lg:px-8">
+            <div className="text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 rounded-full border border-gold-200 bg-gold-50 px-3 py-1 text-xs font-medium text-gold-800">
+                <span aria-hidden="true" className="flex h-2 w-2 rounded-full bg-gold-500" />
+                Nouveau · Testez votre CV gratuitement, sans compte
+              </div>
+
+              <h1 className="mt-6 text-4xl font-extrabold tracking-tight sm:text-5xl xl:text-6xl xl:leading-[1.05]">
+                Accélérez votre carrière{' '}
+                <span className="bg-gradient-to-r from-gold-600 via-gold-700 to-gold-800 bg-clip-text text-transparent">
+                  en moins de 2 minutes
+                </span>
+              </h1>
+
+              <p className="mx-auto mt-6 max-w-xl text-base text-slate-600 sm:text-lg lg:mx-0">
+                Déposez votre CV, recevez immédiatement un score et des recommandations
+                concrètes. Rapide, simple, et <strong className="font-semibold text-slate-900">complètement gratuit</strong> —
+                sans créer de compte.
+              </p>
+
+              <ul className="mx-auto mt-8 flex max-w-xl flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium text-slate-600 lg:mx-0 lg:justify-start">
+                <li className="flex items-center gap-2">
+                  <span aria-hidden="true" className="text-gold-600">✦</span> Aucune inscription
+                </li>
+                <li className="flex items-center gap-2">
+                  <span aria-hidden="true" className="text-gold-600">✦</span> Résultat instantané
+                </li>
+                <li className="flex items-center gap-2">
+                  <span aria-hidden="true" className="text-gold-600">✦</span> Rien n’est conservé
+                </li>
+              </ul>
             </div>
 
-            <h1 className="mt-6 text-4xl font-extrabold tracking-tight sm:text-6xl sm:leading-none">
-              Accelerate your career trajectory with{' '}
-              <span className="bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-500 bg-clip-text text-transparent dark:from-neutral-100 dark:via-neutral-300 dark:to-neutral-500">
-                intelligent coaching
-              </span>
-            </h1>
-
-            <p className="mx-auto mt-6 max-w-2xl text-base text-neutral-600 dark:text-neutral-400 sm:text-lg">
-              AI-driven resume optimization, realistic mock interviews, and personalized progression
-              roadmaps engineered to help you conquer high-stakes career transitions.
-            </p>
-
-            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
-              <Link
-                href="/signup"
-                className="w-full rounded-lg bg-neutral-900 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm transition-all hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 sm:w-auto"
-              >
-                Start Free Trial
-              </Link>
-              <Link
-                href="/login"
-                className="w-full rounded-lg border border-neutral-300 bg-white px-6 py-3 text-center text-sm font-semibold text-neutral-700 shadow-sm transition-all hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 sm:w-auto"
-              >
-                Access Dashboard
-              </Link>
-            </div>
+            <QuickTestFunnel isAuthenticated={Boolean(user)} />
           </div>
         </section>
 
-        {/* Feature Grid Section */}
-        <section className="border-t border-neutral-200 bg-neutral-50/50 py-16 dark:border-neutral-800 dark:bg-neutral-900/30 sm:py-24">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* Services */}
+        <section id="services" className="scroll-mt-24 border-t border-slate-200 bg-white px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl">
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                Everything you need to land your next high-impact role
+              <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
+                Services
+              </p>
+              <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                Un coach de carrière complet, propulsé par l’IA
               </h2>
-              <p className="mt-3 text-sm text-neutral-600 dark:text-neutral-400">
-                Designed for ambitious professionals who want structured, data-driven career growth.
+              <p className="mt-4 text-base text-slate-600">
+                Commencez gratuitement par l’analyse de CV, puis débloquez l’ensemble
+                de l’écosystème en créant votre compte.
               </p>
             </div>
 
-            <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
-              {/* Feature 1 */}
-              <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-5 w-5"
-                  >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                    <line x1="10" y1="9" x2="8" y2="9" />
-                  </svg>
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {SERVICES.map((service) => (
+                <div
+                  key={service.title}
+                  className="relative rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gold-100 text-gold-700">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="h-5 w-5"
+                    >
+                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                    </svg>
+                  </div>
+                  <h3 className="mt-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    {service.title}
+                    {service.locked && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 text-gold-600"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    )}
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-600">{service.description}</p>
+                  {service.locked && (
+                    <p className="mt-3 text-xs font-medium text-gold-700">
+                      Débloqué avec un compte gratuit
+                    </p>
+                  )}
                 </div>
-                <h3 className="mt-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                  Automated Resume Review
-                </h3>
-                <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  Receive instant ATS keyword matching, formatting recommendations, and impact score
-                  evaluations tailored to target job descriptions.
+              ))}
+            </div>
+          </div>
+        </section>
+        {/* Billing */}
+        <section id="billing" className="scroll-mt-24 px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="mx-auto max-w-2xl text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
+                Billing
+              </p>
+              <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                Commencez gratuitement, évoluez quand vous voulez
+              </h2>
+            </div>
+
+            <div className="mt-12 grid gap-6 sm:grid-cols-2">
+              {/* Free plan */}
+              <div className="rounded-2xl border border-gold-300 bg-white p-8 shadow-md">
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-lg font-bold text-slate-900">Découverte</h3>
+                  <span className="rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-800">
+                    Actuel
+                  </span>
+                </div>
+                <p className="mt-3 text-4xl font-extrabold">
+                  0 €
+                  <span className="ml-1 text-sm font-medium text-slate-500">pour toujours</span>
                 </p>
+                <ul className="mt-6 space-y-2 text-sm text-slate-600">
+                  <li>✓ Analyse rapide de CV (score, forces, recommandations)</li>
+                  <li>✓ Sans création de compte</li>
+                  <li className="flex items-center gap-1.5">
+                    <Link
+                      href="/signup"
+                      className="font-medium text-gold-700 underline decoration-gold-300 underline-offset-2"
+                    >
+                      Créer un compte
+                    </Link>
+                    pour débloquer :
+                  </li>
+                  <li className="text-slate-500">✓ Matching offres d’emploi</li>
+                  <li className="text-slate-500">✓ Simulations d’entretien</li>
+                  <li className="text-slate-500">✓ Bibliothèque de CVs & historique</li>
+                </ul>
+                <Link
+                  href="/signup"
+                  className="mt-8 block rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 px-6 py-3 text-center text-sm font-bold text-slate-950 shadow-md transition-all hover:from-gold-500 hover:to-gold-600"
+                >
+                  Créer un compte gratuitement
+                </Link>
               </div>
 
-              {/* Feature 2 */}
-              <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-5 w-5"
-                  >
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
+              {/* Premium plan (teaser) */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-900 p-8 text-white shadow-md ring-1 ring-gold-500/40">
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-lg font-bold">Premium</h3>
+                  <span className="rounded-full bg-gold-500/20 px-2.5 py-0.5 text-xs font-semibold text-gold-300">
+                    Bientôt
+                  </span>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                  AI Mock Interviews
-                </h3>
-                <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  Practice behavioral and technical interview questions with real-time feedback on
-                  clarity, structure, and STAR methodology alignment.
+                <p className="mt-3 text-4xl font-extrabold">
+                  —
+                  <span className="ml-1 text-sm font-medium text-slate-400">à venir</span>
                 </p>
-              </div>
-
-              {/* Feature 3 */}
-              <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-5 w-5"
-                  >
-                    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-                    <polyline points="16 7 22 7 22 13" />
-                  </svg>
-                </div>
-                <h3 className="mt-4 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                  Strategic Progression
-                </h3>
-                <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                  Identify critical skill gaps and track measurable career milestones tailored to
-                  your individual promotion and salary aspirations.
+                <ul className="mt-6 space-y-2 text-sm text-slate-300">
+                  <li>✓ Analyses approfondies illimitées</li>
+                  <li>✓ Matching d’offres avancé</li>
+                  <li>✓ Entretiens illimités avec suivi</li>
+                  <li>✓ Export PDF & lettres de motivation</li>
+                </ul>
+                <p className="mt-8 rounded-lg border border-slate-700 px-6 py-3 text-center text-sm font-semibold text-slate-400">
+                  Inscrivez-vous pour être notifié
                 </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-          <div className="mx-auto max-w-4xl rounded-2xl border border-neutral-200 bg-neutral-900 p-8 text-center text-white dark:border-neutral-800 dark:bg-neutral-900 sm:p-12">
-            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Ready to take control of your career journey?
+        {/* À propos + final CTA */}
+        <section
+          id="a-propos"
+          className="scroll-mt-24 border-t border-slate-200 bg-white px-4 py-16 sm:px-6 sm:py-20 lg:px-8"
+        >
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
+              À propos
+            </p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              La carrière n’attend pas
             </h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-neutral-300">
-              Join AI Career Coach today and experience intelligent, personalized career guidance.
+            <p className="mt-4 text-base text-slate-600">
+              AI Career Coach est un coach de carrière assisté par IA : analysez votre CV,
+              confrontez-le aux offres qui vous ciblent et entraînez-vous à l’entretien —
+              tout ce qu’un bon coach ferait, disponible immédiatement, à votre rythme.
+              Votre première analyse est gratuite et éphémère : nous ne conservons rien
+              tant que vous ne créez pas de compte.
             </p>
             <div className="mt-8 flex justify-center">
               <Link
                 href="/signup"
-                className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-neutral-900 shadow-sm transition-all hover:bg-neutral-100"
+                className="rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-md transition-all hover:from-gold-500 hover:to-gold-600"
               >
-                Create Your Free Account
+                Créer votre compte gratuit
               </Link>
             </div>
           </div>
@@ -205,20 +267,23 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-neutral-200 bg-white py-8 dark:border-neutral-800 dark:bg-neutral-950">
+      <footer className="border-t border-gold-100 bg-white py-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8">
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-            &copy; {new Date().getFullYear()} AI Career Coach. All rights reserved.
+          <p className="text-xs text-slate-500">
+            &copy; {new Date().getFullYear()} AI Career Coach. Tous droits réservés.
           </p>
-          <div className="flex gap-6 text-xs text-neutral-500 dark:text-neutral-400">
-            <Link href="/login" className="hover:text-neutral-900 dark:hover:text-neutral-100">
+          <div className="flex gap-6 text-xs text-slate-500">
+            <Link href="#accueil" className="transition-colors hover:text-gold-700">
+              Accueil
+            </Link>
+            <Link href="#services" className="transition-colors hover:text-gold-700">
+              Services
+            </Link>
+            <Link href="/login" className="transition-colors hover:text-gold-700">
               Sign In
             </Link>
-            <Link href="/signup" className="hover:text-neutral-900 dark:hover:text-neutral-100">
+            <Link href="/signup" className="transition-colors hover:text-gold-700">
               Register
-            </Link>
-            <Link href="/dashboard" className="hover:text-neutral-900 dark:hover:text-neutral-100">
-              Dashboard
             </Link>
           </div>
         </div>

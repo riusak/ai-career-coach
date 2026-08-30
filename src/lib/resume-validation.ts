@@ -1,0 +1,66 @@
+/**
+ * Shared, client-safe validation rules for CV uploads.
+ * Used by both the upload UI (instant feedback) and the server
+ * action / storage helper (authoritative security check).
+ * Must stay dependency-free (no Supabase / server-only imports).
+ */
+
+export const MAX_RESUME_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+export const ALLOWED_RESUME_MIME_TYPES = ['application/pdf', 'text/plain'] as const;
+
+export type AllowedResumeMimeType = (typeof ALLOWED_RESUME_MIME_TYPES)[number];
+
+export const ALLOWED_RESUME_EXTENSIONS = ['.pdf', '.txt'] as const;
+
+export const RESUME_ACCEPT_ATTRIBUTE = ALLOWED_RESUME_EXTENSIONS.join(',');
+
+/** Minimal shape needed to validate a file. Compatible with the DOM File. */
+export interface ResumeFileLike {
+  name: string;
+  size: number;
+  type: string;
+}
+
+/**
+ * Returns an error message when the file is invalid, or null when valid.
+ */
+export function validateResumeFile(file: ResumeFileLike): string | null {
+  const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+
+  if (!ALLOWED_RESUME_EXTENSIONS.includes(extension as (typeof ALLOWED_RESUME_EXTENSIONS)[number])) {
+    return `Invalid file type "${extension || file.name}". Only PDF and TXT files are allowed.`;
+  }
+
+  const mimeAllowed = (ALLOWED_RESUME_MIME_TYPES as readonly string[]).includes(file.type);
+  // Some browsers report an empty MIME type; trust the extension in that case.
+  if (file.type !== '' && !mimeAllowed) {
+    return `Invalid file content type "${file.type}". Only PDF and TXT files are allowed.`;
+  }
+
+  if (file.size <= 0) {
+    return 'The selected file is empty.';
+  }
+
+  if (file.size > MAX_RESUME_FILE_SIZE_BYTES) {
+    return `File is too large (${formatBytes(file.size)}). Maximum size is ${formatBytes(
+      MAX_RESUME_FILE_SIZE_BYTES
+    )}.`;
+  }
+
+  return null;
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Sanitizes a filename so it is safe as a storage object key segment.
+ */
+export function sanitizeFileName(fileName: string): string {
+  const base = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return base.length > 0 ? base : 'resume';
+}

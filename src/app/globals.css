@@ -1,1 +1,51 @@
 @import 'tailwindcss';
+
+/*
+ * AI Career Coach — "Light & Gold" design system
+ * Tailwind CSS v4 CSS-first theme (no tailwind.config.js needed).
+ *
+ * Accessibility contract (WCAG 2.1 AA):
+ * - Body text: slate-900 / slate-600 on white or #FAFAFA (>= 7:1).
+ * - Small gold text: gold-700 or darker only (>= 5:1 on white).
+ * - Gold buttons: gold-400 -> gold-500 backgrounds paired with slate-950 text (>= 8:1).
+ * - Large gold gradient headings: gold-600 -> gold-800 (>= 3.4:1, AA large text).
+ * - Focus rings / borders: gold-600 (>= 3:1 against white, WCAG 1.4.11 non-text contrast).
+ */
+@theme {
+  --color-gold-50: #fbf7ee;
+  --color-gold-100: #f5ebd3;
+  --color-gold-200: #ebd8a8;
+  --color-gold-300: #dec178;
+  --color-gold-400: #d4af37;
+  --color-gold-500: #c5a059;
+  --color-gold-600: #a88543;
+  --color-gold-700: #8a6b33;
+  --color-gold-800: #6e5427;
+  --color-gold-900: #55411f;
+}
+
+@layer base {
+  ::selection {
+    background-color: var(--color-gold-200);
+    color: var(--color-slate-900);
+  }
+}
+
+@layer utilities {
+  /* Queued → completed transition of the resume analysis card. */
+  @keyframes fade-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-slide-in {
+    animation: fade-slide-in 0.4s ease-out both;
+  }
+}
+

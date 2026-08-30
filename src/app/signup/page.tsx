@@ -58,17 +58,18 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 py-12 dark:bg-neutral-950 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-xl border border-neutral-200 bg-white p-8 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
         <div>
-          <h1 className="text-center text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+          <div className="mx-auto mb-6 h-1 w-12 rounded-full bg-gradient-to-r from-gold-400 to-gold-600" />
+          <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900">
             Create your account
           </h1>
-          <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="mt-2 text-center text-sm text-slate-600">
             Already have an account?{' '}
             <Link
               href="/login"
-              className="font-medium text-neutral-900 underline hover:text-neutral-700 dark:text-neutral-100 dark:hover:text-neutral-300"
+              className="font-medium text-gold-700 underline transition-colors hover:text-gold-800"
             >
               Sign in
             </Link>
@@ -78,7 +79,7 @@ export default function SignupPage() {
         {error && (
           <div
             role="alert"
-            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/50 dark:text-red-300"
+            className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
           >
             {error}
           </div>
@@ -87,7 +88,7 @@ export default function SignupPage() {
         {successMessage && (
           <div
             role="status"
-            className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900/50 dark:bg-green-950/50 dark:text-green-300"
+            className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700"
           >
             {successMessage}
           </div>
@@ -98,7 +99,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="full-name"
-                className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+                className="block text-sm font-medium text-slate-700"
               >
                 Full Name
               </label>
@@ -110,7 +111,7 @@ export default function SignupPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-neutral-100 dark:focus:ring-neutral-100"
+                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
                 placeholder="Jane Doe"
               />
             </div>
@@ -118,7 +119,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="email-address"
-                className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+                className="block text-sm font-medium text-slate-700"
               >
                 Email address
               </label>
@@ -131,7 +132,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-neutral-100 dark:focus:ring-neutral-100"
+                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
                 placeholder="name@example.com"
               />
             </div>
@@ -139,7 +140,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+                className="block text-sm font-medium text-slate-700"
               >
                 Password
               </label>
@@ -153,7 +154,7 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-neutral-100 dark:focus:ring-neutral-100"
+                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
                 placeholder="•••••••• (min. 6 characters)"
               />
             </div>
@@ -163,7 +164,7 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full justify-center rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 dark:focus:ring-neutral-100"
+              className="flex w-full justify-center rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? 'Creating account...' : 'Create account'}
             </button>
