@@ -1,39 +1,58 @@
-import {
-  MAX_RESUME_FILE_SIZE_BYTES,
-  formatBytes,
-} from '@/lib/resume-validation';
-import {
-  PdfExtractionError,
-  countWords,
-  extractPdfText,
-} from '@/lib/quick-test/pdf-extract';
-import { analyzeResumeText } from '@/lib/quick-test/analysis';
-import {
-  analyzeWithGemini,
-  isLlmConfigured,
-} from '@/lib/quick-test/llm';
-import type { QuickTestAnalysis, QuickTestResponse } from '@/types/quick-test';
-
 /**
- * Visitor Quick Test — ephemeral LLM CV analysis (docs/product/mvp.md §2).
+ * quick-test/route.ts — Endpoint public du Visitor Quick Test.
  *
- * Accepts a multipart form with a single `file` field. Nothing is persisted:
- * the file lives only for the duration of the request and the result is
- * returned as JSON (lifecycle = the client session). Visitor mode accepts
- * PDF only, up to 5 MB, mirroring the `resumes` bucket constraints.
+ * Funnel public illimité (mvp.md §2.2) : 1 PDF envoyé → score + insights.
  *
- * The extracted text is sent to Google Gemini when GEMINI_API_KEY is set;
- * on failure (or without a key) the deterministic heuristic analyzer keeps
- * the funnel functional. Either way, nothing is stored.
+ * Pipeline de sécurité appliqué en ordre :
+ *   1) Validation upload (type/size — 5 Mo PDF, magic-bytes).
+ *   2) Extraction texte PDF.
+ *   3) 🔒 Guardrail sémantique (« est-ce vraiment un CV ? ») — rejette les
+ *      factures/payes avec un 422 exploitable côté UI.
+ *   4) Analyse LLM (Gemini 2.5-flash) → fallback heuristique transparent.
+ *   5) Tracking anonyme (quick_test_events) + rate-limiting léger (non bloquant).
+ *
+ * Conformité :
+ *   - Aucune donnée persistante côté backend (hors logs d’audit anonymes).
+ *   - L’IP est hachée HMAC-SHA256 serveur-only (jamais exposée au client).
+ *   - Toutes les étapes sont synchrones (pas de file d’attente) ; le fallback
+ *     heuristique garantit une réponse < 10 s même en cas d’indisponibilité LLM.
  */
+
+import { MAX_RESUME_FILE_SIZE_BYTES, formatBytes } from '@/lib/resume-validation';
+import { PdfExtractionError, countWords, extractPdfText, isPdfBuffer } from '@/lib/quick-test/pdf-extract';
+import { analyzeWithGemini, isLlmConfigured } from '@/lib/quick-test/llm';
+import { analyzeResumeText } from '@/lib/quick-test/analysis';
+import { validateCvDocument } from '@/lib/quick-test/guardrail';
+import { logQuickTestEvent, checkRateLimit } from '@/lib/quick-test/track';
+import type { QuickTestAnalysis, QuickTestResponse, QuickTestSource } from '@/types/quick-test';
 
 export const runtime = 'nodejs';
 
 function errorResponse(message: string, status: number): Response {
-  return Response.json({ error: message }, { status });
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function clientIp(request: Request): string {
+  const h = (request as Request & { headers: Headers }).headers;
+  const xff = h.get('x-forwarded-for');
+  const cf = h.get('cf-connecting-ip');
+  return xff?.split(',')[0]?.trim() || cf || 'unknown';
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const ip = clientIp(request);
+  const userAgent = (request as Request & { headers: Headers }).headers.get('user-agent') || undefined;
+
+  // 1) Rate limiting (non bloquant — loggué mais on laisse passer)
+  const rateOk = await checkRateLimit(ip).catch(() => true);
+  if (!rateOk) {
+    console.warn(`[quick-test] Rate limit exceeded for ip_hash=${ip.slice(0, 3)}…`);
+  }
+
+  // 2) Extraction du formulaire
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -46,31 +65,33 @@ export async function POST(request: Request): Promise<Response> {
     return errorResponse('Aucun fichier reçu. Déposez votre CV au format PDF.', 400);
   }
 
-  // Visitor mode: PDF only (mvp.md §2.2), consistent with the resumes bucket.
-  const isPdf =
-    file.type === 'application/pdf' ||
-    file.name.toLowerCase().endsWith('.pdf');
+  // 3) Validation upload (PDF + magic bytes)
+  const arrayBuf = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuf);
+
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   if (!isPdf) {
-    return errorResponse(
-      'Le test rapide accepte uniquement les fichiers PDF (5 Mo maximum).',
-      415
-    );
+    await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
+    return errorResponse('Le test rapide accepte uniquement les fichiers PDF.', 415);
   }
 
-  if (file.size <= 0) {
+  if (!isPdfBuffer(buffer)) {
+    await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
+    return errorResponse('Le fichier n’est pas un véritable PDF (signature magic bytes invalide).', 422);
+  }
+
+  if (buffer.length === 0) {
     return errorResponse('Le fichier est vide.', 400);
   }
-  if (file.size > MAX_RESUME_FILE_SIZE_BYTES) {
+
+  if (buffer.length > MAX_RESUME_FILE_SIZE_BYTES) {
     return errorResponse(
-      `Fichier trop volumineux (${formatBytes(file.size)}). Maximum : ${formatBytes(
-        MAX_RESUME_FILE_SIZE_BYTES
-      )}.`,
+      `Fichier trop volumineux (${formatBytes(buffer.length)}). Maximum : ${formatBytes(MAX_RESUME_FILE_SIZE_BYTES)}.`,
       413
     );
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-
+  // 4) Extraction texte
   let extraction;
   try {
     extraction = extractPdfText(buffer);
@@ -89,16 +110,42 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // LLM first (Gemini), deterministic heuristic as fallback. Both are pure
-  // request-lifetime computations — no database or storage writes anywhere.
+    // 5) Tracking de l'upload
+  await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
+
+  // 6) 🔒 Guardrail sémantique — « est-ce vraiment un CV ? »
+  const validation = await validateCvDocument(extraction.text);
+  if (!validation.ok) {
+    await logQuickTestEvent({
+      eventType: 'rejected_non_cv',
+      source: 'heuristic',
+      score: null,
+      ip,
+      userAgent,
+    });
+    console.warn(`[quick-test] ❌ Non-CV rejeté par le guardrail : ${validation.reason}`);
+    return errorResponse(
+      `Ce document ne semble pas être un CV (${validation.reason}). Veuillez télécharger un curriculum vitæ valide.`,
+      422
+    );
+  }
+  console.info(`[quick-test] ✅ Document validé comme CV (${validation.reason})`);
+
+  // 7) Analyse LLM (Gemini) → fallback heuristique transparent
   let analysis: QuickTestAnalysis | null = null;
-  let source: QuickTestResponse['source'] = 'heuristic';
+  let source: QuickTestSource = 'heuristic';
 
   if (isLlmConfigured()) {
     analysis = await analyzeWithGemini(extraction.text);
     if (analysis) {
       source = 'llm';
+    } else {
+      console.warn(
+        `[quick-test] ⚠ HEURISTIC FALLBACK — Gemini a échoué pour un CV valide (texte: ${extraction.text.length} chars, pages: ${extraction.pageCount})`
+      );
     }
+  } else {
+    console.warn('[quick-test] ⚠ HEURISTIC FALLBACK — GEMINI_API_KEY non configuré.');
   }
 
   if (!analysis) {
@@ -106,16 +153,23 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!analysis) {
-    return errorResponse(
-      'Le contenu extrait est trop court pour produire une analyse fiable.',
-      422
-    );
+    return errorResponse('Le contenu extrait est trop court pour produire une analyse fiable.', 422);
   }
 
+  // 8) Tracking de l'analyse (succès LLM vs fallback)
+  await logQuickTestEvent({
+    eventType: source === 'llm' ? 'analysis_success' : 'analysis_fallback',
+    source,
+    score: analysis.score ?? null,
+    ip,
+    userAgent,
+  });
+
+  // 9) Réponse — mêmes données métier + header de vérifiabilité
   const response: QuickTestResponse = {
     metadata: {
       fileName: file.name,
-      fileSizeBytes: file.size,
+      fileSizeBytes: buffer.length,
       pageCount: extraction.pageCount,
       wordCount: countWords(extraction.text),
     },
@@ -123,5 +177,14 @@ export async function POST(request: Request): Promise<Response> {
     source,
   };
 
-  return Response.json(response);
+  console.info(`[quick-test] ✅ Réponse envoyée — source=${source}, score=${analysis.score ?? 'N/A'}`);
+
+  return new Response(JSON.stringify(response), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Quick-Test-Source': source,
+      'Cache-Control': 'no-store',
+    },
+  });
 }

@@ -1,17 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import SuccessBanner from '@/components/ui/SuccessBanner';
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const verified = searchParams.get('verified') === '1';
+  const resetDone = searchParams.get('reset') === '1';
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -68,6 +72,20 @@ export default function LoginPage() {
           </div>
         )}
 
+        {verified && (
+          <SuccessBanner
+            title="Account verified successfully"
+            description="Your email is confirmed. Please sign in to continue."
+          />
+        )}
+
+        {resetDone && (
+          <SuccessBanner
+            title="Password updated"
+            description="Your new password is active. Please sign in with it."
+          />
+        )}
+
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           <div className="space-y-4 rounded-md">
             <div>
@@ -92,12 +110,20 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-slate-700"
-              >
-                Password
-              </label>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-slate-700"
+                >
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-gold-700 underline transition-colors hover:text-gold-800"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 id="password"
                 name="password"
@@ -125,5 +151,19 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold-200 border-t-gold-600" />
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

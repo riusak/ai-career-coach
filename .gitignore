@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local db backups (contain user data, never commit)
+/supabase/backups/
+
+# supabase cli local session state
+/supabase/.temp/

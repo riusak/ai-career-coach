@@ -10,7 +10,6 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -18,7 +17,6 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
-    setSuccessMessage(null);
     setLoading(true);
 
     try {
@@ -29,6 +27,9 @@ export default function SignupPage() {
           data: {
             full_name: fullName.trim() || undefined,
           },
+          // Fallback for email templates rendering {{ .ConfirmationURL }}:
+          // the user lands on /verify, where they can type the 6-digit OTP.
+          emailRedirectTo: `${window.location.origin}/verify?email=${encodeURIComponent(email)}`,
         },
       });
 
@@ -37,17 +38,17 @@ export default function SignupPage() {
         return;
       }
 
-      // If user session exists immediately (email confirmation disabled)
+      // If the session exists immediately, email confirmation is disabled in
+      // the Supabase project: the account is usable right away.
       if (data.session) {
         router.push('/dashboard');
         router.refresh();
         return;
       }
 
-      // If confirmation email was sent
-      setSuccessMessage(
-        'Account created successfully! Please check your email to confirm your registration.'
-      );
+      // Email confirmation enabled: a 6-digit OTP code was sent. Route to the
+      // dedicated verification page.
+      router.push(`/verify?email=${encodeURIComponent(email)}`);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'An unexpected error occurred during registration.';
@@ -82,15 +83,6 @@ export default function SignupPage() {
             className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
           >
             {error}
-          </div>
-        )}
-
-        {successMessage && (
-          <div
-            role="status"
-            className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700"
-          >
-            {successMessage}
           </div>
         )}
 

@@ -4,10 +4,16 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MAX_RESUME_FILE_SIZE_BYTES, formatBytes } from '@/lib/resume-validation';
 import SignupModal from '@/components/landing/SignupModal';
+import ConversionModal from '@/components/landing/ConversionModal';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingSteps from '@/components/ui/LoadingSteps';
 import SuccessBanner from '@/components/ui/SuccessBanner';
-import type { QuickTestResponse } from '@/types/quick-test';
+import type {
+  InsightItem,
+  QuickTestAnalysis,
+  QuickTestResponse,
+  ScoreBreakdownItem,
+} from '@/types/quick-test';
 
 /**
  * Visitor Quick Test funnel (docs/product/mvp.md §2): drag & drop a PDF,
@@ -101,15 +107,15 @@ function FindingList({
   tone,
 }: {
   title: string;
-  items: string[];
+  items: InsightItem[];
   tone: 'positive' | 'negative';
 }) {
   return (
     <div>
       <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-      <ul className="mt-2 space-y-1.5">
+      <ul className="mt-2.5 space-y-3">
         {items.map((item) => (
-          <li key={item} className="flex gap-2 text-sm text-slate-600">
+          <li key={item.title} className="flex gap-2 text-sm">
             <span
               aria-hidden="true"
               className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
@@ -120,10 +126,83 @@ function FindingList({
             >
               {tone === 'positive' ? '✓' : '✕'}
             </span>
-            {item}
+            <div className="min-w-0">
+              <p className="font-medium text-slate-900">{item.title}</p>
+              {item.detail && <p className="mt-0.5 text-slate-600">{item.detail}</p>}
+            </div>
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Per-dimension score bars with the recruiter justification underneath. */
+function ScoreBreakdownPanel({ items }: { items: ScoreBreakdownItem[] }) {
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-slate-900">
+        Détail du score par dimension
+      </h4>
+      <ul className="mt-3 space-y-3.5">
+        {items.map((item) => (
+          <li key={item.category}>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm font-medium text-slate-900">{item.category}</p>
+              <p className="shrink-0 text-sm font-bold text-gold-800">{item.score}/100</p>
+            </div>
+            <div
+              role="progressbar"
+              aria-valuenow={item.score}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Score ${item.category}`}
+              className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+            >
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                  item.score >= 70
+                    ? 'bg-emerald-500'
+                    : item.score >= 45
+                      ? 'bg-gold-500'
+                      : 'bg-red-400'
+                }`}
+                style={{ width: `${item.score}%` }}
+              />
+            </div>
+            {item.comment && <p className="mt-1 text-xs text-slate-500">{item.comment}</p>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Targeted expert advice cards (formatting, action verbs, quantified impact). */
+function ExpertAdvice({ analysis }: { analysis: QuickTestAnalysis }) {
+  const cards = [
+    { title: 'Mise en page & format', body: analysis.formattingAdvice },
+    { title: 'Verbes d’action', body: analysis.actionVerbsAdvice },
+    { title: 'Impact chiffré', body: analysis.impactMetricsAdvice },
+  ].filter((card) => card.body.length > 0);
+
+  if (cards.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6">
+      <h4 className="text-sm font-semibold text-slate-900">Conseils d’expert ciblés</h4>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        {cards.map((card) => (
+          <div key={card.title} className="rounded-lg border border-slate-200 bg-slate-50 p-3.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
+              {card.title}
+            </p>
+            <p className="mt-1.5 text-sm text-slate-600">{card.body}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -178,7 +257,8 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [result, setResult] = useState<QuickTestResponse | null>(null);
+    const [result, setResult] = useState<QuickTestResponse | null>(null);
+  const [showConversionModal, setShowConversionModal] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
@@ -201,7 +281,17 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
     };
   }, [step]);
 
-  const clearSelection = useCallback(() => {
+  // Conversion modal: déclenche 1s après l'affichage du résultat pour un
+  // visiteur non authentifié, pour laisser lire son score en premier.
+  useEffect(() => {
+    if (step === 'result' && result && !isAuthenticated) {
+      const timer = setTimeout(() => setShowConversionModal(true), 1000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [step, result, isAuthenticated]);
+
+const clearSelection = useCallback(() => {
     setSelectedFile(null);
     setClientError(null);
     if (inputRef.current) {
@@ -526,6 +616,11 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
             </div>
           </div>
 
+          {/* Score breakdown by dimension */}
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+            <ScoreBreakdownPanel items={result.analysis.scoreBreakdown} />
+          </div>
+
           {/* Findings */}
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
             <FindingList
@@ -545,13 +640,29 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
               <h4 className="text-sm font-semibold text-gold-900">
                 Recommandations prioritaires
               </h4>
-              <ul className="mt-2 list-inside list-decimal space-y-1 text-sm text-slate-700">
-                {result.analysis.recommendations.map((recommendation) => (
-                  <li key={recommendation}>{recommendation}</li>
+              <ol className="mt-3 space-y-3">
+                {result.analysis.recommendations.map((recommendation, index) => (
+                  <li key={recommendation.title} className="flex gap-3 text-sm">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gold-500 text-[10px] font-bold text-slate-950"
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">{recommendation.title}</p>
+                      {recommendation.detail && (
+                        <p className="mt-0.5 text-slate-600">{recommendation.detail}</p>
+                      )}
+                    </div>
+                  </li>
                 ))}
-              </ul>
+              </ol>
             </div>
           )}
+
+          {/* Targeted expert advice */}
+          <ExpertAdvice analysis={result.analysis} />
 
           {/* Gated features — conversion overlay */}
           <div className="mt-8">
@@ -602,6 +713,10 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
       )}
 
       <SignupModal open={isModalOpen} onClose={() => setIsModalOpen(false)} />
+<ConversionModal
+  isOpen={showConversionModal}
+  onClose={() => setShowConversionModal(false)}
+/>
 
       <input
         ref={inputRef}

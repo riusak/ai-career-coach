@@ -5,38 +5,70 @@ import {
   extractGeminiText,
 } from '@/lib/quick-test/llm';
 
+const validPayload = {
+  score: 78.4,
+  score_breakdown: [
+    { category: 'Structure & lisibilité', score: 88, comment: 'Sections claires.' },
+    { category: 'Impact chiffré', score: 70.9, comment: 'Plusieurs résultats chiffrés.' },
+  ],
+  strengths: [
+    { title: 'Bon impact chiffré', detail: 'Ventes augmentées de 35 %.' },
+    { title: 'Structure claire', detail: 'Sections standard présentes.' },
+  ],
+  weaknesses: [{ title: 'Trop long', detail: 'Plus de 900 mots.' }],
+  recommendations: [
+    { title: 'Condensez sur une page', detail: 'Supprimez les expériences anciennes.' },
+  ],
+  formatting_advice: 'Passez sur une page pour accélérer la lecture.',
+  action_verbs_advice: 'Ajoutez des verbes d’action en tête de puce.',
+  impact_metrics_advice: 'Chiffrez chaque puce (%, montants, volumes).',
+};
+
 describe('buildAnalysisPrompt', () => {
-  it('embeds the CV text and the JSON structure instructions', () => {
+  it('embeds the CV text and the deep JSON structure instructions', () => {
     const prompt = buildAnalysisPrompt('Jean Dupont, développeur.');
     expect(prompt).toContain('Jean Dupont, développeur.');
-    expect(prompt).toContain('"score"');
+    expect(prompt).toContain('"score_breakdown"');
+    expect(prompt).toContain('"formatting_advice"');
     expect(prompt).toContain('JSON');
+  });
+
+  it('demands recruiter-grade depth (5 dimensions, evidence-backed insights)', () => {
+    const prompt = buildAnalysisPrompt('CV text');
+    expect(prompt).toContain('Structure & lisibilité');
+    expect(prompt).toContain('Mots-clés & ATS');
+    expect(prompt).toContain('action_verbs_advice');
+    expect(prompt).toContain('impact_metrics_advice');
   });
 
   it('truncates very long CV texts', () => {
     const prompt = buildAnalysisPrompt('x'.repeat(20_000));
     expect(prompt).toContain('[Texte tronqué]');
-    expect(prompt.length).toBeLessThan(16_000);
+    expect(prompt.length).toBeLessThan(18_000);
   });
 });
 
 describe('coerceLlmAnalysis', () => {
-  const validPayload = {
-    score: 78.4,
-    strengths: ['Bon impact chiffré', 'Structure claire'],
-    weaknesses: ['Trop long'],
-    recommendations: ['Condensez sur une page'],
-  };
-
-  it('accepts a valid payload and clamps/rounds the score', () => {
+  it('accepts a valid deep payload and clamps/rounds the score', () => {
     const analysis = coerceLlmAnalysis(validPayload);
     expect(analysis).not.toBeNull();
     expect(analysis!.score).toBe(78);
+    expect(analysis!.scoreBreakdown).toHaveLength(2);
+    expect(analysis!.scoreBreakdown[0]!.category).toBe('Structure & lisibilité');
     expect(analysis!.strengths).toHaveLength(2);
+    expect(analysis!.strengths[0]!.title).toBe('Bon impact chiffré');
+    expect(analysis!.formattingAdvice).toContain('une page');
+    expect(analysis!.impactMetricsAdvice).toContain('Chiffrez');
   });
 
-  it('clamps out-of-range scores', () => {
-    expect(coerceLlmAnalysis({ ...validPayload, score: 250 })!.score).toBe(100);
+  it('clamps out-of-range scores (global and per-dimension)', () => {
+    const analysis = coerceLlmAnalysis({
+      ...validPayload,
+      score: 250,
+      score_breakdown: [{ category: 'X', score: -12, comment: '' }],
+    });
+    expect(analysis!.score).toBe(100);
+    expect(analysis!.scoreBreakdown[0]!.score).toBe(0);
     expect(coerceLlmAnalysis({ ...validPayload, score: -5 })!.score).toBe(0);
   });
 
@@ -44,22 +76,44 @@ describe('coerceLlmAnalysis', () => {
     expect(coerceLlmAnalysis({ ...validPayload, score: '64' })!.score).toBe(64);
   });
 
-  it('truncates lists to the display limits (3/3/2)', () => {
+  it('truncates lists to the display limits (4 insights, 8 breakdown items, 5 recs)', () => {
+    const insight = { title: 't', detail: 'd' };
     const analysis = coerceLlmAnalysis({
       ...validPayload,
-      strengths: ['a', 'b', 'c', 'd', 'e'],
-      recommendations: ['r1', 'r2', 'r3'],
+      score_breakdown: Array.from({ length: 12 }, (_, i) => ({
+        category: `D${i}`,
+        score: 50,
+        comment: '',
+      })),
+      strengths: Array.from({ length: 7 }, () => insight),
+      weaknesses: Array.from({ length: 7 }, () => insight),
+      recommendations: Array.from({ length: 9 }, () => insight),
     });
-    expect(analysis!.strengths).toHaveLength(3);
-    expect(analysis!.recommendations).toHaveLength(2);
+    expect(analysis!.scoreBreakdown).toHaveLength(8);
+    expect(analysis!.strengths).toHaveLength(4);
+    expect(analysis!.weaknesses).toHaveLength(4);
+    expect(analysis!.recommendations).toHaveLength(5);
   });
 
-  it('drops empty/non-string list entries', () => {
+  it('tolerates plain-string insights and drops empty/non-string entries', () => {
     const analysis = coerceLlmAnalysis({
       ...validPayload,
-      strengths: ['ok', '   ', 42, null],
+      strengths: ['Puce concise', '   ', 42, null, { title: '', detail: 'Détail seul' }],
     });
-    expect(analysis!.strengths).toEqual(['ok']);
+    expect(analysis!.strengths).toHaveLength(2);
+    expect(analysis!.strengths[0]!.title).toBe('Puce concise');
+    expect(analysis!.strengths[1]!.detail).toBe('Détail seul');
+  });
+
+  it('defaults missing advice fields to empty strings (UI hides them)', () => {
+    const analysis = coerceLlmAnalysis({
+      ...validPayload,
+      formatting_advice: undefined,
+      action_verbs_advice: 123,
+    });
+    expect(analysis!.formattingAdvice).toBe('');
+    expect(analysis!.actionVerbsAdvice).toBe('');
+    expect(analysis!.impactMetricsAdvice).toContain('Chiffrez');
   });
 
   it('returns null for malformed payloads', () => {
@@ -71,6 +125,35 @@ describe('coerceLlmAnalysis', () => {
     expect(
       coerceLlmAnalysis({ ...validPayload, recommendations: [] })
     ).toBeNull();
+    expect(coerceLlmAnalysis({ ...validPayload, score_breakdown: [] })).toBeNull();
+    expect(
+      coerceLlmAnalysis({
+        ...validPayload,
+        score_breakdown: [{ category: '', score: 50, comment: '' }],
+      })
+    ).toBeNull();
+  });
+});
+
+describe('extractGeminiText', () => {
+  it('joins the text parts of the first candidate', () => {
+    const body = {
+      candidates: [
+        {
+          content: {
+            parts: [{ text: '{"score": 80}' }, { text: ' suffix' }],
+          },
+        },
+      ],
+    };
+    expect(extractGeminiText(body)).toBe('{"score": 80} suffix');
+  });
+
+  it('returns null for unexpected response shapes', () => {
+    expect(extractGeminiText(null)).toBeNull();
+    expect(extractGeminiText({})).toBeNull();
+    expect(extractGeminiText({ candidates: [] })).toBeNull();
+    expect(extractGeminiText({ candidates: [{ content: {} }] })).toBeNull();
   });
 });
 

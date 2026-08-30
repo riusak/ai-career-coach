@@ -44,8 +44,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isProtectedPath = pathname.startsWith('/dashboard') || pathname.startsWith('/profile');
-  const isAuthPath = pathname.startsWith('/login') || pathname.startsWith('/signup');
+  const isProtectedPath = pathname.startsWith('/dashboard');
+  const isAuthPath =
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/verify' ||
+    pathname === '/forgot-password';
+
+  // NOTE: /reset-password is intentionally NOT an auth path — visitors reach
+  // it from the recovery email carrying a recovery session that must be able
+  // to set a new password before being bounced anywhere.
 
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone();

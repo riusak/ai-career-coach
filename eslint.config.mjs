@@ -7,13 +7,15 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettierConfig,
-  // Override default ignores of eslint-config-next.
+    // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
     '.next/**',
     'out/**',
     'build/**',
     'next-env.d.ts',
+    // Scripts utilitaires (test SMTP, etc.) — pas du code source applicatif
+    'scripts/**',
   ]),
 ]);
 
