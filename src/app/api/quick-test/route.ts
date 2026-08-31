@@ -27,6 +27,7 @@ import { logQuickTestEvent, checkRateLimit } from '@/lib/quick-test/track';
 import type { QuickTestAnalysis, QuickTestResponse, QuickTestSource } from '@/types/quick-test';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 function errorResponse(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
@@ -43,6 +44,7 @@ function clientIp(request: Request): string {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  console.time('[quick-test] Total request');
   const ip = clientIp(request);
   const userAgent = (request as Request & { headers: Headers }).headers.get('user-agent') || undefined;
 
@@ -93,9 +95,12 @@ export async function POST(request: Request): Promise<Response> {
 
   // 4) Extraction texte
   let extraction;
+  console.time('[quick-test] PDF extraction');
   try {
     extraction = extractPdfText(buffer);
+    console.timeEnd('[quick-test] PDF extraction');
   } catch (error) {
+    console.timeEnd('[quick-test] PDF extraction');
     const message =
       error instanceof PdfExtractionError
         ? error.message
@@ -114,7 +119,9 @@ export async function POST(request: Request): Promise<Response> {
   await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
 
   // 6) 🔒 Guardrail sémantique — « est-ce vraiment un CV ? »
+  console.time('[quick-test] Guardrail validation');
   const validation = await validateCvDocument(extraction.text);
+  console.timeEnd('[quick-test] Guardrail validation');
   if (!validation.ok) {
     await logQuickTestEvent({
       eventType: 'rejected_non_cv',
@@ -136,7 +143,9 @@ export async function POST(request: Request): Promise<Response> {
   let source: QuickTestSource = 'heuristic';
 
   if (isLlmConfigured()) {
+    console.time('[quick-test] LLM analysis');
     analysis = await analyzeWithGemini(extraction.text);
+    console.timeEnd('[quick-test] LLM analysis');
     if (analysis) {
       source = 'llm';
     } else {
@@ -178,6 +187,7 @@ export async function POST(request: Request): Promise<Response> {
   };
 
   console.info(`[quick-test] ✅ Réponse envoyée — source=${source}, score=${analysis.score ?? 'N/A'}`);
+  console.timeEnd('[quick-test] Total request');
 
   return new Response(JSON.stringify(response), {
     status: 200,

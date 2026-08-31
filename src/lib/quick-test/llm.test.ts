@@ -35,15 +35,15 @@ describe('buildAnalysisPrompt', () => {
 
   it('demands recruiter-grade depth (5 dimensions, evidence-backed insights)', () => {
     const prompt = buildAnalysisPrompt('CV text');
-    expect(prompt).toContain('Structure & lisibilité');
-    expect(prompt).toContain('Mots-clés & ATS');
+    expect(prompt).toContain('Structure');
+    expect(prompt).toContain('Mots-clés ATS');
     expect(prompt).toContain('action_verbs_advice');
     expect(prompt).toContain('impact_metrics_advice');
   });
 
   it('truncates very long CV texts', () => {
     const prompt = buildAnalysisPrompt('x'.repeat(20_000));
-    expect(prompt).toContain('[Texte tronqué]');
+    expect(prompt).toContain('[tronqué]');
     expect(prompt.length).toBeLessThan(18_000);
   });
 });

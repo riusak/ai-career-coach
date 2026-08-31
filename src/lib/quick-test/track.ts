@@ -34,7 +34,7 @@ export async function logQuickTestEvent(params: {
   userAgent?: string | null;
 }): Promise<void> {
   try {
-        const supabase = await createClient();
+    const supabase = await createClient();
 
     await supabase.from('quick_test_events').insert({
       event_type: params.eventType,
@@ -55,7 +55,7 @@ export async function logQuickTestEvent(params: {
  */
 export async function checkRateLimit(ip: string): Promise<boolean> {
   try {
-        const supabase = await createClient();
+    const supabase = await createClient();
     const ipHash = hashIp(ip);
     const limit = parseInt(process.env.QUICK_TEST_RATE_LIMIT || '30', 10);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

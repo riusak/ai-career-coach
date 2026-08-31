@@ -1,4 +1,4 @@
-import type { InsightItem, QuickTestAnalysis, ScoreBreakdownItem } from '@/types/quick-test';
+﻿import type { InsightItem, QuickTestAnalysis, ScoreBreakdownItem } from '@/types/quick-test';
 
 /**
  * Google Gemini (Flash) client for the visitor Quick Test — DEEP analysis.
@@ -18,8 +18,12 @@ const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/mo
 // gemini-3.6-flash (or override with GEMINI_MODEL). `gemini-flash-latest`
 // also tracks the newest stable Flash model.
 const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
-const MAX_LLM_TEXT_CHARS = 15_000;
-const LLM_TIMEOUT_MS = 30_000;
+const MAX_LLM_TEXT_CHARS = 12_000;
+// Timeout for the main analysis call — kept short so the heuristic fallback
+// kicks in well before the Vercel function timeout (maxDuration).
+const LLM_TIMEOUT_MS = 12_000;
+// Shorter timeout for the guardrail validation call (fast-path).
+export const GUARDRAIL_TIMEOUT_MS = 5_000;
 
 export type AnalysisSource = 'llm' | 'heuristic';
 
@@ -37,8 +41,10 @@ function getGeminiModel(): string {
  * decide how to fall back. Logs every phase synchronously like analyzeWithGemini.
  */
 export async function callGeminiJson<T>(
-  prompt: string
+  prompt: string,
+  options: { timeoutMs?: number; temperature?: number } = {}
 ): Promise<T | null> {
+  const { timeoutMs = LLM_TIMEOUT_MS, temperature = 0.1 } = options;
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn('[quick-test] GEMINI_API_KEY not configured — skipping Gemini call.');
@@ -47,7 +53,8 @@ export async function callGeminiJson<T>(
 
   const model = getGeminiModel();
   const startedAt = Date.now();
-  console.info(`[quick-test] Gemini (generic) START model=${model} promptChars=${prompt.length}`);
+  console.time(`[quick-test] Gemini (generic) model=${model}`);
+  console.info(`[quick-test] Gemini (generic) START model=${model} promptChars=${prompt.length} timeoutMs=${timeoutMs}`);
 
   try {
     const response = await fetch(
@@ -61,11 +68,11 @@ export async function callGeminiJson<T>(
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.1,
+            temperature,
             responseMimeType: 'application/json',
           },
         }),
-        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       }
     );
 
@@ -73,6 +80,7 @@ export async function callGeminiJson<T>(
 
     if (!response.ok) {
       console.error(`[quick-test] Gemini (generic) FAILED after ${elapsedMs}ms — HTTP ${response.status} ${response.statusText}.`);
+      console.timeEnd(`[quick-test] Gemini (generic) model=${model}`);
       return null;
     }
 
@@ -80,6 +88,7 @@ export async function callGeminiJson<T>(
     const generatedText = extractGeminiText(body);
     if (!generatedText || generatedText.trim().length === 0) {
       console.error(`[quick-test] Gemini (generic) FAILED after ${elapsedMs}ms — no generated content.`);
+      console.timeEnd(`[quick-test] Gemini (generic) model=${model}`);
       return null;
     }
 
@@ -88,14 +97,17 @@ export async function callGeminiJson<T>(
       parsed = JSON.parse(generatedText);
     } catch {
       console.error(`[quick-test] Gemini (generic) FAILED after ${elapsedMs}ms — invalid JSON (${generatedText.length} chars).`);
+      console.timeEnd(`[quick-test] Gemini (generic) model=${model}`);
       return null;
     }
 
     console.info(`[quick-test] Gemini (generic) SUCCESS in ${elapsedMs}ms`);
+    console.timeEnd(`[quick-test] Gemini (generic) model=${model}`);
     return parsed as T;
   } catch (error) {
     const elapsedMs = Date.now() - startedAt;
     console.error(`[quick-test] Gemini (generic) FAILED after ${elapsedMs}ms — network/timeout error:`, error);
+    console.timeEnd(`[quick-test] Gemini (generic) model=${model}`);
     return null;
   }
 }
@@ -104,42 +116,27 @@ export async function callGeminiJson<T>(
 export function buildAnalysisPrompt(cvText: string): string {
   const truncated =
     cvText.length > MAX_LLM_TEXT_CHARS
-      ? `${cvText.slice(0, MAX_LLM_TEXT_CHARS)}\n[Texte tronqué]`
+      ? `${cvText.slice(0, MAX_LLM_TEXT_CHARS)}\n[tronqué]`
       : cvText;
 
-  return [
-    'Tu es un coach de carrière senior et recruteur expert (10+ ans en cabinet de recrutement).',
-    'Réalise une analyse professionnelle COMPLÈTE et DÉTAILLÉE du CV ci-dessous,',
-    'identique à celle d’un audit payant. Renvoie UNIQUEMENT un objet JSON valide, sans texte autour,',
-    'avec exactement cette structure :',
-    '{',
-    '  "score": <nombre 0-100, note globale du CV>,',
-    '  "score_breakdown": [',
-    '    {"category": "<dimension>", "score": <0-100>, "comment": "<justification d’une phrase>"}',
-    '  ],',
-    '  "strengths": [{"title": "<point fort>", "detail": "<explication précise, preuve tirée du CV>"}],',
-    '  "weaknesses": [{"title": "<point faible>", "detail": "<explication précise, impact recruteur>"}],',
-    '  "recommendations": [{"title": "<action prioritaire>", "detail": "<comment faire, concrètement>"}],',
-    '  "formatting_advice": "<conseil contextuel sur la mise en page, la longueur et la lisibilité>",',
-    '  "action_verbs_advice": "<conseil contextuel sur les verbes d’action et les formulations>",',
-    '  "impact_metrics_advice": "<conseil contextuel sur le chiffrage des résultats et la preuve d’impact>"',
-    '}',
-    '',
-    'Exigences de qualité :',
-    '- score_breakdown : évalue au minimum ces 5 dimensions sur 100 avec une justification chacune :',
-    '  "Structure & lisibilité", "Impact chiffré", "Clarté des missions", "Adéquation au poste visé", "Mots-clés & ATS".',
-    '- strengths : 2 à 4 points forts, chacun ancré dans une preuve précise du texte.',
-    '- weaknesses : 2 à 4 points faibles concrets, formulés comme un recruteur les verrait.',
-    '- recommendations : 2 à 4 actions concrètes et priorisées, adaptées AU CONTENU de ce CV',
-    '  (pas de conseil générique), avec le « comment » opérationnel.',
-    '- Les 3 conseils ciblés doivent citer des éléments réels du CV et proposer une reformulation exemple.',
-    '- Texte entièrement en français ; ton professionnel et direct.',
-    '- Base-toi uniquement sur le texte fourni, sans inventer d’expérience.',
-    '',
-    '=== CV ===',
-    truncated,
-    '=== FIN DU CV ===',
-  ].join('\n');
+  return `Tu es un recruteur expert. Analyse ce CV et renvoie UNIQUEMENT un JSON valide (sans texte autour) avec cette structure exacte :
+{
+  "score": <0-100>,
+  "score_breakdown": [
+    {"category": "<dimension>", "score": <0-100>, "comment": "<justification>"}
+  ],
+  "strengths": [{"title": "<titre>", "detail": "<preuve du CV>"}],
+  "weaknesses": [{"title": "<titre>", "detail": "<impact recruteur>"}],
+  "recommendations": [{"title": "<action>", "detail": "<comment faire>"}],
+  "formatting_advice": "<conseil mise en page>",
+  "action_verbs_advice": "<conseil verbes d'action>",
+  "impact_metrics_advice": "<conseil chiffrage>"
+}
+
+Règles : 5 dimensions minimum (Structure, Impact chiffré, Clarté missions, Adéquation poste, Mots-clés ATS) ; 2-4 éléments par liste ; conseils concrets et spécifiques au CV ; français ; pas d'invention.
+
+CV :
+${truncated}`;
 }
 
 const GEMINI_RESPONSE_SCHEMA = {
@@ -361,6 +358,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
 
   const model = getGeminiModel();
   const startedAt = Date.now();
+  console.time(`[quick-test] Gemini (analysis) model=${model}`);
   console.info(
     `[quick-test] Gemini START model=${model} chars=${cvText.length} timeoutMs=${LLM_TIMEOUT_MS}`
   );
@@ -377,7 +375,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: buildAnalysisPrompt(cvText) }] }],
           generationConfig: {
-            temperature: 0.4,
+            temperature: 0.1,
             responseMimeType: 'application/json',
             responseSchema: GEMINI_RESPONSE_SCHEMA,
           },
@@ -392,6 +390,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
       console.error(
         `[quick-test] Gemini FAILED after ${elapsedMs}ms — HTTP ${response.status} ${response.statusText}. Falling back to heuristic.`
       );
+      console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
       return null;
     }
 
@@ -401,6 +400,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
       console.error(
         `[quick-test] Gemini FAILED after ${elapsedMs}ms — response contained no generated content. Falling back to heuristic.`
       );
+      console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
       return null;
     }
 
@@ -411,6 +411,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
       console.error(
         `[quick-test] Gemini FAILED after ${elapsedMs}ms — generated text is not valid JSON (${generatedText.length} chars). Falling back to heuristic.`
       );
+      console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
       return null;
     }
 
@@ -419,6 +420,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
       console.error(
         `[quick-test] Gemini FAILED after ${elapsedMs}ms — payload failed schema coercion (missing/broken required fields). Falling back to heuristic.`
       );
+      console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
       return null;
     }
 
@@ -427,6 +429,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
         `breakdown=${analysis.scoreBreakdown.length}, strengths=${analysis.strengths.length}, ` +
         `weaknesses=${analysis.weaknesses.length}, recommendations=${analysis.recommendations.length} (source=llm)`
     );
+    console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
     return analysis;
   } catch (error) {
     const elapsedMs = Date.now() - startedAt;
@@ -435,6 +438,7 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
       error,
       'Falling back to heuristic.'
     );
+    console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
     return null;
   }
 }

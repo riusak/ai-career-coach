@@ -1,21 +1,16 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { getSupabaseEnv } from '@/utils/supabase/url';
 
 /**
  * Browser-side Supabase client. Environment variables are inlined by Next.js
  * at build time (NEXT_PUBLIC_*), so a missing value means they were absent
  * when the app was built — fail loudly instead of silently hitting a bogus
- * endpoint (see #debug).
+ * endpoint (see #debug). The project URL is normalized (service sub-paths and
+ * trailing slashes stripped) so a misconfigured NEXT_PUBLIC_SUPABASE_URL can
+ * never produce PostgREST "Invalid path specified in request URL" errors.
  */
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    throw new Error(
-      'Supabase is not configured: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY ' +
-        'must be set in .env.local before starting the app.'
-    );
-  }
+  const { url, anonKey } = getSupabaseEnv();
 
   return createBrowserClient(url, anonKey);
 }

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import ErrorState from '@/components/ui/ErrorState';
 import SuccessBanner from '@/components/ui/SuccessBanner';
+import { classifyAuthError } from '@/lib/supabase/auth-errors';
 
 /**
  * Email verification page — the visitor types the 6-digit OTP code sent by
@@ -197,7 +198,8 @@ function VerifyOtpForm() {
         email,
       });
       if (resendError) {
-        setError(mapOtpError(resendError.message));
+        const info = classifyAuthError(resendError.message);
+        setError(info.kind === 'generic' ? mapOtpError(resendError.message) : info.message);
         return;
       }
       setInfo('A new 6-digit code has been sent to your inbox.');
@@ -248,6 +250,10 @@ function VerifyOtpForm() {
             We sent a 6-digit code to{' '}
             <strong className="font-semibold text-slate-900">{email}</strong>. Enter it below to
             activate your account.
+          </p>
+          <p className="mt-1 text-center text-xs text-slate-500">
+            No code in the email? Click the confirmation link instead — your account gets
+            confirmed automatically.
           </p>
         </div>
 

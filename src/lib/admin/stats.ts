@@ -1,0 +1,101 @@
+import { createClient } from '@/utils/supabase/server';
+import { computePercent } from '@/lib/admin/utils';
+import { listAuditLogs } from '@/lib/admin/audit';
+import {
+  QUICK_TEST_EVENT_TYPES,
+  type AdminStats,
+  type AuditLogRow,
+  type QuickTestEventRow,
+  type QuickTestEventType,
+} from '@/types/admin';
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Aggregates the KPIs rendered by the /admin overview dashboard.
+ *
+ * All reads go through the caller's own session + RLS (the admin SELECT
+ * policies of migrations 005/006), so a misused call from a non-admin context
+ * simply returns nothing useful instead of leaking data.
+ */
+export async function getAdminStats(): Promise<AdminStats | null> {
+  try {
+    const supabase = await createClient();
+    const since30d = new Date(Date.now() - THIRTY_DAYS_MS).toISOString();
+
+    // 1. Counters — profiles (registered accounts) & quick_test_events.
+    const [totalUsersRes, users30dRes, totalEventsRes, events30dRes, ...typeRes] =
+      await Promise.all([
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .gte('created_at', since30d),
+        supabase.from('quick_test_events').select('id', { count: 'exact', head: true }),
+        supabase
+          .from('quick_test_events')
+          .select('id', { count: 'exact', head: true })
+          .gte('created_at', since30d),
+        ...QUICK_TEST_EVENT_TYPES.map((eventType) =>
+          supabase
+            .from('quick_test_events')
+            .select('id', { count: 'exact', head: true })
+            .eq('event_type', eventType)
+        ),
+      ]);
+
+    if (
+      totalUsersRes.error ||
+      users30dRes.error ||
+      totalEventsRes.error ||
+      events30dRes.error ||
+      typeRes.some((result) => result.error)
+    ) {
+      console.error('[admin] getAdminStats() count query failed.');
+      return null;
+    }
+
+    // 2. Recent Quick Test activity feed (anonymous funnel events).
+    const recentEventsRes = await supabase
+      .from('quick_test_events')
+      .select('id, event_type, source, score, ip_hash, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (recentEventsRes.error) {
+      return null;
+    }
+
+    const eventsByTypeEntries = QUICK_TEST_EVENT_TYPES.map((eventType, index) => [
+      eventType as QuickTestEventType,
+      typeRes[index]?.count ?? 0,
+    ]);
+    const eventsByType = Object.fromEntries(
+      eventsByTypeEntries
+    ) as Record<QuickTestEventType, number>;
+
+    const analysesCompleted =
+      eventsByType['analysis_success'] + eventsByType['analysis_fallback'];
+    const users30d = users30dRes.count ?? 0;
+    const events30d = events30dRes.count ?? 0;
+
+    // 3. Recent audit trail entries (join + names handled by the audit lib).
+    const recentLogs = await listAuditLogs({ page: 1, pageSize: 10 });
+
+    return {
+      totalUsers: totalUsersRes.count ?? 0,
+      users30d,
+      totalEvents: totalEventsRes.count ?? 0,
+      events30d,
+      eventsByType,
+      analysesCompleted,
+      conversionRate: computePercent(eventsByType.conversion_cta, analysesCompleted),
+      signupRate30d: computePercent(users30d, events30d),
+      recentEvents: (recentEventsRes.data ?? []) as QuickTestEventRow[],
+      recentAuditLogs: recentLogs.logs as AuditLogRow[],
+    };
+  } catch (err) {
+    console.error('[admin] getAdminStats() failed:', (err as Error)?.message);
+    return null;
+  }
+}

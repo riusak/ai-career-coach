@@ -1,6 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import SignOutButton from '@/components/ui/SignOutButton';
 import { getCurrentUserProfile } from '@/lib/supabase/profiles';
-import { signOutAction } from './actions';
 
 /** Builds up-to-two-letter initials from the user's full name. */
 function getInitials(fullName: string | null): string {
@@ -24,6 +25,15 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }>) {
   const { data: profile, error: profileError } = await getCurrentUserProfile();
+
+  // The admin console is a fully separate journey: administrators never see
+  // the standard user dashboard. Non-admins keep the regular experience, and
+  // /admin itself enforces a strict role check with a 403 for non-admins
+  // (see src/app/admin/layout.tsx and src/lib/admin/guard.ts).
+  if (!profileError && profile?.role === 'admin') {
+    redirect('/admin');
+  }
+
   const displayName = profileError ? 'Account' : (profile?.full_name ?? 'Account');
 
   return (
@@ -80,14 +90,7 @@ export default async function DashboardLayout({
                 {displayName}
               </span>
             </div>
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800"
-              >
-                Sign out
-              </button>
-            </form>
+            <SignOutButton className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800 disabled:cursor-not-allowed disabled:opacity-50" />
           </div>
         </div>
       </header>

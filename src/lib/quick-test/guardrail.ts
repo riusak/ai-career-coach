@@ -13,7 +13,7 @@
  * ici que dans un éventuel futur contrôle de douceur côté serveur.
  */
 
-import { callGeminiJson } from './llm';
+import { callGeminiJson, GUARDRAIL_TIMEOUT_MS } from './llm';
 
 interface QuickTestValidation {
   ok: boolean;
@@ -70,6 +70,7 @@ export async function validateCvDocument(text: string): Promise<QuickTestValidat
   }
 
   // Validation fine via Gemini — on force la sortie JSON stricte.
+  console.time('[quick-test] Guardrail Gemini call');
   const prompt = `
 Tu es un expert en recrutement. Analyse ce texte et réponds STRICTEMENT par du JSON valide
 (sans aucun texte autour) au format:
@@ -80,7 +81,10 @@ document administratif/financier (facture, paie, devis, reçu…) ?
 Texte (tronqué à 3000 caractères) :
 """${trimmed.slice(0, 3000)}"""
 `;
-    const res = await callGeminiJson<{ is_cv: boolean; confidence: number; reason: string }>(prompt);
+    const res = await callGeminiJson<{ is_cv: boolean; confidence: number; reason: string }>(prompt, {
+      timeoutMs: GUARDRAIL_TIMEOUT_MS,
+    });
+    console.timeEnd('[quick-test] Guardrail Gemini call');
 
   if (res && typeof res.is_cv === 'boolean') {
     return { ok: res.is_cv, reason: res.reason || (res.is_cv ? 'validation Gemini ok' : 'rejeté par Gemini') };

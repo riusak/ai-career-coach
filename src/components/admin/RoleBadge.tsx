@@ -1,0 +1,22 @@
+import type { UserRole } from '@/types/admin';
+
+interface RoleBadgeProps {
+  role: UserRole;
+  size?: 'sm' | 'default';
+}
+
+/**
+ * Badge indicating a user's authorization role, in "Light & Gold".
+ * Admin → gold, regular user → slate.
+ */
+export default function RoleBadge({ role, size = 'default' }: RoleBadgeProps) {
+  const isAdmin = role === 'admin';
+  const base =
+    'inline-flex items-center rounded-full font-semibold ring-1 capitalize';
+  const sizeClass = size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-0.5 text-xs';
+  const style = isAdmin
+    ? `${base} ${sizeClass} bg-gold-100 text-gold-800 ring-gold-200`
+    : `${base} ${sizeClass} bg-slate-100 text-slate-700 ring-slate-200`;
+
+  return <span className={style}>{role}</span>;
+}

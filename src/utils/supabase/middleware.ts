@@ -1,17 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-
-function getSupabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    throw new Error(
-      'Supabase is not configured: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY ' +
-        'must be set in .env.local.'
-    );
-  }
-  return { url, anonKey };
-}
+import { getSupabaseEnv } from '@/utils/supabase/url';
+import { resolvePostLoginPath } from '@/lib/auth/post-login';
 
 export async function updateSession(request: NextRequest) {
   const { url, anonKey } = getSupabaseEnv();
@@ -43,8 +33,9 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
-  const isProtectedPath = pathname.startsWith('/dashboard');
+      const { pathname } = request.nextUrl;
+  const isProtectedPath =
+    pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
   const isAuthPath =
     pathname === '/login' ||
     pathname === '/signup' ||
@@ -62,8 +53,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (isAuthPath && user) {
+    // Authenticated users hitting /login (etc.) are sent to their home area:
+    // admins go straight to the admin console, everyone else to /dashboard.
+    // Reads the caller's OWN profile row, always permitted by the
+    // "Users can select own profile" RLS policy (migration 005).
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+    const role = (profileRow as { role: string } | null)?.role ?? null;
+
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = resolvePostLoginPath(role);
     return NextResponse.redirect(url);
   }
 

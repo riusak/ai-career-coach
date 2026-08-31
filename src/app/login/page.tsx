@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { resolvePostLoginPath } from '@/lib/auth/post-login';
 import SuccessBanner from '@/components/ui/SuccessBanner';
 
 function LoginForm() {
@@ -23,23 +24,37 @@ function LoginForm() {
     setLoading(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) {
         setError(signInError.message);
+        setLoading(false);
         return;
       }
 
-      router.push('/dashboard');
+      // Route administrators straight to the admin console, bypassing the
+      // standard user dashboard entirely. The caller's own profile row is
+      // always readable under the "Users can select own profile" RLS policy.
+      let role: string | null = null;
+      if (data.user) {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        role = (profileRow as { role: string } | null)?.role ?? null;
+      }
+
+      // Keep the submit button disabled while the client navigates away.
+      router.replace(resolvePostLoginPath(role));
       router.refresh();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'An unexpected error occurred during sign in.';
       setError(message);
-    } finally {
       setLoading(false);
     }
   };

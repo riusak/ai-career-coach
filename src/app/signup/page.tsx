@@ -4,12 +4,16 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { classifyAuthError, type AuthErrorClassification } from '@/lib/supabase/auth-errors';
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Tracks the classified error kind so the UI can offer the right next step
+  // when Supabase failed to deliver the confirmation email (SMTP issue).
+  const [errorKind, setErrorKind] = useState<AuthErrorClassification | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -17,6 +21,7 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setErrorKind(null);
     setLoading(true);
 
     try {
@@ -34,7 +39,9 @@ export default function SignupPage() {
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        const info = classifyAuthError(signUpError.message);
+        setError(info.message);
+        setErrorKind(info.kind);
         return;
       }
 
@@ -82,7 +89,16 @@ export default function SignupPage() {
             role="alert"
             className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700"
           >
-            {error}
+            <p>{error}</p>
+            {(errorKind === 'confirmation-email' ||
+              errorKind === 'user-already-registered') && (
+              <Link
+                href={`/verify?email=${encodeURIComponent(email)}`}
+                className="mt-2 inline-block font-semibold underline transition-colors hover:text-red-900"
+              >
+                Go to the verification page to enter or resend the code
+              </Link>
+            )}
           </div>
         )}
 
