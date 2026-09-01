@@ -8,11 +8,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# AI Career Coach - Guidelines & Conventions
+# ForPro AI - Guidelines & Conventions
 
 ## 1. Project Context & Stack
 
-- **Project**: AI Career Coach (MVP for academic/portfolio validation).
+- **Project**: ForPro AI (MVP for academic/portfolio validation).
 - **Stack**: Next.js (App Router), TypeScript (Strict), Tailwind CSS, Supabase (SSR via free tier), Vitest, Playwright.
 
 ## 2. Coding Conventions

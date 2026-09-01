@@ -1,13 +1,16 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/utils/supabase/client';
+import AuthShell from '@/components/auth/AuthShell';
 import ErrorState from '@/components/ui/ErrorState';
+import TransitionOverlay from '@/components/ui/TransitionOverlay';
 
 /**
- * Password reset completion page — the user lands here from the recovery
+ * Password reset completion page â€” the user lands here from the recovery
  * email. The Supabase browser client detects the recovery code in the URL
  * (detectSessionInUrl, PKCE flow) and establishes the recovery session
  * automatically; this page only collects the new password.
@@ -21,19 +24,23 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Branded route-transition overlay while navigating back to /login.
+  const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const t = useTranslations('auth');
+
 
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
     if (password.length < 6) {
-      setError('The password must be at least 6 characters long.');
+      setError(t('errorWeak'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('The two passwords do not match.');
+      setError(t('errorMismatch'));
       return;
     }
 
@@ -45,7 +52,7 @@ export default function ResetPasswordPage() {
         const normalized = updateError.message.toLowerCase();
         setError(
           normalized.includes('session') || normalized.includes('logged in')
-            ? 'This reset link is invalid or has expired. Request a new reset email and try again.'
+            ? t('resetLinkExpired')
             : updateError.message
         );
         return;
@@ -54,12 +61,13 @@ export default function ResetPasswordPage() {
       // Drop the recovery session so /login renders the confirmation banner
       // instead of the auth proxy bouncing the user to /dashboard.
       await supabase.auth.signOut();
+      setRedirecting(true);
       router.replace('/login?reset=1');
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'An unexpected error occurred while updating the password.'
+          : t('errorUnexpectedReset')
       );
     } finally {
       setLoading(false);
@@ -67,25 +75,24 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
+    <AuthShell>
+      <div className="space-y-8">
         <div>
-          <div className="mx-auto mb-6 h-1 w-12 rounded-full bg-gradient-to-r from-gold-400 to-gold-600" />
-          <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-            Choose a new password
+          <h1 className="text-center text-2xl font-bold tracking-tight text-navy-900">
+            {t('resetTitle')}
           </h1>
-          <p className="mt-2 text-center text-sm text-slate-600">
-            Pick a strong password of at least 6 characters.
+          <p className="mt-2 text-center text-sm text-navy-600">
+            {t('resetSubtitle')}
           </p>
         </div>
 
         {error && (
-          <ErrorState title="Password update failed" description={error}>
+          <ErrorState title={t('resetErrorTitle')} description={error}>
             <Link
               href="/forgot-password"
               className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
             >
-              Request a new link
+              {t('requestNewLink')}
             </Link>
           </ErrorState>
         )}
@@ -93,8 +100,8 @@ export default function ResetPasswordPage() {
         <form className="mt-8 space-y-6" onSubmit={handleUpdate}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="new-password" className="block text-sm font-medium text-slate-700">
-                New password
+              <label htmlFor="new-password" className="block text-sm font-medium text-navy-700">
+                {t('passwordNew')}
               </label>
               <input
                 id="new-password"
@@ -106,17 +113,17 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-                placeholder="•••••••• (min. 6 characters)"
+                className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+                placeholder={t('passwordPlaceholder')}
               />
             </div>
 
             <div>
               <label
                 htmlFor="confirm-password"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-navy-700"
               >
-                Confirm new password
+                {t('passwordConfirm')}
               </label>
               <input
                 id="confirm-password"
@@ -128,8 +135,8 @@ export default function ResetPasswordPage() {
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-                placeholder="••••••••"
+                className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
               />
             </div>
           </div>
@@ -137,23 +144,38 @@ export default function ResetPasswordPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="flex w-full justify-center rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={loading || redirecting}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Updating password...' : 'Update password'}
+              {loading || redirecting ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  />
+                  {t('resetLoading')}
+                </>
+              ) : (
+                t('submitReset')
+              )}
             </button>
           </div>
         </form>
 
-        <p className="text-center text-sm text-slate-600">
+        <p className="text-center text-sm text-navy-600">
           <Link
             href="/login"
-            className="font-medium text-gold-700 underline transition-colors hover:text-gold-800"
+            className="font-medium text-orange-700 underline transition-colors hover:text-orange-800"
           >
-            Back to sign in
+            {t('backToLogin')}
           </Link>
         </p>
+
+        <TransitionOverlay
+          show={redirecting}
+          label={t('resetTransition')}
+        />
       </div>
-    </div>
+    </AuthShell>
   );
 }

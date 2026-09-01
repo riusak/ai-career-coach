@@ -32,7 +32,7 @@ export default function RoleToggleForm({
   if (disabled) {
     return (
       <span
-        className="text-xs text-slate-400"
+        className="text-xs text-navy-400"
         title="You cannot change your own role."
         aria-disabled
       >
@@ -57,7 +57,7 @@ export default function RoleToggleForm({
       <button
         type="submit"
         disabled={isPending}
-        className="inline-flex items-center rounded-md border border-gold-300 bg-gold-50 px-2.5 py-1 text-xs font-medium text-gold-800 opacity-90 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-100 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex items-center rounded-md border border-orange-300 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-800 opacity-90 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? 'Saving…' : label}
       </button>

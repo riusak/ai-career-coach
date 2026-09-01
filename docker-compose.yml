@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ai-career-coach-web
+    container_name: forpro-ai-web
     restart: unless-stopped
     ports:
       - '3000:3000'

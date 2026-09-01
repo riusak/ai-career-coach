@@ -1,10 +1,13 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/utils/supabase/client';
 import { classifyAuthError, type AuthErrorClassification } from '@/lib/supabase/auth-errors';
+import AuthShell from '@/components/auth/AuthShell';
+import TransitionOverlay from '@/components/ui/TransitionOverlay';
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState('');
@@ -15,8 +18,12 @@ export default function SignupPage() {
   // when Supabase failed to deliver the confirmation email (SMTP issue).
   const [errorKind, setErrorKind] = useState<AuthErrorClassification | null>(null);
   const [loading, setLoading] = useState(false);
+  // Branded route-transition overlay while navigating to /verify or /dashboard.
+  const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+  const t = useTranslations('auth');
+
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -48,6 +55,7 @@ export default function SignupPage() {
       // If the session exists immediately, email confirmation is disabled in
       // the Supabase project: the account is usable right away.
       if (data.session) {
+        setRedirecting(true);
         router.push('/dashboard');
         router.refresh();
         return;
@@ -55,10 +63,11 @@ export default function SignupPage() {
 
       // Email confirmation enabled: a 6-digit OTP code was sent. Route to the
       // dedicated verification page.
+      setRedirecting(true);
       router.push(`/verify?email=${encodeURIComponent(email)}`);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'An unexpected error occurred during registration.';
+        err instanceof Error ? err.message : t('errorUnexpectedSignUp');
       setError(message);
     } finally {
       setLoading(false);
@@ -66,20 +75,19 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
+    <AuthShell>
+      <div className="space-y-8">
         <div>
-          <div className="mx-auto mb-6 h-1 w-12 rounded-full bg-gradient-to-r from-gold-400 to-gold-600" />
-          <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-            Create your account
+          <h1 className="text-center text-2xl font-bold tracking-tight text-navy-900">
+            {t('signUpTitle')}
           </h1>
-          <p className="mt-2 text-center text-sm text-slate-600">
-            Already have an account?{' '}
+          <p className="mt-2 text-center text-sm text-navy-600">
+            {t('haveAccount')}{' '}
             <Link
               href="/login"
-              className="font-medium text-gold-700 underline transition-colors hover:text-gold-800"
+              className="font-medium text-orange-700 underline transition-colors hover:text-orange-800"
             >
-              Sign in
+              {t('submitSignIn')}
             </Link>
           </p>
         </div>
@@ -96,7 +104,7 @@ export default function SignupPage() {
                 href={`/verify?email=${encodeURIComponent(email)}`}
                 className="mt-2 inline-block font-semibold underline transition-colors hover:text-red-900"
               >
-                Go to the verification page to enter or resend the code
+                {t('goToVerification')}
               </Link>
             )}
           </div>
@@ -107,9 +115,9 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="full-name"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-navy-700"
               >
-                Full Name
+                {t('fullName')}
               </label>
               <input
                 id="full-name"
@@ -119,17 +127,17 @@ export default function SignupPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-                placeholder="Jane Doe"
+                className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+                placeholder={t('fullNamePlaceholder')}
               />
             </div>
 
             <div>
               <label
                 htmlFor="email-address"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-navy-700"
               >
-                Email address
+                {t('email')}
               </label>
               <input
                 id="email-address"
@@ -140,17 +148,17 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-                placeholder="name@example.com"
+                className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+                placeholder={t('emailPlaceholder')}
               />
             </div>
 
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-navy-700"
               >
-                Password
+                {t('password')}
               </label>
               <input
                 id="password"
@@ -162,8 +170,8 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-                placeholder="•••••••• (min. 6 characters)"
+                className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+                placeholder={t('passwordPlaceholder')}
               />
             </div>
           </div>
@@ -171,14 +179,29 @@ export default function SignupPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="flex w-full justify-center rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={loading || redirecting}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading || redirecting ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  />
+                  {t('signUpLoading')}
+                </>
+              ) : (
+                t('submitSignUp')
+              )}
             </button>
           </div>
         </form>
+
+        <TransitionOverlay
+          show={redirecting}
+          label={t('signUpTransition')}
+        />
       </div>
-    </div>
+    </AuthShell>
   );
 }

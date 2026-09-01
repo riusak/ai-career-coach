@@ -75,7 +75,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
 });
 
 async function main() {
-  console.log('— AI Career Coach: seed default admin —');
+  console.log('— ForPro AI: seed default admin —');
   console.log('Supabase URL :', SUPABASE_URL);
   console.log('Admin email  :', DEFAULT_ADMIN.email);
 

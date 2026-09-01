@@ -25,7 +25,7 @@ export default function DeleteUserButton({ userId, userName, disabled }: DeleteU
   if (disabled) {
     return (
       <span
-        className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 opacity-60"
+        className="inline-flex items-center rounded-md border border-navy-200 bg-white px-2.5 py-1 text-xs font-medium text-navy-400 opacity-60"
         title="You cannot delete your own account."
         aria-disabled
       >

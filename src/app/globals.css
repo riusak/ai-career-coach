@@ -1,33 +1,70 @@
 @import 'tailwindcss';
 
 /*
- * AI Career Coach — "Light & Gold" design system
+ * ForPro AI — design system « Navy & Orange »
  * Tailwind CSS v4 CSS-first theme (no tailwind.config.js needed).
  *
+ * Brand palette (strictly enforced, exact hex codes):
+ * - Primary Navy  #101F32  → text, structure, monogram      (token: navy)
+ * - Dark Navy     #1E2A3A  → dark mode backgrounds          (token: navy-dark)
+ * - Brand Orange  #D88318  → arrows, AI badges, primary CTAs (token: orange)
+ * - Light BG      #F3F8FB  → app global background          (token: brand-bg)
+ * - Pure White    #FFFFFF  → cards, containers              (default white)
+ *
+ * Typography: Inter exclusively (self-hosted via next/font in src/app/layout.tsx,
+ * exposed as the --font-inter CSS variable and wired into --font-sans below).
+ *
  * Accessibility contract (WCAG 2.1 AA):
- * - Body text: slate-900 / slate-600 on white or #FAFAFA (>= 7:1).
- * - Small gold text: gold-700 or darker only (>= 5:1 on white).
- * - Gold buttons: gold-400 -> gold-500 backgrounds paired with slate-950 text (>= 8:1).
- * - Large gold gradient headings: gold-600 -> gold-800 (>= 3.4:1, AA large text).
- * - Focus rings / borders: gold-600 (>= 3:1 against white, WCAG 1.4.11 non-text contrast).
+ * - Body text: navy-900 / navy-600 on white or brand-bg (>= 7:1).
+ * - Small orange text: orange-700 or darker only (>= 4.5:1 on white).
+ * - Orange buttons: orange-500 backgrounds paired with white or navy-950 text.
+ * - Focus rings / borders: orange-600 (>= 3:1 against white, WCAG 1.4.11).
+ *
+ * Legacy "Light & Gold" gold-* tokens are kept TEMPORARILY until the
+ * page-by-page overhaul (Landing → Auth → Dashboard → CV Analyzer) replaces
+ * every gold-* usage; they must then be deleted from this file.
  */
 @theme {
-  --color-gold-50: #fbf7ee;
-  --color-gold-100: #f5ebd3;
-  --color-gold-200: #ebd8a8;
-  --color-gold-300: #dec178;
-  --color-gold-400: #d4af37;
-  --color-gold-500: #c5a059;
-  --color-gold-600: #a88543;
-  --color-gold-700: #8a6b33;
-  --color-gold-800: #6e5427;
-  --color-gold-900: #55411f;
+  /* — ForPro AI brand tokens (exact hex codes) — */
+  --color-navy: #101f32;
+  --color-navy-dark: #1e2a3a;
+  --color-orange: #d88318;
+  --color-brand-bg: #f3f8fb;
+
+  /* — Navy scale (anchored on brand hexes: 900 = #101F32, 800 = #1E2A3A) — */
+  --color-navy-50: #f3f8fb;
+  --color-navy-100: #e6edf4;
+  --color-navy-200: #c9d6e3;
+  --color-navy-300: #9fb2c7;
+  --color-navy-400: #6f87a2;
+  --color-navy-500: #4a617d;
+  --color-navy-600: #354961;
+  --color-navy-700: #27374a;
+  --color-navy-800: #1e2a3a;
+  --color-navy-900: #101f32;
+  --color-navy-950: #0a1522;
+
+  /* — Orange scale (anchored on brand orange as 500) — */
+  --color-orange-50: #fdf5e9;
+  --color-orange-100: #fae8cc;
+  --color-orange-200: #f4d098;
+  --color-orange-300: #eeb562;
+  --color-orange-400: #e49b36;
+  --color-orange-500: #d88318;
+  --color-orange-600: #bc6c10;
+  --color-orange-700: #9a560e;
+  --color-orange-800: #7d460f;
+  --color-orange-900: #673a10;
+
+  /* — Typography: Inter exclusively — */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
 }
 
 @layer base {
   ::selection {
-    background-color: var(--color-gold-200);
-    color: var(--color-slate-900);
+    background-color: var(--color-orange-200);
+    color: var(--color-navy-900);
   }
 }
 
@@ -46,6 +83,140 @@
 
   .animate-fade-slide-in {
     animation: fade-slide-in 0.4s ease-out both;
+  }
+
+  /* — Landing page motion toolkit (ForPro AI « Navy & Orange ») — */
+
+  /* Staggered entrance (hero) + shared delay hooks. The delay applies to both
+     animation and transition so the same classes serve keyframe reveals and
+     the IntersectionObserver-driven <Reveal /> component. */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animation-delay-100 {
+    animation-delay: 100ms;
+    transition-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+    transition-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+    transition-delay: 300ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+    transition-delay: 400ms;
+  }
+
+  /* Slow organic drift for hero decorative orbs (parallax feel, zero JS). */
+  @keyframes float-slow {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(0, -24px, 0) scale(1.05);
+    }
+  }
+
+  .animate-float-slow {
+    animation: float-slow 14s ease-in-out infinite;
+  }
+
+  /* Slow drift for the hero's ghost "FP" monograms and geometric nodes.
+     Combined with the JS parallax layers (HeroBackdrop) for depth. */
+  @keyframes drift {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) rotate(0deg);
+    }
+    50% {
+      transform: translate3d(16px, -30px, 0) rotate(2.5deg);
+    }
+  }
+
+  .animate-drift {
+    animation: drift 24s ease-in-out infinite;
+  }
+
+  /* Animated gradient text sweep for hero headline accents. */
+  @keyframes gradient-pan {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-gradient-pan {
+    background-size: 200% 200%;
+    animation: gradient-pan 8s ease infinite;
+  }
+
+  /* Shimmer skeleton — mirrors the exact shape of incoming content blocks
+     (CV score cards, analysis breakdown) instead of generic spinners. */
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      110deg,
+      var(--color-navy-100) 8%,
+      #fbfdfe 18%,
+      var(--color-navy-100) 33%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  /* Subtle engineering-grid backdrop for marketing sections. */
+  .bg-grid-navy {
+    background-image: linear-gradient(
+        to right,
+        rgb(16 31 50 / 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgb(16 31 50 / 0.05) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  /* Chart bars grow from their base (admin overview graphs). */
+  @keyframes grow-y {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  .animate-grow-y {
+    animation: grow-y 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
 

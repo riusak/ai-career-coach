@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getLocale, getTranslations } from 'next-intl/server';
 import ResumeUploader from './ResumeUploader';
 import ConfirmSubmitButton from './ConfirmSubmitButton';
 import EmptyState from '@/components/ui/EmptyState';
@@ -12,60 +13,102 @@ import {
 import { getUserResumes } from '@/lib/supabase/resumes';
 import type { Resume } from '@/types/resume';
 
-export const metadata = {
-  title: 'My Resume | AI Career Coach',
-};
+export async function generateMetadata() {
+  const t = await getTranslations('dashboard');
+  return { title: `${t('myResumes')} | ForPro AI` };
+}
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', {
+function formatDateTime(iso: string, locale: string): string {
+  return new Date(iso).toLocaleString(locale === 'fr' ? 'fr-FR' : locale === 'de' ? 'de-DE' : 'en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
 }
 
-function ResumeCard({ resume }: { resume: Resume }) {
+interface ResumeCardProps {
+  resume: Resume;
+  locale: string;
+  // Pre-resolved translation strings (server component can't use hooks).
+  labels: {
+    primaryBadge: string;
+    parsed: string;
+    pendingParse: string;
+    uploadedOn: (date: string) => string;
+    noLabel: string;
+    labelCategory: string;
+    saveLabel: string;
+    openPreview: string;
+    setPrimary: string;
+    removePrimary: string;
+    delete: string;
+    deleteConfirm: (name: string) => string;
+  };
+}
+
+function PrimaryBadgeIcon() {
   return (
-    <li className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-3 w-3"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function ResumeCard({ resume, locale, labels }: ResumeCardProps) {
+  return (
+    <li className="rounded-xl border border-navy-100 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold text-slate-900">{resume.file_name}</p>
+            <p className="truncate text-sm font-semibold text-navy-900">{resume.file_name}</p>
             {resume.is_primary && (
-              <span className="rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-800">
-                ⭐ Primary
+              <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">
+                <PrimaryBadgeIcon />
+                {labels.primaryBadge}
               </span>
             )}
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 resume.parsed_content
                   ? 'bg-green-100 text-green-700'
-                  : 'bg-slate-100 text-slate-600'
+                  : 'bg-navy-100 text-navy-600'
               }`}
             >
-              {resume.parsed_content ? 'Parsed' : 'Pending parse'}
+              {resume.parsed_content ? labels.parsed : labels.pendingParse}
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">Uploaded {formatDateTime(resume.created_at)}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            {resume.label ? `Label: ${resume.label}` : 'No label yet.'}
+          <p className="mt-1 text-xs text-navy-500">
+            {labels.uploadedOn(formatDateTime(resume.created_at, locale))}
+          </p>
+          <p className="mt-1 text-xs text-navy-500">
+            {resume.label ? `${resume.label}` : labels.noLabel}
           </p>
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Link
             href={`/dashboard/resume/${resume.id}`}
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800"
+            className="rounded-md border border-navy-200 bg-white px-3 py-1.5 text-xs font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
           >
-            Open preview
+            {labels.openPreview}
           </Link>
           {resume.is_primary ? (
             <form action={unsetPrimaryResumeAction}>
               <input type="hidden" name="resumeId" value={resume.id} />
               <button
                 type="submit"
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                className="rounded-md border border-navy-200 bg-white px-3 py-1.5 text-xs font-medium text-navy-700 shadow-sm transition-colors hover:bg-navy-50"
               >
-                Remove primary
+                {labels.removePrimary}
               </button>
             </form>
           ) : (
@@ -73,17 +116,18 @@ function ResumeCard({ resume }: { resume: Resume }) {
               <input type="hidden" name="resumeId" value={resume.id} />
               <button
                 type="submit"
-                className="rounded-md border border-gold-400 bg-gold-50 px-3 py-1.5 text-xs font-semibold text-gold-800 shadow-sm transition-colors hover:bg-gold-100"
+                className="inline-flex items-center gap-1 rounded-md border border-orange-400 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800 shadow-sm transition-colors hover:bg-orange-100"
               >
-                Set as primary ⭐
+                <PrimaryBadgeIcon />
+                {labels.setPrimary}
               </button>
             </form>
           )}
           <form action={deleteResumeAction}>
             <input type="hidden" name="resumeId" value={resume.id} />
             <ConfirmSubmitButton
-              label="Delete"
-              confirmMessage={`Delete "${resume.file_name}"? Its analysis history will be removed too.`}
+              label={labels.delete}
+              confirmMessage={labels.deleteConfirm(resume.file_name)}
               className="rounded-md px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
             />
           </form>
@@ -97,9 +141,9 @@ function ResumeCard({ resume }: { resume: Resume }) {
         <input type="hidden" name="resumeId" value={resume.id} />
         <label
           htmlFor={`label-${resume.id}`}
-          className="shrink-0 text-xs font-medium text-slate-600"
+          className="shrink-0 text-xs font-medium text-navy-600"
         >
-          Label / category
+          {labels.labelCategory}
         </label>
         <input
           id={`label-${resume.id}`}
@@ -107,14 +151,14 @@ function ResumeCard({ resume }: { resume: Resume }) {
           type="text"
           maxLength={80}
           defaultValue={resume.label ?? ''}
-          placeholder="e.g. Backend roles — FR"
-          className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 sm:flex-1"
+          placeholder={resume.label ?? ''}
+          className="w-full rounded-md border border-navy-200 bg-white px-3 py-1.5 text-xs text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 sm:flex-1"
         />
         <button
           type="submit"
-          className="shrink-0 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800"
+          className="shrink-0 rounded-md border border-navy-200 bg-white px-3 py-1.5 text-xs font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
         >
-          Save label
+          {labels.saveLabel}
         </button>
       </form>
     </li>
@@ -122,76 +166,100 @@ function ResumeCard({ resume }: { resume: Resume }) {
 }
 
 export default async function ResumePage() {
+  const [locale, t, tCommon, tNav] = await Promise.all([
+    getLocale(),
+    getTranslations('dashboard'),
+    getTranslations('common'),
+    getTranslations('nav'),
+  ]);
   const { data: resumes, error } = await getUserResumes();
   const resumeList = resumes ?? [];
 
+  const labels = {
+    primaryBadge: t('primaryBadge'),
+    parsed: t('parsed'),
+    pendingParse: t('pendingParse'),
+    uploadedOn: (date: string) => t('uploadedOn', { date }),
+    noLabel: t('noLabel'),
+    labelCategory: t('labelCategory'),
+    saveLabel: t('saveLabel'),
+    openPreview: t('openResumePreview'),
+    setPrimary: t('setPrimary'),
+    removePrimary: t('removePrimary'),
+    delete: t('deleteResume'),
+    deleteConfirm: (name: string) => t('deleteConfirm', { name }),
+  };
+
   return (
-    <div className="min-h-screen bg-[#FAFAFA] px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <div className="min-h-screen bg-brand-bg px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            My Resume
+          <h1 className="text-2xl font-bold tracking-tight text-navy-900">
+            {tNav('myResumes')}
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Manage your CV catalogue, choose your primary CV (⭐), and analyze it when you are
-            ready.
+          <p className="mt-1 text-sm text-navy-600">
+            {t('resumeCatalogue')}
           </p>
         </div>
 
         {error && (
           <ErrorState
-            title="Impossible de charger vos CVs"
+            title={tCommon('errorGeneric')}
             description={error}
           >
             <Link
               href="/dashboard/resume"
               className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
             >
-              Réessayer
+              {tCommon('retry')}
             </Link>
           </ErrorState>
         )}
 
-        <div id="upload" className="scroll-mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Upload a resume
+        <div id="upload" className="scroll-mt-8 rounded-xl border border-navy-100 bg-white p-6 shadow-sm sm:p-8">
+          <h2 className="text-lg font-semibold text-navy-900">
+            {t('uploadResumeTitle')}
           </h2>
-          <p className="mt-1 mb-6 text-sm text-slate-600">
-            Accepted formats: PDF or TXT, up to 5 MB. Files are stored privately and only visible
-            to you. You will be able to preview it before launching any analysis.
+          <p className="mt-1 mb-6 text-sm text-navy-600">
+            {t('uploadResumeHints')}
           </p>
           <ResumeUploader />
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Resume catalogue
+            <h2 className="text-lg font-semibold text-navy-900">
+              {t('resumeCatalogue')}
             </h2>
-            <span className="rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-800">
-              {resumeList.length} {resumeList.length === 1 ? 'CV' : 'CVs'}
+            <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">
+              {resumeList.length} CV{resumeList.length === 1 ? '' : 's'}
             </span>
           </div>
           {resumeList.length > 0 ? (
             <ul className="mt-4 space-y-4">
               {resumeList.map((resume) => (
-                <ResumeCard key={resume.id} resume={resume} />
+                <ResumeCard
+                  key={resume.id}
+                  resume={resume}
+                  locale={locale}
+                  labels={labels}
+                />
               ))}
             </ul>
           ) : error ? (
-            <p className="mt-4 text-sm text-slate-500">Resumes could not be loaded.</p>
+            <p className="mt-4 text-sm text-navy-500">{tCommon('errorGeneric')}</p>
           ) : (
             <div className="mt-4">
               <EmptyState
                 icon="document"
-                title="Votre catalogue est vide"
-                description="Téléversez votre premier CV (PDF ou TXT, 5 Mo max) pour le prévisualiser, le désigner comme CV par défaut et lancer une analyse complète quand vous êtes prêt."
+                title={t('catalogueEmptyTitle')}
+                description={t('catalogueEmptyDesc')}
                 action={
                   <Link
                     href="#upload"
-                    className="rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600"
+                    className="rounded-lg bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
                   >
-                    Ajouter mon premier CV
+                    {t('addFirstCv')}
                   </Link>
                 }
               />

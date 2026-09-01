@@ -23,16 +23,16 @@ export default function Pagination({
   const canNext = page < totalPages;
 
   const baseBtn =
-    'inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors';
+    'inline-flex items-center justify-center rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm font-medium text-navy-700 shadow-sm transition-colors';
   const disabledBtn =
-    'inline-flex items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-400';
+    'inline-flex items-center justify-center rounded-md border border-navy-100 bg-navy-50 px-3 py-1.5 text-sm font-medium text-navy-400';
 
   return (
     <div className="flex items-center justify-between">
-      <p className="text-sm text-slate-500">
-        Page <span className="font-medium text-slate-700">{page}</span>{' '}
-        of <span className="font-medium text-slate-700">{totalPages}</span> —{' '}
-        <span className="font-medium text-slate-700">{totalItems}</span> results
+      <p className="text-sm text-navy-500">
+        Page <span className="font-medium text-navy-700">{page}</span>{' '}
+        of <span className="font-medium text-navy-700">{totalPages}</span> —{' '}
+        <span className="font-medium text-navy-700">{totalItems}</span> results
       </p>
       <nav className="flex items-center gap-2">
         {canPrev ? (

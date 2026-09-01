@@ -12,8 +12,8 @@ interface UsersTableProps {
 }
 
 const TH =
-  'px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500';
-const TD = 'px-4 py-2.5 align-top text-sm text-slate-900';
+  'px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-navy-500';
+const TD = 'px-4 py-2.5 align-top text-sm text-navy-900';
 
 /**
  * Clean "Light & Gold" table of registered users. Actions are wired through
@@ -25,9 +25,9 @@ export default function UsersTable({ users, currentAdminId }: UsersTableProps) {
   }
 
   return (
-    <div className="-mx-1 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+    <div className="-mx-1 overflow-x-auto rounded-xl border border-navy-100 bg-white">
       <table className="w-full text-left align-top">
-        <thead className="bg-slate-50">
+        <thead className="bg-navy-50">
           <tr>
             <th className={TH}>User</th>
             <th className={TH}>Role</th>
@@ -42,15 +42,15 @@ export default function UsersTable({ users, currentAdminId }: UsersTableProps) {
             return (
               <tr key={user.id} className="align-top">
                 <td className={TD}>
-                  <div className="font-medium text-slate-900">
+                  <div className="font-medium text-navy-900">
                     {user.full_name || 'Unnamed account'}
                   </div>
                   {user.email ? (
-                    <div className="text-slate-500">{user.email}</div>
+                    <div className="text-navy-500">{user.email}</div>
                   ) : (
-                    <span className="text-xs text-slate-400">no email</span>
+                    <span className="text-xs text-navy-400">no email</span>
                   )}
-                  <div className="mt-1 text-xs text-slate-400">
+                  <div className="mt-1 text-xs text-navy-400">
                     ID: <span className="font-mono">{user.id.slice(0, 8)}…</span>
                   </div>
                 </td>
@@ -65,14 +65,14 @@ export default function UsersTable({ users, currentAdminId }: UsersTableProps) {
                   </div>
                 </td>
                 <td className={TD}>
-                  <div className="text-slate-600">
+                  <div className="text-navy-600">
                     {user.resume_count} CV{user.resume_count === 1 ? '' : 's'} ·{' '}
                     {user.analysis_count} analysis
                     {user.analysis_count === 1 ? '' : 's'}
                   </div>
                 </td>
                 <td className={TD}>
-                  <span className="whitespace-nowrap text-slate-500">
+                  <span className="whitespace-nowrap text-navy-500">
                     {formatDateTime(user.created_at)}
                   </span>
                 </td>
@@ -80,7 +80,7 @@ export default function UsersTable({ users, currentAdminId }: UsersTableProps) {
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/admin/users/${user.id}`}
-                      className="text-xs font-medium text-gold-700 hover:text-gold-800"
+                      className="text-xs font-medium text-orange-700 hover:text-orange-800"
                     >
                       View
                     </Link>

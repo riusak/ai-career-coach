@@ -1,4 +1,4 @@
-# AI Career Coach — Spécifications Produit (MVP)
+# ForPro AI — Spécifications Produit (MVP)
 
 > **Source de vérité produit.** Ce document fait foi pour le périmètre fonctionnel.
 > Toute évolution de périmètre doit être reflétée ici avant implémentation.
@@ -15,7 +15,7 @@
 
 ## 1. Contexte & Vision
 
-AI Career Coach est un MVP à vocation académique/portfolio. La proposition de valeur :
+ForPro AI est un MVP à vocation académique/portfolio. La proposition de valeur :
 **analyser un CV, le confronter à une offre d'emploi, et s'entraîner à l'entretien** —
 le tout assisté par IA.
 

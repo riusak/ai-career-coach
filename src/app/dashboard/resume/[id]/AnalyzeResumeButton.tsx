@@ -22,9 +22,19 @@ export default function AnalyzeResumeButton({ resumeId }: AnalyzeResumeButtonPro
         <button
           type="submit"
           disabled={isPending}
-          className="w-full rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isPending ? 'Queueing analysis...' : 'Analyze my CV'}
+          {isPending ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+              />
+              Queueing analysis…
+            </>
+          ) : (
+            'Analyze my CV'
+          )}
         </button>
       </form>
       {state.message && (

@@ -1,42 +1,62 @@
 import Link from 'next/link';
-import { getCurrentUserProfile } from '@/lib/supabase/profiles';
+import { getTranslations } from 'next-intl/server';
 import ProfileForm from './ProfileForm';
+import {
+  getCurrentUserProfile,
+} from '@/lib/supabase/profiles';
+import {
+  listCertifications,
+  listEducations,
+  listExperiences,
+  listSkills,
+} from '@/lib/supabase/profile-extensions';
 
 export default async function ProfilePage() {
-  const { data: profile, error } = await getCurrentUserProfile();
+  const [t, tNav, profileResult, educationsResult, experiencesResult, skillsResult, certificationsResult] =
+    await Promise.all([
+      getTranslations('profile'),
+      getTranslations('nav'),
+      getCurrentUserProfile(),
+      listEducations(),
+      listExperiences(),
+      listSkills(),
+      listCertifications(),
+    ]);
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-3xl space-y-6">
+    <div className="min-h-screen bg-brand-bg px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Profile Management
+            <h1 className="text-2xl font-bold tracking-tight text-navy-900">
+              {t('title')}
             </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Manage your personal and professional career information.
-            </p>
+            <p className="mt-1 text-sm text-navy-600">{t('subtitle')}</p>
           </div>
           <Link
             href="/dashboard"
-            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800"
+            className="rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
           >
-            Back to Dashboard
+            {tNav('dashboard')}
           </Link>
         </div>
 
-        {error && !profile && (
+        {profileResult.error && !profileResult.data && (
           <div
             role="alert"
             className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
           >
-            {error}
+            {profileResult.error}
           </div>
         )}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <ProfileForm initialProfile={profile} />
-        </div>
+        <ProfileForm
+          initialProfile={profileResult.data}
+          educations={educationsResult.data ?? []}
+          experiences={experiencesResult.data ?? []}
+          skills={skillsResult.data ?? []}
+          certifications={certificationsResult.data ?? []}
+        />
       </div>
     </div>
   );

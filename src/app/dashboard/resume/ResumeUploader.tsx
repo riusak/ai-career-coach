@@ -1,16 +1,20 @@
 'use client';
 
 import { useActionState, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   RESUME_ACCEPT_ATTRIBUTE,
   formatBytes,
   validateResumeFile,
 } from '@/lib/resume-validation';
 import ErrorState from '@/components/ui/ErrorState';
+import Skeleton from '@/components/ui/Skeleton';
 import SuccessBanner from '@/components/ui/SuccessBanner';
 import { uploadResumeAction, type ResumeUploadState } from './actions';
 
 export default function ResumeUploader() {
+  const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
   const initialState: ResumeUploadState = { success: false, message: null, data: null };
   const [state, formAction, isPending] = useActionState(uploadResumeAction, initialState);
 
@@ -75,11 +79,11 @@ export default function ResumeUploader() {
 
   return (
     <form action={handleFormAction} className="space-y-4">
-      {(clientError || (state.message && !state.success)) && (
+      {clientError || (state.message && !state.success) && (
         <div className="mb-4">
           <ErrorState
-            title={clientError ? 'Fichier non valide' : 'Échec du téléversement'}
-            description={clientError ?? (state.message ?? 'Une erreur est survenue.')}
+            title={clientError ? t('uploadResumeTitle') : tCommon('errorGeneric')}
+            description={clientError ?? (state.message ?? tCommon('errorGeneric'))}
           >
             <button
               type="button"
@@ -89,7 +93,7 @@ export default function ResumeUploader() {
               }}
               className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
             >
-              Choisir un autre fichier
+              {t('changeFile') ?? 'Choisir un autre fichier'}
             </button>
           </ErrorState>
         </div>
@@ -98,7 +102,7 @@ export default function ResumeUploader() {
       {state.success && state.message && (
         <div className="mb-4">
           <SuccessBanner
-            title="CV ajouté à votre catalogue !"
+            title={t('uploadResumeTitle')}
             description={state.message}
           />
         </div>
@@ -114,12 +118,12 @@ export default function ResumeUploader() {
         onClick={() => inputRef.current?.click()}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
           isDragActive
-            ? 'border-gold-500 bg-gold-50'
-            : 'border-slate-300 bg-slate-50 hover:border-gold-400 hover:bg-gold-50'
+            ? 'border-orange-500 bg-orange-50'
+            : 'border-navy-200 bg-navy-50 hover:border-orange-400 hover:bg-orange-50'
         }`}
       >
         <svg
-          className="mb-3 h-10 w-10 text-gold-600"
+          className="mb-3 h-10 w-10 text-orange-600"
           fill="none"
           stroke="currentColor"
           strokeWidth={1.5}
@@ -132,11 +136,11 @@ export default function ResumeUploader() {
             d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z"
           />
         </svg>
-        <p className="text-sm font-medium text-slate-900">
-          Drag and drop your CV here, or click to browse
+        <p className="text-sm font-medium text-navy-900">
+          {t('uploadResumeTitle')}
         </p>
-        <p className="mt-1 text-xs text-slate-500">
-          PDF or TXT, up to {formatBytes(5 * 1024 * 1024)}
+        <p className="mt-1 text-xs text-navy-500">
+          {t('uploadResumeHints')}
         </p>
       </div>
 
@@ -152,12 +156,12 @@ export default function ResumeUploader() {
       />
 
       {selectedFile && (
-        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+        <div className="flex items-center justify-between rounded-lg border border-navy-100 bg-white px-4 py-3 text-sm shadow-sm">
           <div className="min-w-0">
-            <p className="truncate font-medium text-slate-900">
+            <p className="truncate font-medium text-navy-900">
               {selectedFile.name}
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-navy-500">
               {formatBytes(selectedFile.size)}
             </p>
           </div>
@@ -165,9 +169,9 @@ export default function ResumeUploader() {
             type="button"
             onClick={clearSelection}
             disabled={isPending}
-            className="ml-4 shrink-0 text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700 disabled:opacity-50"
+            className="ml-4 shrink-0 text-sm font-medium text-navy-500 underline transition-colors hover:text-navy-700 disabled:opacity-50"
           >
-            Remove
+            {t('changeFile') ?? 'Remove'}
           </button>
         </div>
       )}
@@ -176,7 +180,7 @@ export default function ResumeUploader() {
         <button
           type="submit"
           disabled={isPending || !selectedFile}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending && (
             <svg
@@ -201,9 +205,26 @@ export default function ResumeUploader() {
               />
             </svg>
           )}
-          {isPending ? 'Téléversement…' : 'Upload Resume'}
+          {isPending ? t('uploadCta') + '…' : t('uploadCta')}
         </button>
       </div>
+
+      {/* Shimmer skeleton mirroring the catalogue card being created —
+          perceived performance: the upload feels already "in progress". */}
+      {isPending && (
+        <div
+          aria-hidden="true"
+          className="mt-4 rounded-xl border border-navy-100 bg-white p-4 shadow-sm sm:p-5"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-5 w-24 rounded-full" />
+            <Skeleton className="h-5 w-28 rounded-full" />
+          </div>
+          <Skeleton className="mt-2 h-3 w-56" />
+          <Skeleton className="mt-1.5 h-3 w-40" />
+        </div>
+      )}
     </form>
   );
 }

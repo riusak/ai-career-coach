@@ -12,7 +12,7 @@ import {
 } from '@/lib/admin/utils';
 
 export const metadata = {
-  title: 'Users — Admin Dashboard | AI Career Coach',
+  title: 'Users — Admin Dashboard | ForPro AI',
   description: 'Registered users management.',
 };
 
@@ -54,7 +54,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
       >
         <Link
           href="/admin/users"
-          className="rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm hover:from-gold-500 hover:to-gold-600"
+          className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
         >
           Retry
         </Link>
@@ -70,17 +70,17 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-navy-900">
             Registered users
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-navy-500">
             {list.total} account{list.total === 1 ? '' : 's'} registered
             (showing {list.users.length} on this page).
           </p>
         </div>
         <Link
           href="/admin"
-          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800"
+          className="rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
         >
           ← Overview
         </Link>
@@ -94,11 +94,11 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
             name="q"
             defaultValue={q ?? ''}
             placeholder="Search by full name…"
-            className="block w-full rounded-md border border-slate-300 bg-white pl-3 pr-9 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600"
+            className="block w-full rounded-md border border-navy-200 bg-white pl-3 pr-9 py-2 text-sm text-navy-900 placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600"
           />
           <svg
             aria-hidden="true"
-            className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-slate-400"
+            className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-navy-400"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -112,7 +112,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         <select
           name="role"
           defaultValue={(role ?? '') as string}
-          className="block w-full min-w-[140px] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 sm:w-auto"
+          className="block w-full min-w-[140px] rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 sm:w-auto"
         >
           <option value="">All roles</option>
           <option value="admin">Admin</option>
@@ -120,14 +120,14 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         </select>
         <button
           type="submit"
-          className="rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600"
+          className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
         >
           Apply
         </button>
         {q || role ? (
           <Link
             href="/admin/users"
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800"
+            className="rounded-md border border-navy-200 bg-white px-3 py-2 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
           >
             Reset
           </Link>
@@ -143,7 +143,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
               ? 'Try adjusting the search or role filter.'
               : 'There are no registered users yet.'
           }
-          icon="sparkles"
+          icon="users"
         />
       ) : (
         <UsersTable users={list.users} currentAdminId={admin.userId} />

@@ -42,3 +42,26 @@ export type ResumeResponse<T> = {
   data: T | null;
   error: string | null;
 };
+
+import type { QuickTestAnalysis, QuickTestSource } from '@/types/quick-test';
+
+/**
+ * Payload persisted in `resume_analyses.structured_output` once the deep
+ * analysis pipeline completes (migration 007 enables the completion UPDATE).
+ */
+export interface DeepAnalysisOutput {
+  /** Which engine produced the analysis: Gemini LLM or heuristic fallback. */
+  source: QuickTestSource;
+  /** Full structured result (score breakdown, insights, expert advice). */
+  analysis: QuickTestAnalysis;
+}
+
+/**
+ * Transient claim marker written into `structured_output` while the pipeline
+ * processes a queued row (score stays null). A claim older than the pipeline
+ * stale-claim window is considered abandoned and may be reclaimed.
+ */
+export interface DeepAnalysisProcessingMarker {
+  status: 'processing';
+  claimed_at: string;
+}

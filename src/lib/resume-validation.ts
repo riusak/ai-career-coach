@@ -7,11 +7,15 @@
 
 export const MAX_RESUME_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
-export const ALLOWED_RESUME_MIME_TYPES = ['application/pdf', 'text/plain'] as const;
+export const ALLOWED_RESUME_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+] as const;
 
 export type AllowedResumeMimeType = (typeof ALLOWED_RESUME_MIME_TYPES)[number];
 
-export const ALLOWED_RESUME_EXTENSIONS = ['.pdf', '.txt'] as const;
+export const ALLOWED_RESUME_EXTENSIONS = ['.pdf', '.docx', '.txt'] as const;
 
 export const RESUME_ACCEPT_ATTRIBUTE = ALLOWED_RESUME_EXTENSIONS.join(',');
 

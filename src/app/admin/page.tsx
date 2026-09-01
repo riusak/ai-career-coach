@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BarChart from '@/components/admin/BarChart';
 import StatCard from '@/components/admin/StatCard';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
@@ -9,7 +10,7 @@ import { QUICK_TEST_EVENT_TYPES, type QuickTestEventType } from '@/types/admin';
 
 
 export const metadata = {
-  title: 'Overview — Admin Dashboard | AI Career Coach',
+  title: 'Overview — Admin Dashboard | ForPro AI',
   description: 'Live metrics, user management and audit trail.',
 };
 
@@ -22,15 +23,30 @@ const EVENT_LABELS: Record<QuickTestEventType, string> = {
 };
 
 const TABLE_TH =
-  'px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500';
+  'px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-navy-500';
 const TABLE_TD = 'px-4 py-2 text-sm align-top';
 
-/** Small label + count cell for the funnel breakdown. */
-function FunnelItem({ label, value }: { label: string; value: number }) {
+/** Label + count + proportional bar cell for the funnel breakdown. */
+function FunnelItem({
+  label,
+  value,
+  max,
+}: {
+  label: string;
+  value: number;
+  max: number;
+}) {
+  const width = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div className="rounded-lg border border-slate-200 bg-[#FAFAFA] p-3">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold text-slate-900">{value}</p>
+    <div className="rounded-xl border border-navy-100 bg-brand-bg p-3">
+      <p className="text-xs uppercase tracking-wide text-navy-500">{label}</p>
+      <p className="mt-1 text-xl font-bold text-navy-900">{value}</p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-navy-100">
+        <div
+          className="animate-grow-y h-full origin-left rounded-full bg-orange"
+          style={{ width: `${width}%` }}
+        />
+      </div>
     </div>
   );
 }
@@ -46,7 +62,7 @@ export default async function AdminOverviewPage() {
       >
         <Link
           href="/admin"
-          className="rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm hover:from-gold-500 hover:to-gold-600"
+          className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
         >
           Refresh
         </Link>
@@ -54,20 +70,22 @@ export default async function AdminOverviewPage() {
     );
   }
 
+  const funnelMax = Math.max(1, ...Object.values(stats.eventsByType));
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-navy-900">
             Admin Dashboard
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Live metrics, user management and the audit trail for AI Career Coach.
+          <p className="mt-1 text-sm text-navy-600">
+            Live metrics, user management and the audit trail for ForPro AI.
           </p>
         </div>
         <Link
           href="/admin/users"
-          className="rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600"
+          className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
         >
           Manage users
         </Link>
@@ -76,6 +94,7 @@ export default async function AdminOverviewPage() {
       {/* 1. KPI row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
+          accent
           label="Registered users"
           value={stats.totalUsers}
           hint={`+${stats.users30d} over the last 30 days`}
@@ -101,10 +120,45 @@ export default async function AdminOverviewPage() {
         />
       </div>
 
-      {/* 2. Quick Test funnel */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Quick Test funnel</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      {/* 2. 14-day activity charts */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-lg font-semibold text-navy-900">Quick Test activity</h2>
+            <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-navy-400">
+              14 derniers jours
+            </span>
+          </div>
+          <div className="mt-4">
+            <BarChart
+              data={stats.dailyEvents}
+              tone="orange"
+              ariaLabel="Événements Quick Test quotidiens sur les 14 derniers jours"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-lg font-semibold text-navy-900">Nouveaux comptes</h2>
+            <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-navy-400">
+              14 derniers jours
+            </span>
+          </div>
+          <div className="mt-4">
+            <BarChart
+              data={stats.dailyUsers}
+              tone="navy"
+              ariaLabel="Nouvelles inscriptions quotidiennes sur les 14 derniers jours"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Quick Test funnel */}
+      <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-navy-900">Quick Test funnel</h2>
+        <p className="mt-1 text-sm text-navy-500">
           Anonymous visitor events (privacy-preserving: IPs are HMAC-hashed).
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -113,6 +167,7 @@ export default async function AdminOverviewPage() {
               key={eventType}
               label={EVENT_LABELS[eventType]}
               value={stats.eventsByType[eventType] ?? 0}
+              max={funnelMax}
             />
           ))}
         </div>
@@ -121,8 +176,8 @@ export default async function AdminOverviewPage() {
             {/* 3. Recent activity */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* 3a. Recent visitor Quick Test events */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Recent visitor tests</h2>
+        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy-900">Recent visitor tests</h2>
           {stats.recentEvents.length === 0 ? (
             <EmptyState
               icon="chart"
@@ -145,7 +200,7 @@ export default async function AdminOverviewPage() {
                   {stats.recentEvents.map((event) => (
                     <tr key={event.id}>
                       <td className={TABLE_TD}>
-                        <span className="whitespace-nowrap text-slate-500">
+                        <span className="whitespace-nowrap text-navy-500">
                           {formatDateTime(event.created_at)}
                         </span>
                       </td>
@@ -166,11 +221,11 @@ export default async function AdminOverviewPage() {
         </div>
 
         {/* 3b. Recent audit log entries */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Recent audit activity</h2>
+        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy-900">Recent audit activity</h2>
           {stats.recentAuditLogs.length === 0 ? (
             <EmptyState
-              icon="sparkles"
+              icon="users"
               title="No audit entries yet"
               description="Privileged admin actions (role changes, deletions) will be recorded here."
             />
@@ -189,7 +244,7 @@ export default async function AdminOverviewPage() {
                   {stats.recentAuditLogs.map((log) => (
                     <tr key={log.id}>
                       <td className={TABLE_TD}>
-                        <span className="whitespace-nowrap text-slate-500">
+                        <span className="whitespace-nowrap text-navy-500">
                           {formatDateTime(log.created_at)}
                         </span>
                       </td>
@@ -201,7 +256,7 @@ export default async function AdminOverviewPage() {
                             : '—'}
                       </td>
                       <td className={TABLE_TD}>
-                        <span className="font-medium text-slate-900">{log.action}</span>
+                        <span className="font-medium text-navy-900">{log.action}</span>
                       </td>
                       <td
                         className={TABLE_TD}
@@ -222,7 +277,7 @@ export default async function AdminOverviewPage() {
           <div className="mt-3 text-right">
             <Link
               href="/admin/audit"
-              className="text-xs font-medium text-gold-700 hover:text-gold-800"
+              className="text-xs font-medium text-orange-700 hover:text-orange-800"
             >
               View full audit log →
             </Link>

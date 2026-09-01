@@ -10,8 +10,10 @@ import { inflateRawSync, inflateSync } from 'node:zlib';
  *     text-positioning operators as line breaks.
  *
  * Known limitations (accepted for the MVP): no ToUnicode CMap resolution
- * (WinAnsi ≈ latin-1 is assumed), no support for encrypted documents, and no
- * OCR — scanned PDFs yield an empty string that callers must handle.
+ * (WinAnsi ≈ CP-1252 is assumed for literal strings), no support for
+ * encrypted documents, and no OCR — scanned PDFs yield an empty string that
+ * callers must handle. Binary streams (embedded font files, images) are
+ * filtered out so they never pollute the extracted text.
  */
 
 export interface PdfExtractionResult {
@@ -59,7 +61,7 @@ function decodePdfEscapes(body: string): string {
   for (let i = 0; i < body.length; i += 1) {
     const char = body[i];
     if (char !== '\\') {
-      out += char;
+      out += mapWinAnsi(char);
       continue;
     }
     const next = body[i + 1];
@@ -74,7 +76,7 @@ function decodePdfEscapes(body: string): string {
         octal += body[i + 1];
         i += 1;
       }
-      out += String.fromCharCode(parseInt(octal, 8));
+      out += mapWinAnsi(String.fromCharCode(parseInt(octal, 8)));
     } else if (next === '\r') {
       // Line continuation (handle \r\n too).
       if (body[i + 2] === '\n') {
@@ -91,11 +93,92 @@ function decodePdfEscapes(body: string): string {
         b: '\b',
         f: '\f',
       };
-      out += escapes[next] ?? next;
+      out += escapes[next] ?? mapWinAnsi(next);
       i += 1;
     }
   }
   return out;
+}
+
+/**
+ * WinAnsi (CP-1252) high-byte map — the default encoding for literal strings
+ * in the vast majority of text PDFs. Without it, bytes 0x80–0x9F (curly
+ * quotes, en/em dashes, ellipsis, euro…) decode as invisible C1 control
+ * characters, which litters French CV text with "mojibake" the guardrail
+ * rightly rejects. Undefined slots (0x81, 0x8D, 0x8F, 0x90, 0x9D) map to ''.
+ */
+const WINANSI_HIGH: Record<string, string> = {
+  '\u0080': '€',
+  '\u0082': '‚',
+  '\u0083': 'ƒ',
+  '\u0084': '„',
+  '\u0085': '…',
+  '\u0086': '†',
+  '\u0087': '‡',
+  '\u0088': 'ˆ',
+  '\u0089': '‰',
+  '\u008A': 'Š',
+  '\u008B': '‹',
+  '\u008C': 'Œ',
+  '\u008D': '',
+  '\u008E': 'Ž',
+  '\u008F': '',
+  '\u0090': '',
+  '\u0091': '’',
+  '\u0092': '’',
+  '\u0093': '“',
+  '\u0094': '”',
+  '\u0095': '•',
+  '\u0096': '–',
+  '\u0097': '—',
+  '\u0098': '˜',
+  '\u0099': '™',
+  '\u009A': 'š',
+  '\u009B': '›',
+  '\u009C': 'œ',
+  '\u009D': '',
+  '\u009E': 'ž',
+  '\u009F': 'Ÿ',
+};
+
+function mapWinAnsi(char: string): string {
+  return WINANSI_HIGH[char] ?? char;
+}
+
+/** Ratio of human-readable characters in a string (0–1). */
+function printableRatio(s: string): number {
+  if (s.length === 0) {
+    return 0;
+  }
+  let printable = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    const code = s.charCodeAt(i);
+    if (
+      code === 9 ||
+      code === 10 ||
+      code === 13 ||
+      (code >= 32 && code < 127) ||
+      code >= 160
+    ) {
+      printable += 1;
+    }
+  }
+  return printable / s.length;
+}
+
+/**
+ * Heuristic filter separating real page-content streams from the binary
+ * streams embedded by most PDF generators (FontFile2/3 TrueType subsets,
+ * image XObjects…). Those binaries contain `(str)` / `<hex>`-looking token
+ * sequences that used to be extracted as garbage text — the "mojibake" the
+ * CV guardrail rejected. A genuine content stream always shows text with
+ * BT…ET blocks using Tj/TJ operators and is almost entirely printable.
+ */
+function isLikelyTextContent(content: string): boolean {
+  if (!/\bT[jJ]\b/.test(content) || !/\bBT\b[\s\S]*\bET\b/.test(content)) {
+    return false;
+  }
+  return printableRatio(content) >= 0.85;
 }
 
 function decodeHexString(hex: string): string {
@@ -129,7 +212,20 @@ function extractTextFromContent(content: string): string {
   let match: RegExpExecArray | null;
   while ((match = tokenRegex.exec(withoutImages)) !== null) {
     if (match[1] !== undefined) {
-      text += decodePdfEscapes(match[1]);
+      const literal = decodePdfEscapes(match[1]);
+      // UTF-16BE literal strings start with the \376\377 BOM (latin1: "þÿ").
+      if (literal.startsWith('\u00FE\u00FF')) {
+        let utf16 = '';
+        const rest = literal.slice(2);
+        for (let i = 0; i + 1 < rest.length; i += 2) {
+          utf16 += String.fromCharCode(
+            (rest.charCodeAt(i) << 8) | rest.charCodeAt(i + 1)
+          );
+        }
+        text += utf16;
+      } else {
+        text += literal;
+      }
     } else if (match[2] !== undefined) {
       text += decodeHexString(match[2]);
     } else {
@@ -170,14 +266,27 @@ export function extractPdfText(data: Buffer): PdfExtractionResult {
     const payload = data.subarray(payloadStart, endMarker);
     const inflated = inflateStream(payload, isFlateEncoded(raw, match.index));
     if (inflated.length > 0) {
-      text += extractTextFromContent(inflated.toString('latin1'));
-      text += '\n';
+      const content = inflated.toString('latin1');
+      // Only content streams (BT…ET + Tj/TJ operators, printable) carry text.
+      // Font binaries and image data are skipped instead of being mined for
+      // garbage tokens.
+      if (isLikelyTextContent(content)) {
+        text += extractTextFromContent(content);
+        text += '\n';
+      }
     }
     streamRegex.lastIndex = endMarker;
   }
 
   return {
-    text: text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim(),
+    text: text
+      // Strip any surviving control characters (C0/C1/DEL) — real line breaks
+      // and tabs are preserved; the rest is decode noise that reads as
+      // binary corruption downstream.
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u0080-\u009F]/g, '')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim(),
     pageCount,
   };
 }

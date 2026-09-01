@@ -2,6 +2,7 @@
 
 import { Fragment } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 interface ConversionModalProps {
   isOpen: boolean;
@@ -11,10 +12,13 @@ interface ConversionModalProps {
 /**
  * Modal de conversion non bloquante.
  *
- * S’affiche une fois les résultats du Quick Test rendus visibles, mais ne
- * l’empêche jamais l’utilisateur de relancer un nouveau test gratuit.
+ * S'affiche une fois les résultats du Quick Test rendus visibles, mais ne
+ * l'empêche jamais l'utilisateur de relancer un nouveau test gratuit.
  */
 export default function ConversionModal({ isOpen, onClose }: ConversionModalProps) {
+  const t = useTranslations('landing');
+  const tCommon = useTranslations('common');
+
   if (!isOpen) return null;
 
   return (
@@ -26,14 +30,14 @@ export default function ConversionModal({ isOpen, onClose }: ConversionModalProp
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-slate-400 hover:text-slate-600"
-          aria-label="Fermer"
+          aria-label={tCommon('close')}
         >
           ✕
         </button>
 
         <div className="mb-6 text-center">
           <div className="mb-4 flex justify-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold-100 text-gold-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-6 w-6"
@@ -51,11 +55,10 @@ export default function ConversionModal({ isOpen, onClose }: ConversionModalProp
             </div>
           </div>
           <h2 className="text-xl font-bold text-slate-900">
-            Sauvegardez votre analyse ?
+            {t('conversionModal.title')}
           </h2>
           <p className="mt-2 text-sm text-slate-600">
-            Créez un compte gratuit pour sauvegarder vos analyses, comparer des
-            offres d’emploi, et accéder aux fonctionnalités complètes.
+            {t('conversionModal.subtitle')}
           </p>
         </div>
 
@@ -63,20 +66,20 @@ export default function ConversionModal({ isOpen, onClose }: ConversionModalProp
           <Link
             href="/signup"
             onClick={onClose}
-            className="rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 px-6 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-md transition-all hover:from-gold-500 hover:to-gold-600"
+            className="rounded-lg bg-gradient-to-r from-orange-400 to-orange-500 px-6 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-md transition-all hover:from-orange-500 hover:to-orange-600"
           >
-            Créer un compte gratuit
+            {t('conversionModal.cta')}
           </Link>
           <button
             onClick={onClose}
             className="text-sm font-medium text-slate-500 hover:text-slate-700"
           >
-            Continuer sans compte
+            {t('conversionModal.skip')}
           </button>
         </div>
 
         <p className="mt-4 text-center text-xs text-slate-400">
-          Vous pouvez relancer un test gratuit à tout moment.
+          {t('conversionModal.reassurance')}
         </p>
       </div>
     </div>

@@ -14,8 +14,11 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
-    // Scripts utilitaires (test SMTP, etc.) — pas du code source applicatif
+        // Scripts utilitaires (test SMTP, etc.) — pas du code source applicatif
     'scripts/**',
+    // k9/harness working-tree mirror (e.g. .kilo/worktrees/<branch>) — not
+    // project source; linting it double-counts files and flags stale scripts.
+    '.kilo/**',
   ]),
 ]);
 

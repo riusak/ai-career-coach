@@ -14,8 +14,8 @@ interface AdminUserDetailPageProps {
 }
 
 const TH =
-  'px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500';
-const TD = 'px-4 py-2 align-top text-sm text-slate-900';
+  'px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-navy-500';
+const TD = 'px-4 py-2 align-top text-sm text-navy-900';
 
 export default async function AdminUserDetailPage({
   params,
@@ -46,16 +46,16 @@ export default async function AdminUserDetailPage({
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-navy-900">
             {detail.user.full_name || 'Unnamed account'}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-navy-500">
             {detail.user.email ?? 'no email'}
           </p>
         </div>
         <Link
           href="/admin/users"
-          className="ml-auto rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-gold-400 hover:bg-gold-50 hover:text-gold-800"
+          className="ml-auto rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
         >
           ← Back to users
         </Link>
@@ -63,49 +63,49 @@ export default async function AdminUserDetailPage({
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left: identity */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-1">
-          <h2 className="text-lg font-semibold text-slate-900">Profile</h2>
+        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm lg:col-span-1">
+          <h2 className="text-lg font-semibold text-navy-900">Profile</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div>
-              <dt className="font-medium text-slate-500">Role</dt>
+              <dt className="font-medium text-navy-500">Role</dt>
               <dd className="mt-1">
                 <RoleBadge role={detail.user.role} />
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-slate-500">Full name</dt>
-              <dd className="mt-1 text-slate-900">
+              <dt className="font-medium text-navy-500">Full name</dt>
+              <dd className="mt-1 text-navy-900">
                 {detail.user.full_name || (
-                  <span className="italic text-slate-400">Not set</span>
+                  <span className="italic text-navy-400">Not set</span>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-slate-500">Email</dt>
-              <dd className="mt-1 break-all text-slate-900">
+              <dt className="font-medium text-navy-500">Email</dt>
+              <dd className="mt-1 break-all text-navy-900">
                 {detail.user.email ?? '—'}
               </dd>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <dt className="font-medium text-slate-500">Created</dt>
-                <dd className="mt-1 text-slate-900">
+                <dt className="font-medium text-navy-500">Created</dt>
+                <dd className="mt-1 text-navy-900">
                   {formatDateTime(detail.user.created_at)}
                 </dd>
               </div>
               <div>
-                <dt className="font-medium text-slate-500">Updated</dt>
-                <dd className="mt-1 text-slate-900">
+                <dt className="font-medium text-navy-500">Updated</dt>
+                <dd className="mt-1 text-navy-900">
                   {formatDateTime(detail.user.updated_at)}
                 </dd>
               </div>
               <div className="col-span-2">
-                <dt className="font-medium text-slate-500">Last sign-in</dt>
-                <dd className="mt-1 text-slate-900">
+                <dt className="font-medium text-navy-500">Last sign-in</dt>
+                <dd className="mt-1 text-navy-900">
                   {detail.user.last_sign_in_at ? (
                     formatDateTime(detail.user.last_sign_in_at)
                   ) : (
-                    <span className="italic text-slate-400">Never</span>
+                    <span className="italic text-navy-400">Never</span>
                   )}
                 </dd>
               </div>
@@ -113,27 +113,27 @@ export default async function AdminUserDetailPage({
           </dl>
         </div>
                 {/* Middle: content summary */}
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
-          <h2 className="text-lg font-semibold text-slate-900">
+        <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm lg:col-span-2">
+          <h2 className="text-lg font-semibold text-navy-900">
             Content catalogue
           </h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between">
-              <dt className="font-medium text-slate-500">Resumes</dt>
-              <dd className="text-slate-900">{detail.resumes.length} CV(s)</dd>
+              <dt className="font-medium text-navy-500">Resumes</dt>
+              <dd className="text-navy-900">{detail.resumes.length} CV(s)</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="font-medium text-slate-500">Analyses</dt>
-              <dd className="text-slate-900">{detail.analysis_count}</dd>
+              <dt className="font-medium text-navy-500">Analyses</dt>
+              <dd className="text-navy-900">{detail.analysis_count}</dd>
             </div>
             {detail.latestAnalysis && (
               <div className="flex justify-between">
-                <dt className="font-medium text-slate-500">Latest analysis</dt>
-                <dd className="text-right text-slate-900">
+                <dt className="font-medium text-navy-500">Latest analysis</dt>
+                <dd className="text-right text-navy-900">
                   <span className="font-medium">
                     {detail.latestAnalysis.score ?? '—'}
                   </span>
-                  <span className="ml-1 text-xs text-slate-500">
+                  <span className="ml-1 text-xs text-navy-500">
                     ({detail.latestAnalysis.analysis_type})
                   </span>
                 </dd>
@@ -155,15 +155,27 @@ export default async function AdminUserDetailPage({
                   {detail.resumes.map((resume) => (
                     <tr key={resume.id}>
                       <td className={TD}>
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-navy-900">
                           {resume.file_name}
                         </span>
                         {resume.is_primary && (
                           <span
-                            className="ml-1 text-xs text-gold-700"
+                            className="ml-1 inline-flex items-center text-orange-700"
                             aria-label="Primary CV"
                           >
-                            ⭐
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                              className="h-3.5 w-3.5"
+                            >
+                              <path d="M20 6 9 17l-5-5" />
+                            </svg>
                           </span>
                         )}
                       </td>
@@ -173,7 +185,7 @@ export default async function AdminUserDetailPage({
                           : 'TXT'}
                       </td>
                       <td className={TD}>
-                        <span className="whitespace-nowrap text-slate-500">
+                        <span className="whitespace-nowrap text-navy-500">
                           {formatDateTime(resume.created_at)}
                         </span>
                       </td>
@@ -193,9 +205,9 @@ export default async function AdminUserDetailPage({
       </div>
 
       {/* Role management */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Role management</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-navy-900">Role management</h2>
+        <p className="mt-1 text-sm text-navy-500">
           {isAdmin
             ? 'This user is an administrator.'
             : 'This user is a standard user.'}{' '}
@@ -209,7 +221,7 @@ export default async function AdminUserDetailPage({
             disabled={isSelf}
           />
           {isSelf && (
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-navy-400">
               You cannot change your own role. Sign in as another admin to edit
               it.
             </p>
@@ -233,7 +245,7 @@ export default async function AdminUserDetailPage({
             disabled={isSelf}
           />
           {isSelf && (
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-navy-400">
               You cannot delete your own account.
             </p>
           )}

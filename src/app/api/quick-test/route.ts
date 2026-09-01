@@ -1,25 +1,26 @@
-/**
- * quick-test/route.ts — Endpoint public du Visitor Quick Test.
+﻿/**
+ * quick-test/route.ts â€” Endpoint public du Visitor Quick Test.
  *
- * Funnel public illimité (mvp.md §2.2) : 1 PDF envoyé → score + insights.
+ * Funnel public illimitÃ© (mvp.md Â§2.2) : 1 PDF envoyÃ© â†’ score + insights.
  *
- * Pipeline de sécurité appliqué en ordre :
- *   1) Validation upload (type/size — 5 Mo PDF, magic-bytes).
+ * Pipeline de sÃ©curitÃ© appliquÃ© en ordre :
+ *   1) Validation upload (type/size â€” 5 Mo PDF, magic-bytes).
  *   2) Extraction texte PDF.
- *   3) 🔒 Guardrail sémantique (« est-ce vraiment un CV ? ») — rejette les
- *      factures/payes avec un 422 exploitable côté UI.
- *   4) Analyse LLM (Gemini 2.5-flash) → fallback heuristique transparent.
- *   5) Tracking anonyme (quick_test_events) + rate-limiting léger (non bloquant).
+ *   3) ðŸ”’ Guardrail sÃ©mantique (Â« est-ce vraiment un CV ? Â») â€” rejette les
+ *      factures/payes avec un 422 exploitable cÃ´tÃ© UI.
+ *   4) Analyse LLM (Gemini Flash â€” see llm.ts for the benchmarked model) â†’ fallback heuristique transparent.
+ *   5) Tracking anonyme (quick_test_events) + rate-limiting lÃ©ger (non bloquant).
  *
- * Conformité :
- *   - Aucune donnée persistante côté backend (hors logs d’audit anonymes).
- *   - L’IP est hachée HMAC-SHA256 serveur-only (jamais exposée au client).
- *   - Toutes les étapes sont synchrones (pas de file d’attente) ; le fallback
- *     heuristique garantit une réponse < 10 s même en cas d’indisponibilité LLM.
+ * ConformitÃ© :
+ *   - Aucune donnÃ©e persistante cÃ´tÃ© backend (hors logs dâ€™audit anonymes).
+ *   - Lâ€™IP est hachÃ©e HMAC-SHA256 serveur-only (jamais exposÃ©e au client).
+ *   - Toutes les Ã©tapes sont synchrones (pas de file dâ€™attente) ; le fallback
+ *     heuristique garantit une rÃ©ponse < 10 s mÃªme en cas dâ€™indisponibilitÃ© LLM.
  */
 
 import { MAX_RESUME_FILE_SIZE_BYTES, formatBytes } from '@/lib/resume-validation';
 import { PdfExtractionError, countWords, extractPdfText, isPdfBuffer } from '@/lib/quick-test/pdf-extract';
+import { DocxExtractionError, extractDocxText, isDocxBuffer } from '@/lib/quick-test/docx-extract';
 import { analyzeWithGemini, isLlmConfigured } from '@/lib/quick-test/llm';
 import { analyzeResumeText } from '@/lib/quick-test/analysis';
 import { validateCvDocument } from '@/lib/quick-test/guardrail';
@@ -48,10 +49,10 @@ export async function POST(request: Request): Promise<Response> {
   const ip = clientIp(request);
   const userAgent = (request as Request & { headers: Headers }).headers.get('user-agent') || undefined;
 
-  // 1) Rate limiting (non bloquant — loggué mais on laisse passer)
+  // 1) Rate limiting (non bloquant â€” logguÃ© mais on laisse passer)
   const rateOk = await checkRateLimit(ip).catch(() => true);
   if (!rateOk) {
-    console.warn(`[quick-test] Rate limit exceeded for ip_hash=${ip.slice(0, 3)}…`);
+    console.warn(`[quick-test] Rate limit exceeded for ip_hash=${ip.slice(0, 3)}â€¦`);
   }
 
   // 2) Extraction du formulaire
@@ -59,27 +60,34 @@ export async function POST(request: Request): Promise<Response> {
   try {
     formData = await request.formData();
   } catch {
-    return errorResponse('Requête invalide : impossible de lire le fichier envoyé.', 400);
+    return errorResponse('RequÃªte invalide : impossible de lire le fichier envoyÃ©.', 400);
   }
 
   const file = formData.get('file');
   if (!(file instanceof File)) {
-    return errorResponse('Aucun fichier reçu. Déposez votre CV au format PDF.', 400);
+    return errorResponse('Aucun fichier reÃ§u. DÃ©posez votre CV au format PDF ou Word.', 400);
   }
 
-  // 3) Validation upload (PDF + magic bytes)
+  // 3) Validation upload (PDF + DOCX + magic bytes)
   const arrayBuf = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuf);
 
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  if (!isPdf) {
+  const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.toLowerCase().endsWith('.docx');
+  if (!isPdf && !isDocx) {
     await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
-    return errorResponse('Le test rapide accepte uniquement les fichiers PDF.', 415);
+    return errorResponse('Le test rapide accepte uniquement les fichiers PDF et Word (.docx).', 415);
   }
 
-  if (!isPdfBuffer(buffer)) {
+  const pdfMagic = isPdfBuffer(buffer);
+  const docxMagic = isDocxBuffer(buffer);
+  if (isPdf && !pdfMagic) {
     await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
-    return errorResponse('Le fichier n’est pas un véritable PDF (signature magic bytes invalide).', 422);
+    return errorResponse('Le fichier n’est pas un véritable PDF (signature invalide).', 422);
+  }
+  if (isDocx && !docxMagic) {
+    await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
+    return errorResponse('Le fichier n’est pas un véritable document Word (.docx) (signature invalide).', 422);
   }
 
   if (buffer.length === 0) {
@@ -93,24 +101,33 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // 4) Extraction texte
-  let extraction;
-  console.time('[quick-test] PDF extraction');
+  // 4) Extraction texte (PDF ou DOCX)
+  let text: string;
+  let pageCount: number;
+  console.time('[quick-test] Extraction');
   try {
-    extraction = extractPdfText(buffer);
-    console.timeEnd('[quick-test] PDF extraction');
+    if (isPdf) {
+      const extraction = extractPdfText(buffer);
+      text = extraction.text;
+      pageCount = extraction.pageCount;
+    } else {
+      const extraction = await extractDocxText(buffer);
+      text = extraction.text;
+      pageCount = 1;
+    }
+    console.timeEnd('[quick-test] Extraction');
   } catch (error) {
-    console.timeEnd('[quick-test] PDF extraction');
+    console.timeEnd('[quick-test] Extraction');
     const message =
-      error instanceof PdfExtractionError
+      error instanceof PdfExtractionError || error instanceof DocxExtractionError
         ? error.message
-        : 'Impossible de lire ce PDF. Il est peut-être corrompu.';
+        : 'Impossible de lire ce document. Il est peut-Ãªtre corrompu.';
     return errorResponse(message, 422);
   }
 
-  if (extraction.text.length === 0) {
+  if (text.length === 0) {
     return errorResponse(
-      'Aucun texte extractible : ce PDF semble être un document scanné (image). Le test rapide nécessite un PDF textuel.',
+      'Aucun texte extractible : ce document semble Ãªtre un PDF scannÃ© (image) ou un Word contenant uniquement des images. Le test rapide nÃ©cessite un document textuel.',
       422
     );
   }
@@ -118,9 +135,9 @@ export async function POST(request: Request): Promise<Response> {
     // 5) Tracking de l'upload
   await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
 
-  // 6) 🔒 Guardrail sémantique — « est-ce vraiment un CV ? »
+  // 6) ðŸ”’ Guardrail sÃ©mantique â€” Â« est-ce vraiment un CV ? Â»
   console.time('[quick-test] Guardrail validation');
-  const validation = await validateCvDocument(extraction.text);
+  const validation = await validateCvDocument(text);
   console.timeEnd('[quick-test] Guardrail validation');
   if (!validation.ok) {
     await logQuickTestEvent({
@@ -130,42 +147,42 @@ export async function POST(request: Request): Promise<Response> {
       ip,
       userAgent,
     });
-    console.warn(`[quick-test] ❌ Non-CV rejeté par le guardrail : ${validation.reason}`);
+    console.warn(`[quick-test] âŒ Non-CV rejetÃ© par le guardrail : ${validation.reason}`);
     return errorResponse(
-      `Ce document ne semble pas être un CV (${validation.reason}). Veuillez télécharger un curriculum vitæ valide.`,
+      `Ce document ne semble pas Ãªtre un CV (${validation.reason}). Veuillez tÃ©lÃ©charger un curriculum vitÃ¦ valide.`,
       422
     );
   }
-  console.info(`[quick-test] ✅ Document validé comme CV (${validation.reason})`);
+  console.info(`[quick-test] âœ… Document validÃ© comme CV (${validation.reason})`);
 
-  // 7) Analyse LLM (Gemini) → fallback heuristique transparent
+  // 7) Analyse LLM (Gemini) â†’ fallback heuristique transparent
   let analysis: QuickTestAnalysis | null = null;
   let source: QuickTestSource = 'heuristic';
 
   if (isLlmConfigured()) {
     console.time('[quick-test] LLM analysis');
-    analysis = await analyzeWithGemini(extraction.text);
+    analysis = await analyzeWithGemini(text);
     console.timeEnd('[quick-test] LLM analysis');
     if (analysis) {
       source = 'llm';
     } else {
       console.warn(
-        `[quick-test] ⚠ HEURISTIC FALLBACK — Gemini a échoué pour un CV valide (texte: ${extraction.text.length} chars, pages: ${extraction.pageCount})`
+        `[quick-test] âš  HEURISTIC FALLBACK â€” Gemini a Ã©chouÃ© pour un CV valide (texte: ${text.length} chars, pages: ${pageCount})`
       );
     }
   } else {
-    console.warn('[quick-test] ⚠ HEURISTIC FALLBACK — GEMINI_API_KEY non configuré.');
+    console.warn('[quick-test] âš  HEURISTIC FALLBACK â€” GEMINI_API_KEY non configurÃ©.');
   }
 
   if (!analysis) {
-    analysis = analyzeResumeText(extraction.text);
+    analysis = analyzeResumeText(text);
   }
 
   if (!analysis) {
     return errorResponse('Le contenu extrait est trop court pour produire une analyse fiable.', 422);
   }
 
-  // 8) Tracking de l'analyse (succès LLM vs fallback)
+  // 8) Tracking de l'analyse (succÃ¨s LLM vs fallback)
   await logQuickTestEvent({
     eventType: source === 'llm' ? 'analysis_success' : 'analysis_fallback',
     source,
@@ -174,19 +191,19 @@ export async function POST(request: Request): Promise<Response> {
     userAgent,
   });
 
-  // 9) Réponse — mêmes données métier + header de vérifiabilité
+  // 9) RÃ©ponse â€” mÃªmes donnÃ©es mÃ©tier + header de vÃ©rifiabilitÃ©
   const response: QuickTestResponse = {
     metadata: {
       fileName: file.name,
       fileSizeBytes: buffer.length,
-      pageCount: extraction.pageCount,
-      wordCount: countWords(extraction.text),
+      pageCount,
+      wordCount: countWords(text),
     },
     analysis,
     source,
   };
 
-  console.info(`[quick-test] ✅ Réponse envoyée — source=${source}, score=${analysis.score ?? 'N/A'}`);
+  console.info(`[quick-test] âœ… RÃ©ponse envoyÃ©e â€” source=${source}, score=${analysis.score ?? 'N/A'}`);
   console.timeEnd('[quick-test] Total request');
 
   return new Response(JSON.stringify(response), {

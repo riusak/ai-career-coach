@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 
 /**
  * Conversion modal gating the Quick Test advanced features: shown when a
@@ -15,6 +16,10 @@ interface SignupModalProps {
 }
 
 export default function SignupModal({ open, onClose }: SignupModalProps) {
+  const t = useTranslations('landing');
+  const tAuth = useTranslations('auth');
+  const tCommon = useTranslations('common');
+
   useEffect(() => {
     if (!open) {
       return;
@@ -45,12 +50,12 @@ export default function SignupModal({ open, onClose }: SignupModalProps) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md rounded-2xl border border-gold-200 bg-white p-8 shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-orange-200 bg-white p-8 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <button
           type="button"
-          aria-label="Fermer"
+          aria-label={tCommon('close')}
           onClick={onClose}
           className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
         >
@@ -69,7 +74,7 @@ export default function SignupModal({ open, onClose }: SignupModalProps) {
           </svg>
         </button>
 
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 text-slate-950 shadow-md">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-md">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -90,41 +95,58 @@ export default function SignupModal({ open, onClose }: SignupModalProps) {
           id="signup-modal-title"
           className="mt-4 text-xl font-bold tracking-tight text-slate-900"
         >
-          Créez un compte gratuitement pour débloquer
+          {t('unlockButton')}
         </h2>
         <p className="mt-2 text-sm text-slate-600">
-          Votre aperçu gratuit reste éphémère. Avec un compte, vous accédez à
-          l&apos;analyse complète, au matching d&apos;offres et à votre historique.
+          {tAuth('signUpSubtitle')}
         </p>
 
         <ul className="mt-4 space-y-2 text-sm text-slate-600">
           <li className="flex items-center gap-2">
-            <span aria-hidden="true" className="text-gold-600">✦</span>
-            Analyse complète & recommandations détaillées
+            <CheckBullet />
+            {t('unlockFull')}
           </li>
           <li className="flex items-center gap-2">
-            <span aria-hidden="true" className="text-gold-600">✦</span>
-            Matching CV ↔ offre d&apos;emploi
+            <CheckBullet />
+            {t('unlockMatching')}
           </li>
           <li className="flex items-center gap-2">
-            <span aria-hidden="true" className="text-gold-600">✦</span>
-            Simulations d&apos;entretien & bibliothèque de CVs
+            <CheckBullet />
+            {t('unlockLibrary')}
           </li>
         </ul>
 
         <Link
           href="/signup"
-          className="mt-6 block rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 px-6 py-3 text-center text-sm font-bold text-slate-950 shadow-md transition-all hover:from-gold-500 hover:to-gold-600"
+          className="mt-6 block rounded-lg bg-gradient-to-r from-orange-400 to-orange-500 px-6 py-3 text-center text-sm font-bold text-slate-950 shadow-md transition-all hover:from-orange-500 hover:to-orange-600"
         >
-          Créer mon compte gratuit
+          {tAuth('submitSignUp')}
         </Link>
         <p className="mt-3 text-center text-xs text-slate-500">
-          Déjà inscrit ?{' '}
-          <Link href="/login" className="font-medium text-gold-700 underline">
-            Se connecter
+          {tAuth('haveAccount')}{' '}
+          <Link href="/login" className="font-medium text-orange-700 underline">
+            {tAuth('submitSignIn')}
           </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+function CheckBullet() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-3.5 w-3.5 shrink-0 text-orange-600"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   );
 }

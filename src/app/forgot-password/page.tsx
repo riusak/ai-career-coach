@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
+import AuthShell from '@/components/auth/AuthShell';
+import { useTranslations } from 'next-intl';
 import ErrorState from '@/components/ui/ErrorState';
 import SuccessBanner from '@/components/ui/SuccessBanner';
 
@@ -19,6 +21,8 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
+  const t = useTranslations('auth');
+  const tCommon = useTranslations('common');
 
   const handleReset = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -40,7 +44,7 @@ export default function ForgotPasswordPage() {
       setError(
         err instanceof Error
           ? err.message
-          : 'An unexpected error occurred while requesting the reset email.'
+          : t('errorUnexpectedForgot')
       );
     } finally {
       setLoading(false);
@@ -48,41 +52,40 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
+    <AuthShell>
+      <div className="space-y-8">
         <div>
-          <div className="mx-auto mb-6 h-1 w-12 rounded-full bg-gradient-to-r from-gold-400 to-gold-600" />
-          <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-            Reset your password
+          <h1 className="text-center text-2xl font-bold tracking-tight text-navy-900">
+            {t('forgotTitle')}
           </h1>
-          <p className="mt-2 text-center text-sm text-slate-600">
-            Enter your account email and we will send you a reset link.
+          <p className="mt-2 text-center text-sm text-navy-600">
+            {t('forgotSubtitle')}
           </p>
         </div>
 
         {error && (
-          <ErrorState title="Reset request failed" description={error}>
+          <ErrorState title={t('forgotErrorTitle')} description={error}>
             <button
               type="button"
               onClick={() => setError(null)}
               className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
             >
-              Try again
+              {tCommon('retry')}
             </button>
           </ErrorState>
         )}
 
         {sent && (
           <SuccessBanner
-            title="Check your inbox"
-            description={`If an account exists for ${email}, a password reset link is on its way. The link opens our reset page automatically — no routing errors to worry about.`}
+            title={t('forgotSuccessTitle')}
+            description={t('forgotSuccessDesc', { email })}
           />
         )}
 
         <form className="mt-8 space-y-6" onSubmit={handleReset}>
           <div>
-            <label htmlFor="email-address" className="block text-sm font-medium text-slate-700">
-              Email address
+            <label htmlFor="email-address" className="block text-sm font-medium text-navy-700">
+              {t('email')}
             </label>
             <input
               id="email-address"
@@ -93,8 +96,8 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               disabled={loading || sent}
-              className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-              placeholder="name@example.com"
+              className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+              placeholder={t('emailPlaceholder')}
             />
           </div>
 
@@ -102,23 +105,33 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading || sent}
-              className="flex w-full justify-center rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Sending reset link...' : 'Send reset link'}
+              {loading ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  />
+                  {t('forgotLoading')}
+                </>
+              ) : (
+                t('submitForgot')
+              )}
             </button>
           </div>
         </form>
 
-        <p className="text-center text-sm text-slate-600">
-          Remembered it?{' '}
+        <p className="text-center text-sm text-navy-600">
+          {t('rememberedIt')}{' '}
           <Link
             href="/login"
-            className="font-medium text-gold-700 underline transition-colors hover:text-gold-800"
+            className="font-medium text-orange-700 underline transition-colors hover:text-orange-800"
           >
-            Back to sign in
+            {t('backToLogin')}
           </Link>
         </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }

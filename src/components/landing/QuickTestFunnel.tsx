@@ -1,19 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import { MAX_RESUME_FILE_SIZE_BYTES, formatBytes } from '@/lib/resume-validation';
 import SignupModal from '@/components/landing/SignupModal';
 import ConversionModal from '@/components/landing/ConversionModal';
+import QuickTestResultSection, { ANALYSIS_STEP_KEYS } from '@/components/landing/QuickTestResult';
 import ErrorState from '@/components/ui/ErrorState';
-import LoadingSteps from '@/components/ui/LoadingSteps';
-import SuccessBanner from '@/components/ui/SuccessBanner';
-import type {
-  InsightItem,
-  QuickTestAnalysis,
-  QuickTestResponse,
-  ScoreBreakdownItem,
-} from '@/types/quick-test';
+import type { QuickTestResponse } from '@/types/quick-test';
 
 /**
  * Visitor Quick Test funnel (docs/product/mvp.md §2): drag & drop a PDF,
@@ -27,243 +24,50 @@ interface QuickTestFunnelProps {
   isAuthenticated: boolean;
 }
 
-const LOCKED_FEATURES = [
-  {
-    title: 'Analyse complète & détaillée',
-    description:
-      'Recommandations approfondies, plan d’action priorisé et réécriture guidée section par section.',
-  },
-  {
-    title: 'Matching offre d’emploi',
-    description:
-      'Confrontez votre CV à une offre cible : score d’adéquation, mots-clés manquants et écarts à combler.',
-  },
-  {
-    title: 'Bibliothèque & historique',
-    description:
-      'Gérez plusieurs versions de votre CV et suivez la progression de vos analyses dans le temps.',
-  },
-] as const;
-
-/**
- * "Billet d'attente" steps shown while the analysis runs. They advance on a
- * timer (not on real completion) to maximize perceived performance; each
- * stage realistically matches the backend pipeline order.
- */
-const ANALYSIS_STEPS = [
-  'Extraction du texte en cours',
-  'Analyse des compétences par l’IA',
-  'Génération des recommandations',
-] as const;
-
 const STEP_DURATIONS_MS = [1600, 3400, 8000] as const;
 
-function ScoreRing({ score }: { score: number }) {
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-  // Animate from 0 on mount: the ring sweep + count-up create a celebratory
-  // reveal once the analysis completes (perceived performance pattern).
-  const [shownScore, setShownScore] = useState(0);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      setMounted(true);
-      setShownScore(score);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [score]);
-
-  const progress = mounted ? shownScore / 100 : 0;
-  const offset = circumference * (1 - progress);
-
-  return (
-    <div className="relative h-32 w-32 shrink-0">
-      <svg viewBox="0 0 120 120" className="h-32 w-32 -rotate-90">
-        <circle cx="60" cy="60" r={radius} fill="none" strokeWidth="10" className="stroke-gold-100" />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          fill="none"
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className="stroke-gold-500 transition-all duration-1000 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-extrabold text-slate-900">{shownScore}</span>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-gold-700">/ 100</span>
-      </div>
-    </div>
-  );
-}
-
-function FindingList({
-  title,
-  items,
-  tone,
-}: {
-  title: string;
-  items: InsightItem[];
-  tone: 'positive' | 'negative';
-}) {
-  return (
-    <div>
-      <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-      <ul className="mt-2.5 space-y-3">
-        {items.map((item) => (
-          <li key={item.title} className="flex gap-2 text-sm">
-            <span
-              aria-hidden="true"
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                tone === 'positive'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-red-100 text-red-700'
-              }`}
-            >
-              {tone === 'positive' ? '✓' : '✕'}
-            </span>
-            <div className="min-w-0">
-              <p className="font-medium text-slate-900">{item.title}</p>
-              {item.detail && <p className="mt-0.5 text-slate-600">{item.detail}</p>}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** Per-dimension score bars with the recruiter justification underneath. */
-function ScoreBreakdownPanel({ items }: { items: ScoreBreakdownItem[] }) {
-  return (
-    <div>
-      <h4 className="text-sm font-semibold text-slate-900">
-        Détail du score par dimension
-      </h4>
-      <ul className="mt-3 space-y-3.5">
-        {items.map((item) => (
-          <li key={item.category}>
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="text-sm font-medium text-slate-900">{item.category}</p>
-              <p className="shrink-0 text-sm font-bold text-gold-800">{item.score}/100</p>
-            </div>
-            <div
-              role="progressbar"
-              aria-valuenow={item.score}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`Score ${item.category}`}
-              className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100"
-            >
-              <div
-                className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                  item.score >= 70
-                    ? 'bg-emerald-500'
-                    : item.score >= 45
-                      ? 'bg-gold-500'
-                      : 'bg-red-400'
-                }`}
-                style={{ width: `${item.score}%` }}
-              />
-            </div>
-            {item.comment && <p className="mt-1 text-xs text-slate-500">{item.comment}</p>}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** Targeted expert advice cards (formatting, action verbs, quantified impact). */
-function ExpertAdvice({ analysis }: { analysis: QuickTestAnalysis }) {
-  const cards = [
-    { title: 'Mise en page & format', body: analysis.formattingAdvice },
-    { title: 'Verbes d’action', body: analysis.actionVerbsAdvice },
-    { title: 'Impact chiffré', body: analysis.impactMetricsAdvice },
-  ].filter((card) => card.body.length > 0);
-
-  if (cards.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="mt-6">
-      <h4 className="text-sm font-semibold text-slate-900">Conseils d’expert ciblés</h4>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        {cards.map((card) => (
-          <div key={card.title} className="rounded-lg border border-slate-200 bg-slate-50 p-3.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
-              {card.title}
-            </p>
-            <p className="mt-1.5 text-sm text-slate-600">{card.body}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LockedFeatureCard({
-  title,
-  description,
-  onUnlock,
-}: {
-  title: string;
-  description: string;
-  onUnlock: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onUnlock}
-      className="relative w-full cursor-pointer overflow-hidden rounded-xl border border-gold-200 bg-white p-5 text-left shadow-sm transition-all hover:border-gold-400 hover:shadow-md"
-    >
-      <div aria-hidden="true" className="pointer-events-none select-none blur-[3px]">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        <p className="mt-1.5 text-sm text-slate-500">{description}</p>
-        <div className="mt-3 h-2 w-3/4 rounded-full bg-slate-100" />
-        <div className="mt-2 h-2 w-1/2 rounded-full bg-slate-100" />
-      </div>
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/60 px-4 text-center">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className="h-5 w-5 text-gold-600"
-        >
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-        <p className="text-xs font-semibold text-gold-800">Réservé aux membres</p>
-        <p className="text-[11px] font-medium text-gold-700 underline underline-offset-2">
-          Cliquer pour débloquer
-        </p>
-      </div>
-    </button>
-  );
-}
-
 export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProps) {
+  const t = useTranslations('landing');
+  const tCommon = useTranslations('common');
+  const tNav = useTranslations('nav');
   const [step, setStep] = useState<FunnelStep>('idle');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
     const [result, setResult] = useState<QuickTestResponse | null>(null);
+  // True when the server answered with a heuristic-fallback analysis (source
+  // !== 'llm'): a visible warning banner with a retry action is rendered in
+  // the results portal instead of relying on the small "Mode dégradé" badge.
+  const [degradedNotice, setDegradedNotice] = useState(false);
   const [showConversionModal, setShowConversionModal] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  /**
+   * Returns the server-rendered portal root (`#quick-test-results-root`).
+   * Read directly at render time — no state/effect needed, the node is part
+   * of the static HTML and never disappears, so a single DOM lookup is enough.
+   */
+  const getPortalTarget = useCallback(() => {
+    if (typeof document === 'undefined') {
+      return null;
+    }
+    return document.getElementById('quick-test-results-root');
+  }, []);
+
+  /** Smoothly bring the results section (just below the fold) into view.
+   *  Re-targets the inner `#resultats-analyse` once it mounts so the user
+   *  always lands on the freshly-painted result card. */
+  const scrollToResults = useCallback(() => {
+    const target =
+      document.getElementById('resultats-analyse') ?? getPortalTarget();
+    if (!target) {
+      return;
+    }
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [getPortalTarget]);
 
   // "Billet d'attente": advance the progress steps on a timer while the
   // analysis request is in flight (perceived performance — the UI keeps
@@ -293,7 +97,10 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
 
 const clearSelection = useCallback(() => {
     setSelectedFile(null);
-    setClientError(null);
+    // Back to the dropzone: leaving `step` on 'ready' with a null file would
+    // unmount the whole block and freeze the funnel on a blank screen (the
+    // "Changer" bug).
+    setStep('idle');
     if (inputRef.current) {
       inputRef.current.value = '';
     }
@@ -301,7 +108,9 @@ const clearSelection = useCallback(() => {
 
   const resetFunnel = useCallback(() => {
     clearSelection();
+    setClientError(null);
     setServerError(null);
+    setDegradedNotice(false);
     setResult(null);
     setStep('idle');
   }, [clearSelection]);
@@ -316,22 +125,24 @@ const clearSelection = useCallback(() => {
       }
 
       // Visitor mode: PDF only, 5 MB max (mvp.md §2.2).
-      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      if (!isPdf) {
-        setClientError('Format non supporté : le test rapide accepte uniquement des fichiers PDF.');
+const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.toLowerCase().endsWith('.docx');
+if (!isPdf && !isDocx) {
+        setClientError(t('errorNotPdf'));
         clearSelection();
         return;
       }
       if (file.size <= 0) {
-        setClientError('Le fichier est vide.');
+        setClientError(t('errorEmpty'));
         clearSelection();
         return;
       }
       if (file.size > MAX_RESUME_FILE_SIZE_BYTES) {
         setClientError(
-          `Fichier trop volumineux (${formatBytes(file.size)}). Maximum : ${formatBytes(
-            MAX_RESUME_FILE_SIZE_BYTES
-          )}.`
+          t('errorTooLarge', {
+            size: formatBytes(file.size),
+            max: formatBytes(MAX_RESUME_FILE_SIZE_BYTES),
+          })
         );
         clearSelection();
         return;
@@ -340,7 +151,7 @@ const clearSelection = useCallback(() => {
       setSelectedFile(file);
       setStep('ready');
     },
-    [clearSelection]
+    [clearSelection, t]
   );
 
   const runAnalysis = useCallback(async () => {
@@ -349,10 +160,20 @@ const clearSelection = useCallback(() => {
     }
 
     setServerError(null);
-    // Reset the "billet d'attente" before each new run (also handles the
-    // retry case where a previous analysis already advanced the steps).
+    // Reset the "billet d'attente" and the degraded-mode notice before each
+    // new run (also handles the retry case where a previous analysis already
+    // advanced the steps).
     setAnalysisStep(0);
+    setDegradedNotice(false);
     setStep('analyzing');
+
+    // Guided navigation: the results area (skeleton first) sits just below
+    // the fold — glide down to it as soon as the analysis starts. Two
+    // requests: one immediately for the skeleton, one after the report
+    // replaces it so the user lands on the freshly-painted result card
+    // (the section's height changes once the skeleton becomes a real grid).
+    window.setTimeout(scrollToResults, 120);
+    window.setTimeout(scrollToResults, 1200);
 
     try {
       const formData = new FormData();
@@ -368,35 +189,46 @@ const clearSelection = useCallback(() => {
 
       if (!response.ok) {
         const payload: { error?: string } = await response.json().catch(() => ({}));
-        throw new Error(payload.error ?? 'Une erreur est survenue pendant l’analyse.');
+        throw new Error(payload.error ?? t('errorGeneric'));
       }
 
       const payload: QuickTestResponse = await response.json();
+      // Successful API call: only flag the degraded state when the analysis
+      // genuinely fell back to the heuristic engine — a real LLM result
+      // displays the full AI-powered scores with no warning.
+      setDegradedNotice(payload.source !== 'llm');
       setResult(payload);
       setStep('result');
     } catch (error) {
-      let message = 'Une erreur est survenue pendant l’analyse.';
+      let message = t('errorGeneric');
       if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-        message =
-          'Le serveur met trop de temps à répondre. Vérifiez votre connexion puis réessayez — votre CV n’a pas été conservé.';
+        message = t('errorTimeout');
       } else if (error instanceof Error) {
         message = error.message;
       }
       setServerError(message);
       setStep('ready');
     }
-  }, [selectedFile]);
+  }, [selectedFile, scrollToResults, t]);
 
   const errorMessage = clientError ?? serverError;
 
   return (
-    <div className="rounded-2xl border border-gold-200 bg-white p-6 shadow-xl shadow-gold-100/60 sm:p-8">
+    <div className="rounded-2xl border border-orange-200 bg-white p-6 shadow-xl shadow-orange-100/60 sm:p-8">
       {step === 'idle' && (
         <div>
+          {/* Local validation errors (non-PDF, empty, oversized file) are set
+              by selectFile right before clearSelection() returns here — they
+              must stay visible on the dropzone, not vanish with the card. */}
+          {clientError && (
+            <div className="mb-4">
+              <ErrorState title={t('errorTitle')} description={clientError} />
+            </div>
+          )}
           <div
             role="button"
             tabIndex={0}
-            aria-label="Déposer votre CV au format PDF"
+            aria-label={t('dragDrop')}
             onClick={() => inputRef.current?.click()}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
@@ -416,8 +248,8 @@ const clearSelection = useCallback(() => {
             }}
             className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors ${
               isDragActive
-                ? 'border-gold-500 bg-gold-50'
-                : 'border-gold-300 bg-gold-50/40 hover:border-gold-400 hover:bg-gold-50'
+                ? 'border-orange-500 bg-orange-50'
+                : 'border-orange-300 bg-orange-50/40 hover:border-orange-400 hover:bg-orange-50'
             }`}
           >
             <svg
@@ -429,36 +261,34 @@ const clearSelection = useCallback(() => {
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
-              className="h-12 w-12 text-gold-600"
+              className="h-12 w-12 text-orange-600"
             >
               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
             </svg>
             <p className="mt-4 text-base font-semibold text-slate-900">
-              Glissez-déposez votre CV ici
+              {t('dragDrop')}
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              ou{' '}
-              <span className="font-medium text-gold-700 underline decoration-gold-300 underline-offset-2">
-                parcourez vos fichiers
+              {tCommon('or')}{' '}
+              <span className="font-medium text-orange-700 underline decoration-orange-300 underline-offset-2">
+                {t('browse')}
               </span>
             </p>
-            <p className="mt-4 text-xs text-slate-500">
-              PDF uniquement · 5 Mo maximum · Analyse éphémère, rien n’est conservé
-            </p>
+            <p className="mt-4 text-xs text-slate-500">{t('fileHints')}</p>
           </div>
 
           <p className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs font-medium text-slate-500">
             <span className="flex items-center gap-1">
-              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold-500" />
-              100 % gratuit
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+              {t('trustFree')}
             </span>
             <span className="flex items-center gap-1">
-              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold-500" />
-              Sans inscription
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+              {t('trustNoSignup')}
             </span>
             <span className="flex items-center gap-1">
-              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold-500" />
-              Résultat en moins de 2 minutes
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+              {t('trustFast')}
             </span>
           </p>
         </div>
@@ -469,7 +299,7 @@ const clearSelection = useCallback(() => {
           {errorMessage && (
             <div className="mb-4">
               <ErrorState
-                title={clientError ? 'Fichier non valide' : 'Oups, une erreur est survenue'}
+                title={t('errorTitle')}
                 description={errorMessage}
               >
                 {serverError && selectedFile && (
@@ -478,18 +308,15 @@ const clearSelection = useCallback(() => {
                     onClick={runAnalysis}
                     className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-red-700"
                   >
-                    Réessayer l’analyse
+                    {tCommon('retry')}
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => {
-                    clearSelection();
-                    inputRef.current?.click();
-                  }}
+                  onClick={clearSelection}
                   className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
                 >
-                  Choisir un autre fichier
+                  {tCommon('cancel')}
                 </button>
               </ErrorState>
             </div>
@@ -497,24 +324,29 @@ const clearSelection = useCallback(() => {
 
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold-100 text-xs font-bold uppercase text-gold-700">
-                PDF
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-xs font-bold uppercase text-orange-700">
+                {t('fileLabel')}
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900">
                   {selectedFile.name}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {formatBytes(selectedFile.size)} · Prêt pour l’analyse
+                  {t('readySize', { size: formatBytes(selectedFile.size) })}
                 </p>
               </div>
             </div>
             <button
               type="button"
-              onClick={clearSelection}
+              onClick={() => {
+                clearSelection();
+                // Reopen the OS file picker right away: "Changer" must swap
+                // the file in one gesture, not just silently clear it.
+                inputRef.current?.click();
+              }}
               className="ml-3 shrink-0 text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700"
             >
-              Changer
+              {t('changeFile')}
             </button>
           </div>
 
@@ -522,193 +354,154 @@ const clearSelection = useCallback(() => {
             <button
               type="button"
               onClick={runAnalysis}
-              className="flex-1 rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-md transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2"
+              className="flex-1 rounded-lg bg-gradient-to-r from-orange-400 to-orange-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-md transition-all hover:from-orange-500 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2"
             >
-              Analyser mon CV — gratuitement
+              {t('analyzeButton')}
             </button>
             <button
               type="button"
               onClick={resetFunnel}
               className="rounded-lg border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
             >
-              Annuler
+              {tCommon('cancel')}
             </button>
           </div>
         </div>
       )}
 
-      {step === 'analyzing' && (
-        <div
-          aria-live="polite"
-          className="flex flex-col items-center justify-center rounded-xl border border-gold-100 bg-gold-50/40 py-12"
-        >
-          <LoadingSteps
-            steps={ANALYSIS_STEPS}
-            activeIndex={analysisStep}
-            label="Analyse de votre CV en cours…"
-          />
-          <p className="mt-6 text-xs text-slate-500">
-            Cela ne prend généralement que quelques secondes — aucun compte requis, rien
-            n’est conservé.
+{step === 'analyzing' && (
+        <div aria-live="polite" className="flex items-center gap-3 py-2">
+          <span
+            aria-hidden="true"
+            className="relative flex h-2.5 w-2.5 shrink-0"
+          >
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-500" />
+          </span>
+          <p className="text-sm font-semibold text-slate-900">
+            {t('analyzingInline')}
+          </p>
+          <p className="text-xs text-slate-500">
+            {t(`analysisSteps.${ANALYSIS_STEP_KEYS[analysisStep]}`)}
           </p>
         </div>
       )}
 
       {step === 'result' && result && (
-        <div aria-live="polite">
-          {errorMessage && (
-            <div className="mb-4">
-              <ErrorState
-                title="Oups, une erreur est survenue"
-                description={errorMessage}
-              >
-                <button
-                  type="button"
-                  onClick={resetFunnel}
-                  className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
-                >
-                  Choisir un autre fichier
-                </button>
-              </ErrorState>
-            </div>
-          )}
+        <div
+          aria-live="polite"
+          className="animate-fade-up flex flex-col items-center justify-center gap-5 py-6 text-center"
+        >
+          {/* "Analysé" badge — confirms the report is ready below the fold. */}
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-800">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="h-3.5 w-3.5"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            {t('resultBadge')}
+          </span>
 
-          <div className="mb-5">
-            <SuccessBanner
-              title="Analyse terminée !"
-              description="Voici votre aperçu gratuit. Vos points forts et vos axes d’amélioration prioritaires sont ci-dessous."
-            />
-          </div>
+          {/* Principal logo — large, centered, clean reveal. */}
+          <Image
+            src="/branding/logo-primary-light.png"
+            alt={tCommon('appName')}
+            width={560}
+            height={163}
+            priority
+            className="animate-fade-up h-28 w-auto object-contain sm:h-36"
+          />
 
-          {/* Score & document metadata */}
-          <div className="flex flex-col items-center gap-6 rounded-xl border border-gold-200 bg-gold-50/60 p-5 sm:flex-row">
-            <ScoreRing score={result.analysis.score} />
-            <div className="min-w-0 text-center sm:text-left">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
-                Aperçu gratuit
-              </p>
-              <h3
-                className="mt-1 truncate text-lg font-bold text-slate-900"
-                title={result.metadata.fileName}
-              >
-                {result.metadata.fileName}
-              </h3>
-              <p className="mt-1 text-sm text-slate-500">
-                {result.metadata.pageCount} page{result.metadata.pageCount > 1 ? 's' : ''} ·{' '}
-                {result.metadata.wordCount} mots · {formatBytes(result.metadata.fileSizeBytes)}
-              </p>
-              <p className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                <span className="inline-flex rounded-full border border-gold-200 bg-white px-2.5 py-0.5 text-xs font-medium text-gold-800">
-                  Analyse éphémère — rien n’est enregistré
-                </span>
-                <span
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    result.source === 'llm'
-                      ? 'border border-gold-300 bg-gold-100 text-gold-900'
-                      : 'border border-slate-200 bg-slate-50 text-slate-500'
-                  }`}
-                >
-                  {result.source === 'llm'
-                    ? '✦ Analyse par IA'
-                    : 'Mode dégradé (IA indisponible)'}
-                </span>
-              </p>
-            </div>
-          </div>
+          <p className="max-w-xs text-xs text-navy-600">
+            {t('resultSubtext')}
+          </p>
 
-          {/* Score breakdown by dimension */}
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-            <ScoreBreakdownPanel items={result.analysis.scoreBreakdown} />
-          </div>
-
-          {/* Findings */}
-          <div className="mt-6 grid gap-6 sm:grid-cols-2">
-            <FindingList
-              title="Points forts"
-              items={result.analysis.strengths}
-              tone="positive"
-            />
-            <FindingList
-              title="Points faibles"
-              items={result.analysis.weaknesses}
-              tone="negative"
-            />
-          </div>
-
-          {result.analysis.recommendations.length > 0 && (
-            <div className="mt-6 rounded-xl border border-gold-200 bg-gold-50/50 p-4">
-              <h4 className="text-sm font-semibold text-gold-900">
-                Recommandations prioritaires
-              </h4>
-              <ol className="mt-3 space-y-3">
-                {result.analysis.recommendations.map((recommendation, index) => (
-                  <li key={recommendation.title} className="flex gap-3 text-sm">
-                    <span
-                      aria-hidden="true"
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gold-500 text-[10px] font-bold text-slate-950"
-                    >
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-900">{recommendation.title}</p>
-                      {recommendation.detail && (
-                        <p className="mt-0.5 text-slate-600">{recommendation.detail}</p>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {/* Targeted expert advice */}
-          <ExpertAdvice analysis={result.analysis} />
-
-          {/* Gated features — conversion overlay */}
-          <div className="mt-8">
-            <div className="flex items-center gap-3">
-              <span className="h-px flex-1 bg-gold-200" aria-hidden="true" />
-              <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
-                Débloquez tout le potentiel
-              </p>
-              <span className="h-px flex-1 bg-gold-200" aria-hidden="true" />
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              {LOCKED_FEATURES.map((feature) => (
-                <LockedFeatureCard
-                  key={feature.title}
-                  title={feature.title}
-                  description={feature.description}
-                  onUnlock={() => setIsModalOpen(true)}
-                />
-              ))}
-            </div>
-            <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Link
-                href="/signup"
-                className="rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 px-6 py-3 text-sm font-bold text-slate-950 shadow-md transition-all hover:from-gold-500 hover:to-gold-600"
-              >
-                Créer un compte gratuitement pour débloquer
-              </Link>
-              <button
-                type="button"
-                onClick={resetFunnel}
-                className="text-sm font-medium text-slate-500 underline transition-colors hover:text-slate-700"
-              >
-                Tester un autre CV
-              </button>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={resetFunnel}
+            className="text-xs font-medium text-navy-500 underline transition-colors hover:text-navy-800"
+          >
+            {t('testAnother')}
+          </button>
         </div>
       )}
 
+      {/* Below-the-fold results: portaled into the server-rendered root so the
+          Hero card stays 100% stable. Renders the skeleton during analysis and
+          the full bento report once the payload arrives. */}
+      {(step === 'analyzing' || step === 'result') &&
+        (() => {
+          const target = getPortalTarget();
+          if (!target) {
+            return null;
+          }
+          return createPortal(
+            <>
+              {/* Degraded-mode warning: the server answered 200 but with the
+                  heuristic engine. Explicit, actionable feedback — the visitor
+                  can re-run the analysis to try for a real AI result. */}
+              {step === 'result' && degradedNotice && (
+                <div
+                  role="alert"
+                  className="animate-fade-up mb-4 flex flex-col items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm sm:flex-row sm:items-center"
+                >
+                  <div className="flex items-start gap-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="mt-0.5 h-5 w-5 shrink-0 text-amber-600"
+                    >
+                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                      <path d="M12 9v4M12 17h.01" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">
+                        {t('degradedTitle')}
+                      </p>
+                      <p className="mt-0.5 text-xs text-amber-800">
+                        {t('degradedDescription')}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={runAnalysis}
+                    className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                  >
+                    {t('degradedRetry')}
+                  </button>
+                </div>
+              )}
+              <QuickTestResultSection
+                status={step === 'result' ? 'result' : 'analyzing'}
+                result={result}
+                analysisStep={analysisStep}
+                onUnlock={() => setIsModalOpen(true)}
+                onReset={resetFunnel}
+              />
+            </>,
+            target
+          );
+        })()}
       {isAuthenticated && (
         <p className="mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">
-          Vous êtes connecté : retrouvez la gestion complète de vos CVs dans{' '}
-          <Link href="/dashboard" className="font-medium text-gold-700 underline">
-            votre tableau de bord
+          <Link href="/dashboard" className="font-medium text-orange-700 underline">
+            {tNav('dashboard')}
           </Link>
-          .
         </p>
       )}
 
@@ -722,7 +515,7 @@ const clearSelection = useCallback(() => {
         ref={inputRef}
         type="file"
         name="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="hidden"
         onChange={(event) => selectFile(event.target.files?.[0])}
         disabled={step === 'analyzing'}

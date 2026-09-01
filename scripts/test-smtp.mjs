@@ -37,9 +37,9 @@ try {
   await transporter.verify();
   console.info('[test-smtp] AUTH + CONNECTION OK (smtp-relay.brevo.com:587)');
   const info = await transporter.sendMail({
-    from: '"AI Career Coach" <effoeakolly@gmail.com>',
+    from: '"ForPro AI" <effoeakolly@gmail.com>',
     to: TO,
-    subject: 'Test SMTP — AI Career Coach',
+    subject: 'Test SMTP — ForPro AI',
     text: 'Configuration SMTP validée. Vous pouvez ignorer cet email.',
   });
   console.info(`[test-smtp] EMAIL SENT — messageId=${info.messageId} → ${TO}`);

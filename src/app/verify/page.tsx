@@ -1,15 +1,19 @@
-'use client';
+﻿'use client';
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/utils/supabase/client';
+import AuthShell from '@/components/auth/AuthShell';
+import BrandLoader from '@/components/ui/BrandLoader';
 import ErrorState from '@/components/ui/ErrorState';
 import SuccessBanner from '@/components/ui/SuccessBanner';
+import TransitionOverlay from '@/components/ui/TransitionOverlay';
 import { classifyAuthError } from '@/lib/supabase/auth-errors';
 
 /**
- * Email verification page — the visitor types the 6-digit OTP code sent by
+ * Email verification page â€” the visitor types the 6-digit OTP code sent by
  * Supabase Auth at signup ("Confirm signup" email template must render
  * {{ .Token }} so the code appears in the message body).
  *
@@ -22,17 +26,15 @@ import { classifyAuthError } from '@/lib/supabase/auth-errors';
 const CODE_LENGTH = 6;
 const RESEND_COOLDOWN_SECONDS = 60;
 
-function mapOtpError(message: string): string {
+function isInvalidOrExpired(message: string): boolean {
   const normalized = message.toLowerCase();
-  if (normalized.includes('expired') || normalized.includes('invalid')) {
-    return 'This code is invalid or has expired. Request a new code below and try again.';
-  }
-  return message;
+  return normalized.includes('expired') || normalized.includes('invalid');
 }
 
 function VerifyOtpForm() {
   const searchParams = useSearchParams();
   const email = (searchParams.get('email') ?? '').trim();
+  const t = useTranslations('auth');
   const router = useRouter();
   const supabase = createClient();
 
@@ -40,6 +42,8 @@ function VerifyOtpForm() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Branded route-transition overlay while navigating to /login?verified=1.
+  const [redirecting, setRedirecting] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
@@ -50,7 +54,7 @@ function VerifyOtpForm() {
 
   // If a session already exists (e.g. the visitor clicked the confirmation
   // link of the default email template, which auto-confirms), skip the form:
-  // the email is already verified — route to /login with the success banner.
+  // the email is already verified â€” route to /login with the success banner.
   useEffect(() => {
     let cancelled = false;
     const checkExistingSession = async () => {
@@ -63,7 +67,7 @@ function VerifyOtpForm() {
           router.replace('/login?verified=1');
         }
       } catch {
-        // Not signed in — normal path, show the code form.
+        // Not signed in â€” normal path, show the code form.
       }
     };
     void checkExistingSession();
@@ -149,12 +153,12 @@ function VerifyOtpForm() {
     setInfo(null);
 
     if (!email) {
-      setError('No email to verify. Restart the sign-up flow to receive a new code.');
+      setError(t('verifyNoEmailError'));
       return;
     }
     const token = digits.join('');
     if (token.length !== CODE_LENGTH) {
-      setError(`Please enter the ${CODE_LENGTH}-digit code from your email.`);
+      setError(t('verifyEnterCodeError', { length: CODE_LENGTH }));
       return;
     }
 
@@ -167,19 +171,20 @@ function VerifyOtpForm() {
       });
 
       if (verifyError) {
-        setError(mapOtpError(verifyError.message));
+        setError(isInvalidOrExpired(verifyError.message) ? t('verifyInvalidCode') : verifyError.message);
         return;
       }
 
-      // Verification succeeded — discard the auto-created session so the
+      // Verification succeeded â€” discard the auto-created session so the
       // auth proxy does not bounce the user away from /login.
       await supabase.auth.signOut();
+      setRedirecting(true);
       router.replace('/login?verified=1');
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'An unexpected error occurred while verifying the code.'
+          : t('errorUnexpectedVerify')
       );
     } finally {
       setLoading(false);
@@ -199,10 +204,10 @@ function VerifyOtpForm() {
       });
       if (resendError) {
         const info = classifyAuthError(resendError.message);
-        setError(info.kind === 'generic' ? mapOtpError(resendError.message) : info.message);
+        setError(info.kind === 'generic' ? (isInvalidOrExpired(resendError.message) ? t('verifyInvalidCode') : resendError.message) : info.message);
         return;
       }
-      setInfo('A new 6-digit code has been sent to your inbox.');
+      setInfo(t('verifySentDesc'));
       setResendIn(RESEND_COOLDOWN_SECONDS);
       setDigits(Array<string>(CODE_LENGTH).fill(''));
       focusDigit(0);
@@ -210,7 +215,7 @@ function VerifyOtpForm() {
       setError(
         err instanceof Error
           ? err.message
-          : 'An unexpected error occurred while resending the code.'
+          : t('errorUnexpectedResend')
       );
     }
   };
@@ -218,17 +223,17 @@ function VerifyOtpForm() {
   // Missing email param: the user probably landed on /verify directly.
   if (!email) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-6 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
+      <div className="flex min-h-screen items-center justify-center bg-brand-bg px-4 py-12 sm:px-6 lg:px-8">
+        <div className="w-full max-w-md space-y-6 rounded-xl border border-navy-100 bg-white p-8 shadow-xl shadow-navy-900/10">
           <ErrorState
-            title="No email to verify"
-            description="This page needs the email you registered with. Create your account to receive a 6-digit verification code."
+            title={t('verifyNoEmailTitle')}
+            description={t('verifyNoEmailDesc')}
           >
             <Link
               href="/signup"
-              className="rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-3 py-1.5 text-xs font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600"
+              className="rounded-md bg-gradient-to-r from-orange-400 to-orange-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:from-orange-500 hover:to-orange-600"
             >
-              Go to sign up
+              {t('verifyGoToSignup')}
             </Link>
           </ErrorState>
         </div>
@@ -239,27 +244,24 @@ function VerifyOtpForm() {
   const token = digits.join('');
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
+    <AuthShell>
+      <div className="space-y-8">
         <div>
-          <div className="mx-auto mb-6 h-1 w-12 rounded-full bg-gradient-to-r from-gold-400 to-gold-600" />
-          <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-            Verify your email
+          <h1 className="text-center text-2xl font-bold tracking-tight text-navy-900">
+            {t('verifyTitle')}
           </h1>
-          <p className="mt-2 text-center text-sm text-slate-600">
-            We sent a 6-digit code to{' '}
-            <strong className="font-semibold text-slate-900">{email}</strong>. Enter it below to
-            activate your account.
+          <p className="mt-2 text-center text-sm text-navy-600">
+            {t('verifySubtitlePrefix')}{' '}
+            <strong className="font-semibold text-navy-900">{email}</strong>. {t('verifySubtitleSuffix')}
           </p>
-          <p className="mt-1 text-center text-xs text-slate-500">
-            No code in the email? Click the confirmation link instead — your account gets
-            confirmed automatically.
+          <p className="mt-1 text-center text-xs text-navy-500">
+            {t('verifyNoCodeHint')}
           </p>
         </div>
 
-        {error && <ErrorState title="Verification failed" description={error} />}
+        {error && <ErrorState title={t('verifyErrorTitle')} description={error} />}
 
-        {info && <SuccessBanner title="Code sent" description={info} />}
+        {info && <SuccessBanner title={t('verifySuccessTitle')} description={info} />}
 
         <form className="space-y-6" onSubmit={handleVerify}>
           <div className="flex justify-center gap-2">
@@ -272,14 +274,14 @@ function VerifyOtpForm() {
                 type="text"
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                aria-label={`Digit ${index + 1} of ${CODE_LENGTH}`}
+                aria-label={t('digitLabel', { index: index + 1, length: CODE_LENGTH })}
                 maxLength={CODE_LENGTH}
                 value={digit}
                 onChange={(event) => handleChange(index, event.target.value)}
                 onKeyDown={(event) => handleKeyDown(index, event)}
                 onPaste={handlePaste}
                 disabled={loading}
-                className="h-12 w-11 rounded-md border border-slate-300 bg-white text-center text-lg font-semibold text-slate-900 shadow-sm focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
+                className="h-12 w-11 rounded-md border border-navy-200 bg-white text-center text-lg font-semibold text-navy-900 shadow-sm focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
               />
             ))}
           </div>
@@ -287,46 +289,62 @@ function VerifyOtpForm() {
           <div>
             <button
               type="submit"
-              disabled={loading || token.length !== CODE_LENGTH}
-              className="flex w-full justify-center rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={loading || redirecting || token.length !== CODE_LENGTH}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Verifying...' : 'Verify my email'}
+              {loading || redirecting ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  />
+                  {t('verifyLoading')}
+                </>
+              ) : (
+                t('submitVerify')
+              )}
             </button>
           </div>
         </form>
 
-        <p className="text-center text-sm text-slate-600">
-          Didn&apos;t receive it?{' '}
+        <p className="text-center text-sm text-navy-600">
+          {t('didNotReceive')}{' '}
           <button
             type="button"
             onClick={handleResend}
             disabled={resendIn > 0 || loading}
-            className="font-medium text-gold-700 underline transition-colors hover:text-gold-800 disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+            className="font-medium text-orange-700 underline transition-colors hover:text-orange-800 disabled:cursor-not-allowed disabled:text-navy-400 disabled:no-underline"
           >
-            {resendIn > 0 ? `Resend a new code (${resendIn}s)` : 'Resend a new code'}
+            {resendIn > 0 ? t('resendCooldown', { seconds: resendIn }) : t('resendCode')}
           </button>
         </p>
 
-        <p className="text-center text-sm text-slate-600">
-          Wrong email?{' '}
+        <p className="text-center text-sm text-navy-600">
+          {t('wrongEmail')}{' '}
           <Link
             href="/signup"
-            className="font-medium text-gold-700 underline transition-colors hover:text-gold-800"
+            className="font-medium text-orange-700 underline transition-colors hover:text-orange-800"
           >
-            Start over
+            {t('startOver')}
           </Link>
         </p>
+
+        <TransitionOverlay
+          show={redirecting}
+          label={t('verifyTransition')}
+        />
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
 export default function VerifyPage() {
+  const tCommon = useTranslations('common');
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold-200 border-t-gold-600" />
+        <div className="flex min-h-screen items-center justify-center bg-brand-bg">
+          <BrandLoader size={64} label={tCommon('loading')} />
         </div>
       }
     >

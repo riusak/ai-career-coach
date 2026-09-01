@@ -2,8 +2,8 @@
 
 /**
  * "Billet d'attente" — step-by-step progress feedback for long operations
- * (perceived performance pattern). Completed steps show a gold check, the
- * active step pulses with a spinner, upcoming steps stay dimmed. A gold
+ * (perceived performance pattern). Completed steps show an orange check, the
+ * active step pulses with a spinner, upcoming steps stay dimmed. An orange
  * progress bar reinforces the sense of forward motion.
  */
 
@@ -24,14 +24,14 @@ export default function LoadingSteps({ steps, activeIndex, label }: LoadingSteps
 
       {/* Progress bar */}
       <div
-        className="mx-auto mt-4 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-gold-100"
+        className="mx-auto mt-4 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-orange-100"
         role="progressbar"
         aria-valuenow={progress}
         aria-valuemin={0}
         aria-valuemax={100}
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-gold-400 to-gold-500 transition-all duration-700 ease-out"
+          className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 transition-all duration-700 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -46,9 +46,9 @@ export default function LoadingSteps({ steps, activeIndex, label }: LoadingSteps
                 aria-hidden="true"
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
                   isDone
-                    ? 'bg-gold-500 text-slate-950'
+                    ? 'bg-orange-500 text-slate-950'
                     : isActive
-                      ? 'bg-gold-100 text-gold-700'
+                      ? 'bg-orange-100 text-orange-700'
                       : 'bg-slate-100 text-slate-400'
                 }`}
               >
@@ -82,7 +82,7 @@ export default function LoadingSteps({ steps, activeIndex, label }: LoadingSteps
               <span
                 className={`text-sm transition-colors ${
                   isDone
-                    ? 'text-slate-400 line-through decoration-gold-300'
+                    ? 'text-slate-400 line-through decoration-orange-300'
                     : isActive
                       ? 'font-semibold text-slate-900'
                       : 'text-slate-400'

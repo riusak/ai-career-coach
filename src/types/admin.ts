@@ -107,6 +107,13 @@ export interface AuditLogRow {
   created_at: string;
 }
 
+/** One daily bucket used by the admin overview charts. */
+export interface DailyCount {
+  /** UTC date key (YYYY-MM-DD). */
+  date: string;
+  count: number;
+}
+
 /** Aggregated KPIs for the admin overview dashboard. */
 export interface AdminStats {
   totalUsers: number;
@@ -129,6 +136,10 @@ export interface AdminStats {
    * accounts" (anonymous events cannot be linked to accounts individually).
    */
   signupRate30d: number | null;
+  /** Daily Quick Test event counts over the last 14 days (oldest → newest). */
+  dailyEvents: DailyCount[];
+  /** Daily account signups over the last 14 days (oldest → newest). */
+  dailyUsers: DailyCount[];
   /** Most recent visitor Quick Test events (activity feed). */
   recentEvents: QuickTestEventRow[];
   /** Most recent admin audit entries. */

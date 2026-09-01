@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 /**
  * Inviting placeholder for empty collections or missing data.
  * Server-component friendly (no client hooks) — usable anywhere.
- * "Light & Gold" styling: subtle gold icon, clear guidance, optional action.
+ * "Navy & Orange" styling: subtle orange icon, clear guidance, optional action.
  */
 
-export type EmptyStateIcon = 'document' | 'chart' | 'sparkles';
+export type EmptyStateIcon = 'document' | 'chart' | 'users';
 
 const ICONS: Record<EmptyStateIcon, ReactNode> = {
   document: (
@@ -41,7 +41,7 @@ const ICONS: Record<EmptyStateIcon, ReactNode> = {
       <path d="m19 9-5 5-4-4-3 3" />
     </svg>
   ),
-  sparkles: (
+  users: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
@@ -53,7 +53,9 @@ const ICONS: Record<EmptyStateIcon, ReactNode> = {
       aria-hidden="true"
       className="h-7 w-7"
     >
-      <path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   ),
 };
@@ -73,8 +75,8 @@ export default function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gold-200 bg-gold-50/40 px-6 py-10 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gold-100 text-gold-600">
+    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-orange-200 bg-orange-50/40 px-6 py-10 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 text-orange-600">
         {ICONS[icon]}
       </div>
       <h3 className="mt-4 text-base font-semibold text-slate-900">{title}</h3>

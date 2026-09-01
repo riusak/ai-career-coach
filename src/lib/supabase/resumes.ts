@@ -1,6 +1,9 @@
 import { createClient } from '@/utils/supabase/server';
 import { sanitizeFileName, validateResumeFile } from '@/lib/resume-validation';
 import type {
+  DeepAnalysisOutput,
+  DeepAnalysisProcessingMarker,
+  ParsedResumeContent,
   Resume,
   ResumeAnalysis,
   ResumeAnalysisType,
@@ -513,5 +516,224 @@ export async function createResumeSignedUrl(
         ? err.message
         : 'An unexpected error occurred while creating the preview URL.';
     return { data: null, error: message };
+  }
+}
+
+/**
+ * Downloads a resume file owned by the authenticated user from the private
+ * storage bucket (owner-only access enforced by the storage RLS policies).
+ */
+export async function downloadResumeFile(
+  filePath: string
+): Promise<ResumeResponse<Buffer>> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError?.message ?? 'No authenticated user found.' };
+    }
+
+    const { data, error } = await supabase.storage
+      .from(RESUME_BUCKET)
+      .download(filePath);
+
+    if (error || !data) {
+      return { data: null, error: error?.message ?? 'Failed to download the resume file.' };
+    }
+
+    const buffer = Buffer.from(await data.arrayBuffer());
+    return { data: buffer, error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'An unexpected error occurred while downloading the resume file.';
+    return { data: null, error: message };
+  }
+}
+
+/**
+ * Atomically claims a queued analysis row (score null, no output yet) for
+ * processing by writing a transient claim marker into `structured_output`.
+ * The conditional UPDATE is the concurrency guard: two concurrent pipeline
+ * runs (e.g. two browser tabs) cannot both claim the same row — only the
+ * first UPDATE matches and reports `claimed: true`. Requires the migration
+ * 007 UPDATE policy to be applied.
+ */
+export async function claimQueuedResumeAnalysis(
+  analysisId: string
+): Promise<{ claimed: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { claimed: false, error: authError?.message ?? 'No authenticated user found.' };
+    }
+
+    const marker: DeepAnalysisProcessingMarker = {
+      status: 'processing',
+      claimed_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('resume_analyses')
+      .update({ structured_output: marker })
+      .eq('id', analysisId)
+      .eq('user_id', user.id)
+      .is('score', null)
+      .is('structured_output', null)
+      .select('id');
+
+    if (error) {
+      return { claimed: false, error: error.message };
+    }
+
+    return { claimed: (data?.length ?? 0) === 1, error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'An unexpected error occurred while claiming the analysis.';
+    return { claimed: false, error: message };
+  }
+}
+
+/**
+ * Persists the deep analysis result on a still-queued row (score null →
+ * filled). The `score is null` guard keeps completed rows immutable
+ * (append-only spirit of migration 003). Returns `completed: false` when the
+ * row was concurrently completed or no longer exists.
+ */
+export async function completeResumeAnalysis(
+  analysisId: string,
+  score: number,
+  structuredOutput: DeepAnalysisOutput
+): Promise<{ completed: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { completed: false, error: authError?.message ?? 'No authenticated user found.' };
+    }
+
+    const { data, error } = await supabase
+      .from('resume_analyses')
+      .update({ score, structured_output: structuredOutput })
+      .eq('id', analysisId)
+      .eq('user_id', user.id)
+      .is('score', null)
+      .select('id');
+
+    if (error) {
+      return { completed: false, error: error.message };
+    }
+
+    return { completed: (data?.length ?? 0) === 1, error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'An unexpected error occurred while saving the analysis.';
+    return { completed: false, error: message };
+  }
+}
+
+/**
+ * Removes a still-queued analysis row (score null) owned by the caller.
+ * Used by the pipeline as an anti-deadlock escape hatch: when processing
+ * fails unrecoverably (unreadable/scanned file, corrupted upload), the row
+ * is dropped so the UI falls back to the empty state instead of polling a
+ * result that will never arrive. Completed rows are never touched.
+ */
+export async function deleteQueuedResumeAnalysis(
+  analysisId: string
+): Promise<{ deleted: boolean; error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { deleted: false, error: authError?.message ?? 'No authenticated user found.' };
+    }
+
+    const { data, error } = await supabase
+      .from('resume_analyses')
+      .delete()
+      .eq('id', analysisId)
+      .eq('user_id', user.id)
+      .is('score', null)
+      .select('id');
+
+    if (error) {
+      return { deleted: false, error: error.message };
+    }
+
+    return { deleted: (data?.length ?? 0) === 1, error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'An unexpected error occurred while cleaning up the analysis.';
+    return { deleted: false, error: message };
+  }
+}
+
+/**
+ * Updates the `parsed_content` column of a resume row to mark it as parsed.
+ * Called by the deep-analysis pipeline on successful completion so the
+ * catalogue UI immediately reflects "Analysé" instead of "Analyse en attente".
+ */
+export async function markResumeParsed(
+  resumeId: string,
+  parsedContent: ParsedResumeContent
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { error: authError?.message ?? 'No authenticated user found.' };
+    }
+
+    const { error } = await supabase
+      .from('resumes')
+      .update({ parsed_content: parsedContent })
+      .eq('id', resumeId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'An unexpected error occurred while marking the resume as parsed.';
+    return { error: message };
   }
 }

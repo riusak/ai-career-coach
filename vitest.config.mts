@@ -8,7 +8,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    passWithNoTests: true,
+        passWithNoTests: true,
+    // Exclude the k9/harness working-tree mirror (e.g. .kilo/worktrees/<branch>)
+    // so stale copies of the project's tests don't run twice.
+    exclude: ['**/node_modules/**', '**/.kilo/**', '**/.next/**'],
   },
   resolve: {
     alias: {

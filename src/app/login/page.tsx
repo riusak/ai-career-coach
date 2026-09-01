@@ -1,20 +1,28 @@
-'use client';
+﻿'use client';
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/utils/supabase/client';
 import { resolvePostLoginPath } from '@/lib/auth/post-login';
+import AuthShell from '@/components/auth/AuthShell';
+import BrandLoader from '@/components/ui/BrandLoader';
 import SuccessBanner from '@/components/ui/SuccessBanner';
+import TransitionOverlay from '@/components/ui/TransitionOverlay';
 
 function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Branded route-transition overlay: stays up from successful sign-in until
+  // the target route renders, masking the redirect latency.
+  const [redirecting, setRedirecting] = useState(false);
   const router = useRouter();
   const supabase = createClient();
   const searchParams = useSearchParams();
+  const t = useTranslations('auth');
   const verified = searchParams.get('verified') === '1';
   const resetDone = searchParams.get('reset') === '1';
 
@@ -48,32 +56,33 @@ function LoginForm() {
         role = (profileRow as { role: string } | null)?.role ?? null;
       }
 
-      // Keep the submit button disabled while the client navigates away.
+      // Keep the submit button disabled while the client navigates away, and
+      // show the branded transition overlay until the next route renders.
+      setRedirecting(true);
       router.replace(resolvePostLoginPath(role));
       router.refresh();
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : 'An unexpected error occurred during sign in.';
+        err instanceof Error ? err.message : t('errorUnexpectedSignIn');
       setError(message);
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA] px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-900/5">
+    <AuthShell>
+      <div className="space-y-8">
         <div>
-          <div className="mx-auto mb-6 h-1 w-12 rounded-full bg-gradient-to-r from-gold-400 to-gold-600" />
-          <h1 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-            Sign in to AI Career Coach
+          <h1 className="text-center text-2xl font-bold tracking-tight text-navy-900">
+            {t('signInTitle')}
           </h1>
-          <p className="mt-2 text-center text-sm text-slate-600">
-            Or{' '}
+          <p className="mt-2 text-center text-sm text-navy-600">
+            {t('signInOr')}{' '}
             <Link
               href="/signup"
-              className="font-medium text-gold-700 underline transition-colors hover:text-gold-800"
+              className="font-medium text-orange-700 underline transition-colors hover:text-orange-800"
             >
-              create a new account
+              {t('signUpTitle')}
             </Link>
           </p>
         </div>
@@ -89,15 +98,15 @@ function LoginForm() {
 
         {verified && (
           <SuccessBanner
-            title="Account verified successfully"
-            description="Your email is confirmed. Please sign in to continue."
+            title={t('verifiedTitle')}
+            description={t('verifiedDesc')}
           />
         )}
 
         {resetDone && (
           <SuccessBanner
-            title="Password updated"
-            description="Your new password is active. Please sign in with it."
+            title={t('resetDoneTitle')}
+            description={t('resetDoneDesc')}
           />
         )}
 
@@ -106,9 +115,9 @@ function LoginForm() {
             <div>
               <label
                 htmlFor="email-address"
-                className="block text-sm font-medium text-slate-700"
+                className="block text-sm font-medium text-navy-700"
               >
-                Email address
+                {t('email')}
               </label>
               <input
                 id="email-address"
@@ -119,8 +128,8 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-                placeholder="name@example.com"
+                className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+                placeholder={t('emailPlaceholder')}
               />
             </div>
 
@@ -128,15 +137,15 @@ function LoginForm() {
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="password"
-                  className="block text-sm font-medium text-slate-700"
+                  className="block text-sm font-medium text-navy-700"
                 >
-                  Password
+                  {t('password')}
                 </label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs font-medium text-gold-700 underline transition-colors hover:text-gold-800"
+                  className="text-xs font-medium text-orange-700 underline transition-colors hover:text-orange-800"
                 >
-                  Forgot password?
+                  {t('forgotPassword')}
                 </Link>
               </div>
               <input
@@ -148,8 +157,8 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600 disabled:opacity-50"
-                placeholder="••••••••"
+                className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
+                placeholder={t('passwordPlaceholder')}
               />
             </div>
           </div>
@@ -157,24 +166,40 @@ function LoginForm() {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="flex w-full justify-center rounded-md bg-gradient-to-r from-gold-400 to-gold-500 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm transition-all hover:from-gold-500 hover:to-gold-600 focus:outline-none focus:ring-2 focus:ring-gold-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={loading || redirecting}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-500/25 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading || redirecting ? (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  />
+                  {t('signInLoading')}
+                </>
+              ) : (
+                t('submitSignIn')
+              )}
             </button>
           </div>
         </form>
+
+        <TransitionOverlay
+          show={redirecting}
+          label={t('signInTransition')}
+        />
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
 export default function LoginPage() {
+  const tCommon = useTranslations('common');
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#FAFAFA]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold-200 border-t-gold-600" />
+        <div className="flex min-h-screen items-center justify-center bg-brand-bg">
+          <BrandLoader size={64} label={tCommon('loading')} />
         </div>
       }
     >

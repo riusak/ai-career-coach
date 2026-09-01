@@ -5,11 +5,31 @@ import {
   QUICK_TEST_EVENT_TYPES,
   type AdminStats,
   type AuditLogRow,
+  type DailyCount,
   type QuickTestEventRow,
   type QuickTestEventType,
 } from '@/types/admin';
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** Buckets raw UTC timestamps into the last 14 daily bins (oldest → newest). */
+function buildDailyBuckets(timestamps: string[]): DailyCount[] {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const buckets = new Map<string, number>();
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const day = new Date(today.getTime() - offset * 24 * 60 * 60 * 1000);
+    buckets.set(day.toISOString().slice(0, 10), 0);
+  }
+  for (const timestamp of timestamps) {
+    const key = timestamp.slice(0, 10);
+    if (buckets.has(key)) {
+      buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    }
+  }
+  return [...buckets.entries()].map(([date, count]) => ({ date, count }));
+}
 
 /**
  * Aggregates the KPIs rendered by the /admin overview dashboard.
@@ -66,6 +86,20 @@ export async function getAdminStats(): Promise<AdminStats | null> {
       return null;
     }
 
+    // 2bis. Daily buckets for the 14-day activity charts (overview graphs).
+    const since14d = new Date(Date.now() - FOURTEEN_DAYS_MS).toISOString();
+    const [dailyEventsRes, dailyUsersRes] = await Promise.all([
+      supabase
+        .from('quick_test_events')
+        .select('created_at')
+        .gte('created_at', since14d),
+      supabase.from('profiles').select('created_at').gte('created_at', since14d),
+    ]);
+    if (dailyEventsRes.error || dailyUsersRes.error) {
+      console.error('[admin] getAdminStats() daily bucket query failed.');
+      return null;
+    }
+
     const eventsByTypeEntries = QUICK_TEST_EVENT_TYPES.map((eventType, index) => [
       eventType as QuickTestEventType,
       typeRes[index]?.count ?? 0,
@@ -91,6 +125,12 @@ export async function getAdminStats(): Promise<AdminStats | null> {
       analysesCompleted,
       conversionRate: computePercent(eventsByType.conversion_cta, analysesCompleted),
       signupRate30d: computePercent(users30d, events30d),
+      dailyEvents: buildDailyBuckets(
+        (dailyEventsRes.data ?? []).map((row) => row.created_at),
+      ),
+      dailyUsers: buildDailyBuckets(
+        (dailyUsersRes.data ?? []).map((row) => row.created_at),
+      ),
       recentEvents: (recentEventsRes.data ?? []) as QuickTestEventRow[],
       recentAuditLogs: recentLogs.logs as AuditLogRow[],
     };

@@ -44,4 +44,16 @@ next-env.d.ts
 /supabase/backups/
 
 # supabase cli local session state
+# local debug / temp files
+*.log
+/h-al.txt
+/h-root.txt
+/h-signup.txt
+/login-body.html
+/signup-body.html
+/p1.txt
+/p2.txt
+/p3.txt
+/p4.txt
+/p5.txt
 /supabase/.temp/
