@@ -270,7 +270,7 @@ export default function DeepAnalysisReport({ output, completedAt }: DeepAnalysis
                 <rect x="6" y="6" width="12" height="12" rx="2" />
                 <path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" />
               </svg>
-              {source === 'llm' ? t('sourceLlm') : t('sourceDegraded')}
+              {source === 'llm' ? t('sourceLlm') : t('sourceLocalLegacy')}
             </span>
           </p>
         </div>

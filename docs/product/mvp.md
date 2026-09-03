@@ -54,8 +54,8 @@ expérience enrichie pour les utilisateurs authentifiés (Catalogue de CVs).
 [ Landing / CTA "Testez votre CV gratuitement" ]
         │
         ▼
-[ Upload PDF (drag & drop ou sélection) ]
-        │  validation client + serveur : PDF uniquement, ≤ 5 Mo
+[ Upload PDF/DOCX (drag & drop ou sélection) ]
+        │  validation client + serveur : PDF & DOCX, ≤ 5 Mo
         ▼
 [ Écran de traitement ]  ── pipeline léger : extraction texte + check automatisé
         │
@@ -74,8 +74,7 @@ expérience enrichie pour les utilisateurs authentifiés (Catalogue de CVs).
 ### 2.2 Règles fonctionnelles
 
 - **Un seul CV à la fois.** Relancer le test remplace le CV précédent ; rien n'est conservé.
-- **Formats acceptés :** PDF uniquement en mode visiteur (cohérent avec le bucket
-  `resumes` : `application/pdf`, limite 5 Mo).
+- **Formats acceptés :** PDF et Word (.docx) en mode visiteur (limite 5 Mo).
 - **Aucune persistance :** le fichier et le résultat ne sont ni stockés en base,
   ni dans Storage. Le traitement est éphémère (durée de vie = la session de requête).
 - **Rate limiting :** 1 test gratuit par IP / 24 h (anti-abus du pipeline IA).
@@ -141,7 +140,7 @@ expérience enrichie pour les utilisateurs authentifiés (Catalogue de CVs).
 | Ressource | Limite |
 |---|---|
 | Tests de CV (Quick Test) | 1 / IP / 24 h |
-| Formats | PDF uniquement |
+| Formats | PDF + Word (.docx) |
 | Taille fichier | 5 Mo max |
 | Profondeur d'analyse | Score global + 2–3 forces/faiblesses + 1–2 recommandations |
 | Persistance / historique | Aucun |

@@ -1,28 +1,28 @@
 ﻿/**
  * quick-test/route.ts — Endpoint public du Visitor Quick Test.
  *
- * Funnel public illimité (mvp.md §2.2) : 1 PDF envoyé → score + insights.
+ * Funnel public illimité (mvp.md §2.2) : 1 CV envoyé → score + insights.
  *
  * Pipeline de sécurité appliqué en ordre :
  *   1) Validation upload (type/size — 5 Mo PDF/DOCX, magic-bytes).
- *   2) Extraction texte PDF/DOCX.
- *   3) Vérification que le texte est extractible (rejette les scans/images).
- *   4) Analyse LLM (Gemini Flash — see llm.ts for the benchmarked model) → fallback heuristique transparent.
- *   5) Tracking anonyme (quick_test_events) + rate-limiting bloquant (429).
+ *   2) Extraction texte légère (métadonnées uniquement).
+ *   3) Analyse LLM — DOCUMENT NATIF : le PDF est envoyé tel quel à Gemini
+ *      (inline_data multimodal) pour que le modèle évalue la vraie mise en
+ *      page ; le DOCX part en texte extrait. AUCUN fallback heuristique :
+ *      un échec LLM est une erreur visible (502), jamais un faux score.
+ *   4) Tracking anonyme (quick_test_events) + rate-limiting bloquant (429).
  *
  * Conformité :
  *   - Aucune donnée persistante côté backend (hors logs d'audit anonymes).
  *   - L'IP est hachée HMAC-SHA256 serveur-only (jamais exposée au client).
- *   - Toutes les étapes sont synchrones (pas de file d'attente) ; le fallback
- *     heuristique garantit une réponse < 10 s même en cas d'indisponibilité LLM.
+ *   - Toutes les étapes sont synchrones (pas de file d'attente).
  */
 
 import { MAX_RESUME_FILE_SIZE_BYTES, MAX_RESUME_TEXT_CHARS, formatBytes } from '@/lib/resume-validation';
 import { PdfExtractionError, countWords, extractPdfText, isPdfBuffer } from '@/lib/quick-test/pdf-extract';
 import { DocxExtractionError, extractDocxText, isDocxBuffer } from '@/lib/quick-test/docx-extract';
 import { analyzeWithGemini, isLlmConfigured } from '@/lib/quick-test/llm';
-import { analyzeResumeText } from '@/lib/quick-test/analysis';
-import { heuristicCvGate } from '@/lib/quick-test/guardrail';
+import type { AnalysisDocumentMimeType } from '@/lib/quick-test/llm';
 import { isIpHashSecretConfigured } from '@/lib/quick-test/utils';
 import { logQuickTestEvent, checkRateLimit } from '@/lib/quick-test/track';
 import type { QuickTestAnalysis, QuickTestResponse, QuickTestSource } from '@/types/quick-test';
@@ -138,7 +138,11 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // 4) Extraction texte (PDF ou DOCX)
+  // 4) Extraction texte légère — métadonnées uniquement (pageCount,
+  //    wordCount, parsed guard). L'analyse elle-même part en DOCUMENT NATIF :
+  //    un PDF (même scanné/image) est lisible par Gemini via inline_data, on
+  //    ne rejette donc plus les PDF sans texte extractible. Le DOCX, lui,
+  //    exige le texte (Gemini ne le lit pas nativement).
   let text: string;
   let pageCount: number;
   console.time('[quick-test] Extraction');
@@ -152,30 +156,33 @@ export async function POST(request: Request): Promise<Response> {
       text = extraction.text;
       pageCount = 1;
     }
-    console.timeEnd('[quick-test] Extraction');
   } catch (error) {
-    console.timeEnd('[quick-test] Extraction');
-    const message =
-      error instanceof PdfExtractionError || error instanceof DocxExtractionError
-        ? error.message
-        : 'Impossible de lire ce document. Il est peut-être corrompu.';
-    return errorResponse(message, 422);
-  }
-
-  if (text.length === 0) {
-    const format = isPdf ? 'PDF' : 'DOCX';
-    const suggestion =
-      isPdf
-        ? 'Ce PDF semble être un scan (image), pas un document textuel. Exportez-le depuis Word/Canva en « PDF texte » ou utilisez un générateur de CV texte.'
-        : 'Ce document Word semble contenir uniquement des images. Exportez-le depuis Word au format PDF texte ou DOCX natif.';
-    return errorResponse(
-      `Aucun texte extractible : le ${format} ne contient pas de texte lisible. ${suggestion}`,
-      422
+    if (!isPdf) {
+      console.timeEnd('[quick-test] Extraction');
+      const message =
+        error instanceof DocxExtractionError
+          ? error.message
+          : 'Impossible de lire ce document. Il est peut-être corrompu.';
+      return errorResponse(message, 422);
+    }
+    // PDF : seul un document structurellement illisible (chiffré) bloque ;
+    // toute autre erreur d'extraction est tolérée — le PDF natif part tel
+    // quel au modèle multimodal.
+    if (error instanceof PdfExtractionError) {
+      console.timeEnd('[quick-test] Extraction');
+      return errorResponse(error.message, 422);
+    }
+    console.warn(
+      '[quick-test] PDF text extraction failed — continuing with the native document for the multimodal analysis:',
+      (error as Error)?.message
     );
+    text = '';
+    pageCount = 0;
   }
+  console.timeEnd('[quick-test] Extraction');
 
-  // Decompression-bomb / memory guard: cap the extracted text (the LLM input
-  // truncates at 12k chars anyway; 500k chars ≈ 80k words, no real CV exceeds it).
+  // Decompression-bomb / memory guard: cap the extracted text (metadata +
+  // DOCX LLM input; 500k chars ≈ 80k words, no real CV exceeds it).
   if (text.length > MAX_RESUME_TEXT_CHARS) {
     console.warn(`[quick-test] Extracted text capped: ${text.length} → ${MAX_RESUME_TEXT_CHARS} chars.`);
     text = text.slice(0, MAX_RESUME_TEXT_CHARS);
@@ -184,69 +191,67 @@ export async function POST(request: Request): Promise<Response> {
   // 5) Tracking de l'upload
   await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
 
-  // 6) Analyse LLM (Gemini) → fallback heuristique transparent.
-  //    Le guardrail sémantique « est-ce un CV ? » est FUSIONNÉ dans l'appel
-  //    LLM (champ `is_cv` du responseSchema — un seul appel, latence divisée
-  //    par deux). Le filet heuristique (guardrail.ts) ne sert que lorsque le
-  //    LLM est indisponible, afin qu'un résultat heuristique ne soit jamais
-  //    présenté pour un document qui n'est pas un CV.
-  let analysis: QuickTestAnalysis | null = null;
-  let source: QuickTestSource = 'heuristic';
-
-  if (isLlmConfigured()) {
-    console.time('[quick-test] LLM analysis');
-    const llmResult = await analyzeWithGemini(text);
-    console.timeEnd('[quick-test] LLM analysis');
-    if (llmResult) {
-      if (!llmResult.gate.isCv) {
-        console.warn(
-          `[quick-test] ❌ Non-CV rejeté par le guardrail LLM (type=${llmResult.gate.documentType}, langue=${llmResult.gate.detectedLanguage})`
-        );
-        await logQuickTestEvent({
-          eventType: 'rejected_non_cv',
-          source: 'heuristic',
-          score: null,
-          ip,
-          userAgent,
-        });
-        return errorResponse(
-          `Ce document ne semble pas être un CV (type détecté : ${llmResult.gate.documentType}). Veuillez télécharger un curriculum vitæ valide.`,
-          422
-        );
-      }
-      analysis = llmResult.analysis;
-      source = 'llm';
-    } else {
-      console.warn(
-        `[quick-test] HEURISTIC FALLBACK — Gemini a echoue pour un CV valide (texte: ${text.length} chars, pages: ${pageCount})`
-      );
-    }
-  } else {
-    console.warn('[quick-test] HEURISTIC FALLBACK — GEMINI_API_KEY non configure.');
+  // 6) Analyse LLM — DOCUMENT NATIF, AUCUN fallback heuristique.
+  //    PDF : envoyé tel quel (inline_data) pour que le modèle évalue la vraie
+  //    mise en page. DOCX : texte extrait embarqué dans le prompt.
+  //    Le guardrail sémantique « est-ce un CV ? » reste FUSIONNÉ dans l'appel
+  //    LLM (champ `is_cv` du responseSchema — un seul appel).
+  if (!isLlmConfigured()) {
+    console.error('[quick-test] GEMINI_API_KEY non configurée — analyse impossible (pas de fallback heuristique).');
+    return errorResponse(
+      "Le service d'analyse IA est momentanément indisponible (configuration serveur incomplète).",
+      503
+    );
   }
 
-  if (!analysis) {
-    // Fallback heuristique : le filet sémantique local remplace le guardrail LLM.
-    const gate = heuristicCvGate(text);
-    if (!gate.ok) {
-      await logQuickTestEvent({
-        eventType: 'rejected_non_cv',
-        source: 'heuristic',
-        score: null,
-        ip,
-        userAgent,
-      });
-      return errorResponse(
-        `Ce document ne semble pas être un CV (${gate.reason}). Veuillez télécharger un curriculum vitæ valide.`,
-        422
-      );
-    }
-    analysis = analyzeResumeText(text);
+  const mimeType: AnalysisDocumentMimeType = isPdf
+    ? 'application/pdf'
+    : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+  console.time('[quick-test] LLM analysis');
+  const llmResult = await analyzeWithGemini({ buffer, mimeType, text });
+  console.timeEnd('[quick-test] LLM analysis');
+
+  if (!llmResult) {
+    // Explicit failure — never a fake heuristic score.
+    console.error(
+      `[quick-test] LLM analysis FAILED for a valid upload (${buffer.length} bytes, pages: ${pageCount}) — returning 502.`
+    );
+    await logQuickTestEvent({
+      // `analysis_fallback` (whitelist DB migration 006) now means "the LLM
+      // did not deliver" — the heuristic fallback it used to describe no
+      // longer exists.
+      eventType: 'analysis_fallback',
+      source: 'llm',
+      score: null,
+      ip,
+      userAgent,
+    });
+    return errorResponse(
+      "L'analyse IA n'a pas abouti après plusieurs tentatives (service momentanément saturé ou indisponible). Veuillez relancer l'analyse.",
+      502
+    );
   }
 
-  if (!analysis) {
-    return errorResponse('Le contenu extrait est trop court pour produire une analyse fiable.', 422);
+  if (!llmResult.gate.isCv) {
+    console.warn(
+      `[quick-test] ❌ Non-CV rejeté par le guardrail LLM (type=${llmResult.gate.documentType}, langue=${llmResult.gate.detectedLanguage})`
+    );
+    await logQuickTestEvent({
+      eventType: 'rejected_non_cv',
+      source: 'heuristic',
+      score: null,
+      ip,
+      userAgent,
+    });
+    return errorResponse(
+      `Ce document ne semble pas être un CV (type détecté : ${llmResult.gate.documentType}). Veuillez télécharger un curriculum vitæ valide.`,
+      422
+    );
   }
+
+  const analysis: QuickTestAnalysis = llmResult.analysis;
+  const source: QuickTestSource = 'llm';
 
   // 8) Tracking de l'analyse (succes LLM vs fallback)
   await logQuickTestEvent({

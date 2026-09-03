@@ -35,10 +35,6 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
   const [clientError, setClientError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
     const [result, setResult] = useState<QuickTestResponse | null>(null);
-  // True when the server answered with a heuristic-fallback analysis (source
-  // !== 'llm'): a visible warning banner with a retry action is rendered in
-  // the results portal instead of relying on the small "Mode dégradé" badge.
-  const [degradedNotice, setDegradedNotice] = useState(false);
   const [showConversionModal, setShowConversionModal] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -110,7 +106,6 @@ const clearSelection = useCallback(() => {
     clearSelection();
     setClientError(null);
     setServerError(null);
-    setDegradedNotice(false);
     setResult(null);
     setStep('idle');
   }, [clearSelection]);
@@ -124,7 +119,7 @@ const clearSelection = useCallback(() => {
         return;
       }
 
-      // Visitor mode: PDF only, 5 MB max (mvp.md §2.2).
+      // Visitor mode: PDF + Word (.docx), 5 MB max (mvp.md §2.2).
 const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.toLowerCase().endsWith('.docx');
 if (!isPdf && !isDocx) {
@@ -160,11 +155,9 @@ if (!isPdf && !isDocx) {
     }
 
     setServerError(null);
-    // Reset the "billet d'attente" and the degraded-mode notice before each
-    // new run (also handles the retry case where a previous analysis already
-    // advanced the steps).
+    // Reset the "billet d'attente" before each new run (also handles the
+    // retry case where a previous analysis already advanced the steps).
     setAnalysisStep(0);
-    setDegradedNotice(false);
     setStep('analyzing');
 
     // Guided navigation: the results area (skeleton first) sits just below
@@ -193,10 +186,8 @@ if (!isPdf && !isDocx) {
       }
 
       const payload: QuickTestResponse = await response.json();
-      // Successful API call: only flag the degraded state when the analysis
-      // genuinely fell back to the heuristic engine — a real LLM result
-      // displays the full AI-powered scores with no warning.
-      setDegradedNotice(payload.source !== 'llm');
+      // Successful API call: the report is always a real LLM analysis —
+      // heuristic fallbacks no longer exist (failures surface as errors).
       setResult(payload);
       setStep('result');
     } catch (error) {
@@ -445,47 +436,6 @@ if (!isPdf && !isDocx) {
           }
           return createPortal(
             <>
-              {/* Degraded-mode warning: the server answered 200 but with the
-                  heuristic engine. Explicit, actionable feedback — the visitor
-                  can re-run the analysis to try for a real AI result. */}
-              {step === 'result' && degradedNotice && (
-                <div
-                  role="alert"
-                  className="animate-fade-up mb-4 flex flex-col items-start justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-sm sm:flex-row sm:items-center"
-                >
-                  <div className="flex items-start gap-3">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      className="mt-0.5 h-5 w-5 shrink-0 text-amber-600"
-                    >
-                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-                      <path d="M12 9v4M12 17h.01" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-semibold text-amber-900">
-                        {t('degradedTitle')}
-                      </p>
-                      <p className="mt-0.5 text-xs text-amber-800">
-                        {t('degradedDescription')}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={runAnalysis}
-                    className="shrink-0 rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
-                  >
-                    {t('degradedRetry')}
-                  </button>
-                </div>
-              )}
               <QuickTestResultSection
                 status={step === 'result' ? 'result' : 'analyzing'}
                 result={result}

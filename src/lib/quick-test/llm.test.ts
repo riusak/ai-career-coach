@@ -26,7 +26,7 @@ const validPayload = {
 };
 
 describe('buildAnalysisPrompt', () => {
-  it('embeds the CV text and the deep JSON structure instructions', () => {
+  it('embeds the CV text and the deep JSON structure instructions (DOCX/TXT path)', () => {
     const prompt = buildAnalysisPrompt('Jean Dupont, développeur.');
     expect(prompt).toContain('Jean Dupont, développeur.');
     expect(prompt).toContain('"score_breakdown"');
@@ -34,18 +34,32 @@ describe('buildAnalysisPrompt', () => {
     expect(prompt).toContain('JSON');
   });
 
-  it('demands recruiter-grade depth (5 dimensions, evidence-backed insights)', () => {
+  it('instructs a native-document analysis when no text is provided (PDF path)', () => {
+    const prompt = buildAnalysisPrompt(null);
+    expect(prompt).toContain('pièce jointe PDF');
+    expect(prompt).not.toContain('TEXTE DU DOCUMENT');
+  });
+
+  it('demands recruiter-grade depth covering layout AND content dimensions', () => {
     const prompt = buildAnalysisPrompt('CV text');
+    // Layout / structural design dimensions (document-native upgrade).
+    expect(prompt).toContain('Mise en page & lisibilité');
+    expect(prompt).toContain('Hiérarchie visuelle');
+    expect(prompt).toContain('sidebars');
+    expect(prompt).toContain('parsing ATS');
+    // Content dimensions.
     expect(prompt).toContain('Structure');
     expect(prompt).toContain('Mots-clés ATS');
     expect(prompt).toContain('action_verbs_advice');
     expect(prompt).toContain('impact_metrics_advice');
+    // At least 6 dimensions required in the breakdown.
+    expect(prompt).toContain('AU MOINS 6 dimensions');
   });
 
   it('truncates very long CV texts', () => {
     const prompt = buildAnalysisPrompt('x'.repeat(20_000));
     expect(prompt).toContain('[tronqué]');
-    expect(prompt.length).toBeLessThan(18_000);
+    expect(prompt.length).toBeLessThan(20_000);
   });
 });
 

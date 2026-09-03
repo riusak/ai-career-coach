@@ -163,7 +163,7 @@ function ScoreCell({ result }: { result: QuickTestResponse }) {
                 {t('sourceLlm')}
               </>
             ) : (
-              t('sourceDegraded')
+              t('sourceLocalLegacy')
             )}
           </span>
           <span className="inline-flex rounded-full bg-navy-50 px-2 py-0.5 text-[10px] font-medium text-navy-500">

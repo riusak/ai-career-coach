@@ -1,16 +1,25 @@
 ﻿import type { InsightItem, QuickTestAnalysis, ScoreBreakdownItem } from '@/types/quick-test';
 
 /**
- * Google Gemini (Flash) client for the visitor Quick Test — DEEP analysis.
+ * Google Gemini (Flash) client for the CV analysis pipelines — DEEP analysis.
  *
- * v2 requirements (quality review):
+ * v3 — document-native (multimodal) requirements:
+ *  - PDFs are sent to the model as the NATIVE document (`inline_data`,
+ *    mime_type 'application/pdf') so the LLM "sees" the real layout —
+ *    columns, sidebars, visual hierarchy — exactly like a recruiter/ATS
+ *    would; scanned/image-only PDFs become analyzable for free;
+ *  - DOCX/TXT (not natively readable by Gemini) are sent as pre-extracted
+ *    text with the same analysis prompt;
  *  - the real Gemini Flash API is called synchronously on every request
- *    with a comprehensive recruiter-grade prompt and a strict responseSchema;
+ *    with a comprehensive recruiter-grade prompt (layout + content) and a
+ *    strict responseSchema;
  *  - every phase is logged server-side (START / SUCCESS with duration and
- *    payload stats / FAILURE with the exact reason) so a fallback to the
- *    heuristic analyzer is never silent;
- *  - the CV text lives only for the duration of the request — nothing is
- *    logged or persisted beyond the API call itself.
+ *    payload stats / FAILURE with the exact reason) and transient failures
+ *    are retried with an explicit backoff — there is NO silent heuristic
+ *    fallback anymore: a failed analysis is a visible error, never a fake
+ *    score;
+ *  - the CV lives only for the duration of the request — nothing is logged
+ *    or persisted beyond the API call itself.
  */
 
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -20,6 +29,7 @@ const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/mo
 // analyser" symptom. `gemini-3.5-flash-lite` answers in ~2 s with the full
 // deep-analysis schema; `gemini-3.6-flash` is the quality upgrade but is
 // periodically 503 (high demand), so it is used as the chain fallback.
+// Both 3.x models natively understand PDF documents (inline_data).
 // Override with GEMINI_MODEL.
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
 const FALLBACK_GEMINI_MODEL = 'gemini-3.6-flash';
@@ -34,16 +44,38 @@ const MAX_OUTPUT_TOKENS = 4096;
 // timeout (measured p95 on 3.5-flash-lite ≈ 2-3 s).
 const LLM_TIMEOUT_MS = 20_000;
 // Total wall-clock budget for the full analyzeWithGemini call, including the
-// model-chain fallback. Must stay under the 45 s client timeout once PDF
-// extraction is accounted for.
+// per-model retries and the model-chain fallback. Must stay under the 45 s
+// client timeout once PDF extraction/inline encoding is accounted for.
 const LLM_TOTAL_BUDGET_MS = 32_000;
-// A first attempt that fails quicker than this is considered a "fast failure"
-// (429/503/model-404/network refused) — worth one attempt on the next model
-// of the chain. A timeout already consumed most of the budget, so it is never
-// retried.
+// A transient failure (429/5xx, network refused, garbled generation) is
+// retried on the SAME model with an explicit backoff before moving to the
+// next model of the chain. Non-transient failures (4xx invalid request,
+// timeout) are never retried — they would fail identically or the wall-clock
+// budget is already spent. A fast failure (under this ceiling) is also worth
+// one attempt on the next model of the chain.
 const LLM_FAST_FAILURE_CEILING_MS = 10_000;
+const MAX_ATTEMPTS_PER_MODEL = 2;
+const RETRY_BACKOFF_MS = 1_500;
 
 export type AnalysisSource = 'llm' | 'heuristic';
+
+/** MIME types accepted by the analysis pipeline (mirrors resume-validation). */
+export type AnalysisDocumentMimeType =
+  | 'application/pdf'
+  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  | 'text/plain';
+
+/** The native uploaded file passed to the multimodal analysis. */
+export interface AnalysisDocument {
+  buffer: Buffer;
+  mimeType: AnalysisDocumentMimeType;
+  /**
+   * Pre-extracted text. Required for DOCX/TXT (Gemini cannot read them
+   * natively — the analysis prompt embeds it). For PDFs it is optional:
+   * the native document is what the model actually reads.
+   */
+  text: string;
+}
 
 export function isLlmConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
@@ -64,6 +96,31 @@ function getGeminiModels(): string[] {
 /** Primary model — kept for the generic `callGeminiJson` helper. */
 function getGeminiModel(): string {
   return process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
+}
+
+/**
+ * A failure reason is retryable when it is plausibly transient: 429/5xx
+ * responses, network errors, and garbled/empty generations. Timeouts are NOT
+ * retried (they already consumed the wall-clock budget) and other 4xx errors
+ * (invalid request, auth, unknown model) would fail identically.
+ */
+function isRetryableFailure(reason: string): boolean {
+  if (reason === 'timeout') {
+    return false;
+  }
+  if (reason === 'network error') {
+    return true;
+  }
+  if (reason.startsWith('HTTP ')) {
+    const status = Number.parseInt(reason.slice(5), 10);
+    return status === 429 || (status >= 500 && status <= 599);
+  }
+  // Generation-level hiccups are worth one clean retry.
+  return (
+    reason === 'empty response (no generated content)' ||
+    reason === 'invalid JSON payload' ||
+    reason === 'schema coercion failed'
+  );
 }
 
 /**
@@ -143,14 +200,23 @@ export async function callGeminiJson<T>(
   }
 }
 
-/** Builds the French deep-analysis prompt for the Gemini request. */
-export function buildAnalysisPrompt(cvText: string): string {
+/**
+ * Builds the French deep-analysis prompt. When `documentText` is provided
+ * (DOCX/TXT path) it is embedded in the prompt; otherwise the CV travels as
+ * a native PDF attachment and the prompt instructs the model to evaluate the
+ * REAL layout (columns, sidebars, visual hierarchy) it can see.
+ */
+export function buildAnalysisPrompt(documentText: string | null): string {
   const truncated =
-    cvText.length > MAX_LLM_TEXT_CHARS
-      ? `${cvText.slice(0, MAX_LLM_TEXT_CHARS)}\n[tronqué]`
-      : cvText;
+    documentText && documentText.length > MAX_LLM_TEXT_CHARS
+      ? `${documentText.slice(0, MAX_LLM_TEXT_CHARS)}\n[tronqué]`
+      : documentText;
 
-  return `Tu es un recruteur expert. Le document ci-dessous peut être rédigé dans N'IMPORTE QUELLE langue (français, anglais, allemand, espagnol…) — analyse-le dans sa langue, mais renvoie UNIQUEMENT un JSON valide (sans texte autour) avec cette structure exacte :
+  const documentBlock = truncated
+    ? `Le texte ci-dessous a été extrait du document : la mise en page RÉELLE n'est PAS visible — base ton évaluation de mise en page sur la structure du texte uniquement.\n\nTEXTE DU DOCUMENT :\n${truncated}`
+    : `Le CV est fourni en pièce jointe PDF. Examine sa mise en page RÉELLE exactement comme la verrait un recruteur ou un ATS : colonnes, sidebars, hiérarchie visuelle, typographie, densité, marges.`;
+
+  return `Tu es un recruteur expert (10+ ans en cabinet) ET un spécialiste du design documentaire. Le document ci-dessous peut être rédigé dans N'IMPORTE QUELLE langue (français, anglais, allemand, espagnol…) — analyse-le dans sa langue, mais renvoie UNIQUEMENT un JSON valide (sans texte autour) avec cette structure exacte :
 {
   "is_cv": <true si le document est un curriculum vitae / resume d'une personne physique, false sinon (facture, bulletin de paie, devis, lettre, manuel…)>,
   "document_type": "<type détecté : 'cv', 'invoice', 'payslip', 'quote', 'letter', 'other'…>",
@@ -167,10 +233,19 @@ export function buildAnalysisPrompt(cvText: string): string {
   "impact_metrics_advice": "<conseil chiffrage>"
 }
 
-Règles : si et seulement si is_cv est true, 5 dimensions minimum (Structure, Impact chiffré, Clarté missions, Adéquation poste, Mots-clés ATS) ; 2-4 éléments par liste ; conseils concrets et spécifiques au CV ; pas d'invention. Si is_cv est false, remplis les listes avec des tableaux vides et score 0.
+Évalue le document sur TOUS ces axes (fond ET forme) :
+1. Mise en page & lisibilité — colonnes, sidebars, marges, densité et risque de parsing ATS (les mises en page multi-colonnes ou à sidebar complexe cassent les parseurs ATS classiques) ;
+2. Hiérarchie visuelle — titres, graisses, espacement, scannabilité en 6 secondes, standards professionnels du design de CV ;
+3. Structure — sections standard présentes/absentes ;
+4. Impact chiffré — résultats quantifiés (%, montants, volumes) ;
+5. Clarté des missions ;
+6. Adéquation au poste cible ;
+7. Mots-clés ATS ;
+8. Verbes d'action.
 
-CV :
-${truncated}`;
+Règles : si et seulement si is_cv est true, score_breakdown doit contenir AU MOINS 6 dimensions parmi celles listées ci-dessus, dont obligatoirement « Mise en page & lisibilité » et « Hiérarchie visuelle » ; 2-4 éléments par liste ; conseils concrets et spécifiques au CV (cite ce que tu vois) ; pas d'invention. Si is_cv est false, remplis les listes avec des tableaux vides et score 0.
+
+${documentBlock}`;
 }
 
 const GEMINI_RESPONSE_SCHEMA = {
@@ -419,25 +494,51 @@ export function extractCvGate(raw: unknown): CvGate {
 }
 
 /**
- * Runs the deep analysis through Gemini, synchronously, in real time, walking
- * a MODEL CHAIN: the configured (or default) model first, then the fallback
- * model. A model is skipped to the next one when the attempt failed FAST
- * (HTTP 429/503/model-404, connection refused…) within
- * LLM_FAST_FAILURE_CEILING_MS, while the remaining wall-clock budget allows
- * it. Timeouts are never retried (they already consumed the budget).
+ * Builds the Gemini request parts for the analysis call:
+ *  - PDF → the native document travels as `inline_data` (base64) so the model
+ *    sees the real layout (columns, sidebars, hierarchy, typography);
+ *  - DOCX/TXT → the pre-extracted text travels embedded in the prompt
+ *    (Gemini cannot read these formats natively).
+ */
+function buildRequestParts(document: AnalysisDocument): Array<Record<string, unknown>> {
+  const prompt = buildAnalysisPrompt(
+    document.mimeType === 'application/pdf' ? null : document.text
+  );
+  if (document.mimeType === 'application/pdf') {
+    return [
+      { text: prompt },
+      {
+        inline_data: {
+          mime_type: 'application/pdf',
+          data: document.buffer.toString('base64'),
+        },
+      },
+    ];
+  }
+  return [{ text: prompt }];
+}
+
+/**
+ * Runs the deep analysis through Gemini, synchronously, in real time. Walks
+ * a MODEL CHAIN (configured model first, then the fallback model) and, on
+ * each model, RETRIES transient failures (429/5xx, network refused, garbled
+ * generation) with an explicit backoff — at most MAX_ATTEMPTS_PER_MODEL
+ * attempts per model, always bounded by the global wall-clock budget.
+ * Non-transient failures (timeout, 4xx) move straight to the next model (if
+ * the attempt failed fast) or abort the chain.
  *
  * Every step is logged server-side: START, SUCCESS (with duration and
- * payload statistics) and FAILURE (with the exact reason) — a fallback to
- * the heuristic analyzer is never silent. Returns null on any final failure
- * (network, timeout, malformed output) so the caller can fall back.
+ * payload statistics) and FAILURE (with the exact reason). There is NO
+ * silent heuristic fallback: on final failure the function returns null and
+ * the caller MUST surface an explicit error to the user.
  */
 export async function analyzeWithGemini(
-  cvText: string
+  document: AnalysisDocument
 ): Promise<GeminiAnalysisResult | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn(
-      '[quick-test] GEMINI_API_KEY not configured — heuristic fallback active (dev/CI mode).'
+      '[quick-test] GEMINI_API_KEY not configured — the analysis cannot run (no heuristic fallback anymore).'
     );
     return null;
   }
@@ -446,62 +547,100 @@ export async function analyzeWithGemini(
   const overallStartedAt = Date.now();
   let lastReason = 'unknown';
 
-  for (const model of models) {
-    const elapsedMs = Date.now() - overallStartedAt;
-    const remainingBudgetMs = LLM_TOTAL_BUDGET_MS - elapsedMs;
-    if (remainingBudgetMs < 5_000) {
-      console.warn(
-        `[quick-test] Gemini chain exhausted — remaining budget ${remainingBudgetMs}ms too small.`
-      );
-      break;
-    }
+  for (let modelIndex = 0; modelIndex < models.length; modelIndex += 1) {
+    const model = models[modelIndex]!;
+    const hasNextModel = modelIndex < models.length - 1;
 
-    const { analysis, raw, reason } = await analyzeWithGeminiOnce(
-      cvText,
-      apiKey,
-      model,
-      Math.min(LLM_TIMEOUT_MS, remainingBudgetMs)
-    );
-    if (analysis) {
-      return { analysis, gate: extractCvGate(raw) };
-    }
-    lastReason = reason ?? 'unknown';
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt += 1) {
+      const remainingBudgetMs = LLM_TOTAL_BUDGET_MS - (Date.now() - overallStartedAt);
+      if (remainingBudgetMs < 5_000) {
+        console.warn(
+          `[quick-test] Gemini budget exhausted — remaining ${remainingBudgetMs}ms too small.`
+        );
+        console.error(
+          `[quick-test] Gemini FAILED after ${Date.now() - overallStartedAt}ms — ` +
+            `last reason: ${lastReason}.`
+        );
+        return null;
+      }
 
-    // Only worth trying the next model when the attempt failed quickly — a
-    // timeout or a slow failure already consumed most of the wall-clock budget.
-    const attemptElapsedMs = Date.now() - overallStartedAt - elapsedMs;
-    if (attemptElapsedMs <= LLM_FAST_FAILURE_CEILING_MS) {
-      console.warn(
-        `[quick-test] Gemini model=${model} failed fast in ${attemptElapsedMs}ms (${lastReason}) — trying next model in the chain…`
+      const { analysis, raw, reason } = await analyzeWithGeminiOnce(
+        document,
+        apiKey,
+        model,
+        Math.min(LLM_TIMEOUT_MS, remainingBudgetMs)
       );
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      continue;
+      if (analysis) {
+        return { analysis, gate: extractCvGate(raw) };
+      }
+      lastReason = reason ?? 'unknown';
+
+      const retryable = isRetryableFailure(lastReason);
+      if (attempt < MAX_ATTEMPTS_PER_MODEL && retryable) {
+        if (remainingBudgetMs > RETRY_BACKOFF_MS + 5_000) {
+          console.warn(
+            `[quick-test] Gemini model=${model} attempt ${attempt}/${MAX_ATTEMPTS_PER_MODEL} ` +
+              `failed (${lastReason}) — retrying in ${RETRY_BACKOFF_MS}ms…`
+          );
+          await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+          continue;
+        }
+        console.warn(
+          `[quick-test] Gemini retry skipped — remaining budget ${remainingBudgetMs}ms too small.`
+        );
+        break;
+      }
+
+      // Non-retryable for this model (or attempts exhausted). A fast failure
+      // still leaves budget for the next model of the chain; a timeout or a
+      // slow failure consumed most of it, so the chain stops.
+      const attemptElapsedMs = Date.now() - overallStartedAt;
+      if (hasNextModel && attemptElapsedMs <= LLM_FAST_FAILURE_CEILING_MS) {
+        console.warn(
+          `[quick-test] Gemini model=${model} failed fast (${lastReason}) — ` +
+            `trying next model in the chain…`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        break;
+      }
+
+      console.error(
+        `[quick-test] Gemini FAILED after ${Date.now() - overallStartedAt}ms — ` +
+          `model=${model}, last reason: ${lastReason}.` +
+          (hasNextModel ? '' : ' No models left in the chain.')
+      );
+      return null;
     }
-    break;
   }
 
   console.error(
     `[quick-test] Gemini FAILED after all models in ${Date.now() - overallStartedAt}ms — ` +
-      `last reason: ${lastReason}. Falling back to heuristic.`
+      `last reason: ${lastReason}.`
   );
   return null;
 }
 
 /**
- * Runs ONE analysis attempt against a single Gemini model. Returns the coerced
+ * Runs ONE analysis attempt against a single Gemini model with the NATIVE
+ * document (PDF inline_data) or the extracted text. Returns the coerced
  * analysis + raw payload on success, or a structured failure reason for the
- * model-chain/fallback logic.
+ * retry/model-chain logic.
  */
 async function analyzeWithGeminiOnce(
-  cvText: string,
+  document: AnalysisDocument,
   apiKey: string,
   model: string,
   timeoutMs: number
 ): Promise<GeminiAttemptResult & { raw?: unknown }> {
   const startedAt = Date.now();
+  const isNativePdf = document.mimeType === 'application/pdf';
+  const payloadStats = isNativePdf
+    ? `pdfBytes=${document.buffer.length} (inline base64)`
+    : `chars=${document.text.length}`;
   console.time(`[quick-test] Gemini (analysis) model=${model}`);
   console.info(
-    `[quick-test] Gemini START model=${model} chars=${cvText.length} timeoutMs=${timeoutMs}`
+    `[quick-test] Gemini START model=${model} type=${document.mimeType} ` +
+      `${payloadStats} timeoutMs=${timeoutMs}`
   );
 
   try {
@@ -514,7 +653,7 @@ async function analyzeWithGeminiOnce(
           'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: buildAnalysisPrompt(cvText) }] }],
+          contents: [{ role: 'user', parts: buildRequestParts(document) }],
           generationConfig: {
             temperature: 0.1,
             responseMimeType: 'application/json',

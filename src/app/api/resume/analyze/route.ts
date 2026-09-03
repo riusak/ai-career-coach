@@ -8,23 +8,25 @@
  *   1) Authenticated request (Supabase session cookie) + ownership checks.
  *   2) Atomically claims the queued row (conditional UPDATE — two concurrent
  *      runs cannot process the same row; stale claims are reclaimed).
- *   3) Downloads the private resume file and extracts its text (PDF/TXT).
- *   4) Calls Gemini Flash (single synchronous call, strict responseSchema,
- *      bounded timeout — well under the 60 s Vercel maxDuration) with a
- *      transparent heuristic fallback, mirroring the public Quick Test.
+ *   3) Downloads the private resume file (PDF/DOCX/TXT).
+ *   4) Calls Gemini Flash with the NATIVE document (PDF inline_data — the
+ *      model sees the real layout) or the extracted text (DOCX/TXT); single
+ *      synchronous call, strict responseSchema, bounded timeout with an
+ *      explicit retry chain — well under the 60 s Vercel maxDuration.
  *   5) Persists {score, structured_output} — the client polling loop then
  *      transitions the UI from "Queued" to the completed score.
  *
- * Failure policy: on an unrecoverable error (unreadable/scanned file...) the
- * queued row is DELETED so the UI never hangs forever — the user can simply
- * retry. Transient LLM failures never reach this path (heuristic fallback).
+ * Failure policy: on an unrecoverable error (unreadable file, non-CV
+ * document, LLM failure after retries...) the queued row is DELETED so the
+ * UI never hangs forever — the user can simply retry. There is NO heuristic
+ * fallback: a transient LLM failure fails the run explicitly, never with a
+ * fake score.
  */
 
 import { PdfExtractionError, countWords, extractPdfText } from '@/lib/quick-test/pdf-extract';
 import { DocxExtractionError, extractDocxText } from '@/lib/quick-test/docx-extract';
 import { analyzeWithGemini } from '@/lib/quick-test/llm';
-import { analyzeResumeText } from '@/lib/quick-test/analysis';
-import { heuristicCvGate } from '@/lib/quick-test/guardrail';
+import type { AnalysisDocumentMimeType } from '@/lib/quick-test/llm';
 import { MAX_RESUME_TEXT_CHARS } from '@/lib/resume-validation';
 import {
   claimQueuedResumeAnalysis,
@@ -132,25 +134,41 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    // 4) Download + text extraction (PDF, DOCX ou TXT).
+    // 4) Download the resume file.
     const { data: buffer, error: downloadError } = await downloadResumeFile(resume.file_path);
     if (downloadError || !buffer) {
       throw new Error(downloadError ?? 'Failed to download the resume file.');
     }
 
+    // 4b) Light text extraction — only for the persisted parsed_content +
+    // word_count metadata. The analysis itself goes to the LLM as the NATIVE
+    // document (PDF inline_data — the model sees the real layout, scanned
+    // PDFs included). DOCX/TXT require the extracted text (Gemini cannot
+    // read them natively).
     let text: string;
     const fileNameLower = resume.file_name.toLowerCase();
-    if (fileNameLower.endsWith('.pdf')) {
+    const mimeType: AnalysisDocumentMimeType = fileNameLower.endsWith('.pdf')
+      ? 'application/pdf'
+      : fileNameLower.endsWith('.docx')
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'text/plain';
+
+    if (mimeType === 'application/pdf') {
       try {
         text = extractPdfText(buffer).text;
       } catch (error) {
-        throw new Error(
-          error instanceof PdfExtractionError
-            ? error.message
-            : 'Failed to extract text from the PDF.'
+        if (error instanceof PdfExtractionError) {
+          // Structurally unreadable (encrypted) — the model cannot read it
+          // either; fail explicitly.
+          throw new Error(error.message);
+        }
+        console.warn(
+          '[analyze] PDF text extraction failed — continuing with the native document for the multimodal analysis:',
+          (error as Error)?.message
         );
+        text = '';
       }
-    } else if (fileNameLower.endsWith('.docx')) {
+    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       try {
         text = (await extractDocxText(buffer)).text;
       } catch (error) {
@@ -164,48 +182,37 @@ export async function POST(request: Request): Promise<Response> {
       text = buffer.toString('utf8');
     }
 
-    if (text.trim().length === 0) {
+    if (mimeType !== 'application/pdf' && text.trim().length === 0) {
       throw new Error(
-        'No extractable text (scanned/image-only document) — the analysis cannot run.'
+        'No extractable text — the analysis cannot run on this document.'
       );
     }
 
     // Decompression-bomb / memory guard: cap the extracted text (mirrors the
-    // Quick Test pipeline; the LLM input truncates at 12k chars anyway).
+    // Quick Test pipeline; the LLM text input truncates at 12k chars anyway).
     if (text.length > MAX_RESUME_TEXT_CHARS) {
       console.warn(`[analyze] Extracted text capped: ${text.length} → ${MAX_RESUME_TEXT_CHARS} chars.`);
       text = text.slice(0, MAX_RESUME_TEXT_CHARS);
     }
 
-    // 5) Gemini Flash (single call, bounded timeout, strict responseSchema)
-    // with transparent heuristic fallback — the queue always drains. The
-    // semantic CV gate (`is_cv`) is MERGED into the same LLM call; the local
-    // heuristic gate (guardrail.ts) only backs the fallback path.
-    let source: QuickTestSource = 'heuristic';
-    let analysis: QuickTestAnalysis;
-    const llmResult = await analyzeWithGemini(text);
-    if (llmResult) {
-      if (!llmResult.gate.isCv) {
-        throw new NotACvError(
-          `This document does not look like a resume (detected type: ${llmResult.gate.documentType}).`
-        );
-      }
-      analysis = llmResult.analysis;
-      source = 'llm';
-    } else {
-      console.warn(
-        `[analyze] HEURISTIC FALLBACK — Gemini unavailable for analysis ${latest.id} (${text.length} chars)`
+    // 5) Gemini Flash — NATIVE document (PDF inline_data) or extracted text
+    // (DOCX/TXT), strict responseSchema, explicit retry chain. NO heuristic
+    // fallback: a failure here drops the queued row and the user retries —
+    // never a fake score. The semantic CV gate (`is_cv`) is MERGED into the
+    // same LLM call.
+    const llmResult = await analyzeWithGemini({ buffer, mimeType, text });
+    if (!llmResult) {
+      throw new Error(
+        'The AI analysis failed after several attempts (service temporarily unavailable). Please retry in a moment.'
       );
-      const gate = heuristicCvGate(text);
-      if (!gate.ok) {
-        throw new NotACvError(`This document does not look like a resume (${gate.reason}).`);
-      }
-      const heuristic = analyzeResumeText(text);
-      if (!heuristic) {
-        throw new Error('The extracted text is too short to produce a reliable analysis.');
-      }
-      analysis = heuristic;
     }
+    if (!llmResult.gate.isCv) {
+      throw new NotACvError(
+        `This document does not look like a resume (detected type: ${llmResult.gate.documentType}).`
+      );
+    }
+    const analysis: QuickTestAnalysis = llmResult.analysis;
+    const source: QuickTestSource = 'llm';
 
     // 6) Persist the result (score null → filled; the polling UI picks it up).
     const completion = await completeResumeAnalysis(latest.id, analysis.score, {
