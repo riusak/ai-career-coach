@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import LoadingSteps from '@/components/ui/LoadingSteps';
 import Skeleton from '@/components/ui/Skeleton';
 import DeepAnalysisReport, {
@@ -52,6 +53,10 @@ export default function LatestAnalysisCard({
   const [pollTimedOut, setPollTimedOut] = useState(false);
   /** Number of completed poll ticks — drives the progressive waiting ticket. */
   const [pollCount, setPollCount] = useState(0);
+  /** Non-null when the analysis pipeline reported a terminal error (e.g. the
+   *  document is not a resume → 422). The queue row is deleted server-side on
+   *  such failures, so polling stops and the message is shown instead. */
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
 
   const isQueued = analysis !== null && analysis.score === null;
 
@@ -73,7 +78,7 @@ export default function LatestAnalysisCard({
 
   // Polling loop: only active while an analysis is queued and not timed out.
   useEffect(() => {
-    if (!isQueued || pollTimedOut) {
+    if (!isQueued || pollTimedOut || pipelineError) {
       return;
     }
 
@@ -104,7 +109,7 @@ export default function LatestAnalysisCard({
       clearInterval(intervalId);
       clearTimeout(timeoutId);
     };
-  }, [isQueued, pollTimedOut, resumeId]);
+  }, [isQueued, pollTimedOut, pipelineError, resumeId]);
 
   // Pipeline trigger: queueing only inserts a row (score null) — the deep
   // analysis itself is executed by POST /api/resume/analyze, which this card
@@ -117,7 +122,7 @@ export default function LatestAnalysisCard({
   const triggeredAnalysisIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isQueued || pollTimedOut) {
+    if (!isQueued || pollTimedOut || pipelineError) {
       return;
     }
 
@@ -131,15 +136,38 @@ export default function LatestAnalysisCard({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resumeId }),
-    }).catch(() => {
-      // Network failure: the polling loop keeps running and its 2-minute
-      // timeout surfaces the "still processing" state to the user.
-    });
-  }, [analysis, isQueued, pollTimedOut, resumeId]);
+    })
+      .then(async (res) => {
+        // Terminal failures (500 / 422) delete the queued row server-side: the
+        // polling loop would spin uselessly for 2 minutes. Surface the message
+        // immediately instead (e.g. "This document does not look like a resume").
+        if (res.status === 500 || res.status === 422) {
+          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+          if (payload?.error) {
+            setPipelineError(payload.error);
+            setPollTimedOut(true);
+          }
+        }
+        // 200 (completed / already_completed) → the polling loop picks up the
+        // persisted result.
+      })
+      .catch(() => {
+        // Network failure: the polling loop keeps running and its 2-minute
+        // timeout surfaces the "still processing" state to the user.
+      });
+  }, [analysis, isQueued, pollTimedOut, pipelineError, resumeId]);
 
   return (
     <div className="mt-4 text-sm" aria-live="polite">
-      {analysis ? (
+      {pipelineError ? (
+        <div className="space-y-3">
+          <ErrorState
+            title={t('latestCard.pipelineErrorTitle')}
+            description={pipelineError}
+          />
+          <p className="text-sm text-navy-600">{t('latestCard.pipelineErrorHint')}</p>
+        </div>
+      ) : analysis ? (
         analysis.score === null ? (
           <div className="space-y-6">
             <div className="space-y-2">

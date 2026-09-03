@@ -42,19 +42,23 @@ function isFlateEncoded(raw: string, streamStart: number): boolean {
 
 function inflateStream(payload: Buffer, flate: boolean): Buffer {
   if (!flate) {
-    return payload;
+    // Uncompressed stream: cap it directly (decompression-bomb guard).
+    return payload.length > MAX_DECOMPRESSED_STREAM_BYTES ? Buffer.alloc(0) : payload;
   }
   try {
-    return inflateSync(payload);
+    return inflateSync(payload, { maxOutputLength: MAX_DECOMPRESSED_STREAM_BYTES });
   } catch {
     try {
-      return inflateRawSync(payload);
+      return inflateRawSync(payload, { maxOutputLength: MAX_DECOMPRESSED_STREAM_BYTES });
     } catch {
-      // Corrupt or filtered stream — skip it.
+      // Corrupt, filtered, or bomb-guarded stream — skip it.
       return Buffer.alloc(0);
     }
   }
 }
+
+/** Hard cap on any single decompressed PDF stream (DoS/decompression-bomb guard). */
+const MAX_DECOMPRESSED_STREAM_BYTES = 16 * 1024 * 1024;
 
 function decodePdfEscapes(body: string): string {
   let out = '';

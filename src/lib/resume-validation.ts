@@ -19,6 +19,9 @@ export const ALLOWED_RESUME_EXTENSIONS = ['.pdf', '.docx', '.txt'] as const;
 
 export const RESUME_ACCEPT_ATTRIBUTE = ALLOWED_RESUME_EXTENSIONS.join(',');
 
+/** Hard cap on extracted document text (decompression-bomb / memory guard). */
+export const MAX_RESUME_TEXT_CHARS = 500_000;
+
 /** Minimal shape needed to validate a file. Compatible with the DOM File. */
 export interface ResumeFileLike {
   name: string;

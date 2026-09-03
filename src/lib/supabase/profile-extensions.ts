@@ -1,4 +1,10 @@
 import { createClient } from '@/utils/supabase/server';
+import {
+  imageExtensionForMimeType,
+  validateImageBuffer,
+  MAX_AVATAR_FILE_SIZE_BYTES,
+  MAX_BANNER_FILE_SIZE_BYTES,
+} from '@/lib/image-validation';
 import type {
   Profile,
   ProfileCertification,
@@ -74,12 +80,19 @@ export async function uploadProfileAvatar(file: File): Promise<ProfileResponse<P
     return { data: null, error: 'Not authenticated' };
   }
 
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
-  const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+  // Server-authoritative magic-byte validation — the client-reported MIME type
+  // and file extension are both spoofable, and this bucket is PUBLIC.
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const validation = validateImageBuffer(buffer, MAX_AVATAR_FILE_SIZE_BYTES);
+  if (!validation.ok || !validation.mimeType) {
+    return { data: null, error: validation.error };
+  }
+
+  const path = `${user.id}/avatar-${Date.now()}.${imageExtensionForMimeType(validation.mimeType)}`;
 
   const { error: uploadError } = await supabase.storage
     .from(AVATAR_BUCKET)
-    .upload(path, file, { upsert: true, contentType: file.type });
+    .upload(path, buffer, { upsert: true, contentType: validation.mimeType });
 
   if (uploadError) {
     return { data: null, error: uploadError.message };
@@ -137,12 +150,18 @@ export async function uploadProfileBanner(file: File): Promise<ProfileResponse<P
     return { data: null, error: 'Not authenticated' };
   }
 
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
-  const path = `${user.id}/banner-${Date.now()}.${ext}`;
+  // Server-authoritative magic-byte validation — mirrors the avatar upload.
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const validation = validateImageBuffer(buffer, MAX_BANNER_FILE_SIZE_BYTES);
+  if (!validation.ok || !validation.mimeType) {
+    return { data: null, error: validation.error };
+  }
+
+  const path = `${user.id}/banner-${Date.now()}.${imageExtensionForMimeType(validation.mimeType)}`;
 
   const { error: uploadError } = await supabase.storage
     .from(BANNER_BUCKET)
-    .upload(path, file, { upsert: true, contentType: file.type });
+    .upload(path, buffer, { upsert: true, contentType: validation.mimeType });
 
   if (uploadError) {
     return { data: null, error: uploadError.message };

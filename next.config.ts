@@ -19,6 +19,29 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '6mb',
     },
   },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          // Prevents MIME sniffing — complements the server-side magic-byte
+          // upload validation (an uploaded file served from Storage is out of
+          // scope here, but app responses are covered).
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // The app itself is never legitimately framed (the resume preview
+          // iframe points at Supabase, whose own headers govern that frame).
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          // Ignored over plain HTTP (local dev), enforced on HTTPS deployments.
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+        ],
+      },
+    ];
+    // NOTE: a strict Content-Security-Policy (nonces for Next inline scripts,
+    // allow-lists for the Supabase/Gemini origins) is a deliberate follow-up —
+    // enabling it blindly breaks hydration.
+  },
 };
 
 export default withNextIntl(nextConfig);

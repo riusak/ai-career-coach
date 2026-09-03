@@ -25,6 +25,7 @@ import { DocxExtractionError, extractDocxText } from '@/lib/quick-test/docx-extr
 import { analyzeWithGemini } from '@/lib/quick-test/llm';
 import { analyzeResumeText } from '@/lib/quick-test/analysis';
 import { heuristicCvGate } from '@/lib/quick-test/guardrail';
+import { MAX_RESUME_TEXT_CHARS } from '@/lib/resume-validation';
 import {
   claimQueuedResumeAnalysis,
   completeResumeAnalysis,
@@ -167,6 +168,13 @@ export async function POST(request: Request): Promise<Response> {
       throw new Error(
         'No extractable text (scanned/image-only document) — the analysis cannot run.'
       );
+    }
+
+    // Decompression-bomb / memory guard: cap the extracted text (mirrors the
+    // Quick Test pipeline; the LLM input truncates at 12k chars anyway).
+    if (text.length > MAX_RESUME_TEXT_CHARS) {
+      console.warn(`[analyze] Extracted text capped: ${text.length} → ${MAX_RESUME_TEXT_CHARS} chars.`);
+      text = text.slice(0, MAX_RESUME_TEXT_CHARS);
     }
 
     // 5) Gemini Flash (single call, bounded timeout, strict responseSchema)

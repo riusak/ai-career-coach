@@ -17,12 +17,13 @@
  *     heuristique garantit une réponse < 10 s même en cas d'indisponibilité LLM.
  */
 
-import { MAX_RESUME_FILE_SIZE_BYTES, formatBytes } from '@/lib/resume-validation';
+import { MAX_RESUME_FILE_SIZE_BYTES, MAX_RESUME_TEXT_CHARS, formatBytes } from '@/lib/resume-validation';
 import { PdfExtractionError, countWords, extractPdfText, isPdfBuffer } from '@/lib/quick-test/pdf-extract';
 import { DocxExtractionError, extractDocxText, isDocxBuffer } from '@/lib/quick-test/docx-extract';
 import { analyzeWithGemini, isLlmConfigured } from '@/lib/quick-test/llm';
 import { analyzeResumeText } from '@/lib/quick-test/analysis';
 import { heuristicCvGate } from '@/lib/quick-test/guardrail';
+import { isIpHashSecretConfigured } from '@/lib/quick-test/utils';
 import { logQuickTestEvent, checkRateLimit } from '@/lib/quick-test/track';
 import type { QuickTestAnalysis, QuickTestResponse, QuickTestSource } from '@/types/quick-test';
 
@@ -60,6 +61,18 @@ function clientIp(request: Request): string {
 
 export async function POST(request: Request): Promise<Response> {
   console.time('[quick-test] Total request');
+
+  // 0) Fail-closed configuration guard (production only): without the HMAC
+  //    secret, GDPR-compliant IP hashing AND the anti-abuse rate limiting
+  //    cannot run — refuse to serve rather than run unprotected.
+  if (process.env.NODE_ENV === 'production' && !isIpHashSecretConfigured()) {
+    console.error('[quick-test] IP_HASH_SECRET missing in production — refusing to serve.');
+    return errorResponse(
+      'Service temporairement indisponible (configuration serveur incomplète).',
+      500
+    );
+  }
+
   const ip = clientIp(request);
   const userAgent = request.headers.get('user-agent') || undefined;
 
@@ -159,6 +172,13 @@ export async function POST(request: Request): Promise<Response> {
       `Aucun texte extractible : le ${format} ne contient pas de texte lisible. ${suggestion}`,
       422
     );
+  }
+
+  // Decompression-bomb / memory guard: cap the extracted text (the LLM input
+  // truncates at 12k chars anyway; 500k chars ≈ 80k words, no real CV exceeds it).
+  if (text.length > MAX_RESUME_TEXT_CHARS) {
+    console.warn(`[quick-test] Extracted text capped: ${text.length} → ${MAX_RESUME_TEXT_CHARS} chars.`);
+    text = text.slice(0, MAX_RESUME_TEXT_CHARS);
   }
 
   // 5) Tracking de l'upload
