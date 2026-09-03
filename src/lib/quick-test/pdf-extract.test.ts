@@ -119,3 +119,32 @@ describe('extractPdfText', () => {
     expect(result.text).not.toContain('junk');
   });
 });
+it('extracts text from multi-stream PDF without phantom-stream corruption', () => {
+    // Regression: "endstream" contains "stream", and the old code set
+    // lastIndex to "endstream"'s start, re-matching "stream" inside the
+    // keyword. This created a phantom stream that corrupted extraction.
+    // Build a PDF with a real text stream then a font-file stream.
+    const mainText = 'Multi-stream CV correct';
+    const fontGarbage = Buffer.from(
+      '(garbage) Tj <FFFE> TJ',
+      'latin1'
+    );
+    const fontPayload = deflateSync(
+      Buffer.concat([fontGarbage, Buffer.from([0x00, 0x01, 0xff])])
+    );
+    const fontObject = Buffer.concat([
+      Buffer.from(
+        `\n5 0 obj\n<< /Length ${fontPayload.length} /Length1 4096 /Filter /FlateDecode >>\nstream\n`,
+        'latin1'
+      ),
+      fontPayload,
+      Buffer.from('\nendstream\nendobj\n', 'latin1'),
+    ]);
+
+    const pdf = Buffer.concat([buildPdf([mainText]), fontObject]);
+    const result = extractPdfText(pdf);
+
+    expect(result.text).toContain('Multi-stream CV correct');
+    expect(result.text).not.toContain('garbage');
+    expect(result.text.length).toBeGreaterThan(5);
+  });

@@ -254,7 +254,7 @@ export function extractPdfText(data: Buffer): PdfExtractionResult {
 
   const pageCount = countPages(raw);
 
-  const streamRegex = /stream\r?\n?/g;
+  const streamRegex = /stream[ \t]*\r?\n?/g;
   let text = '';
   let match: RegExpExecArray | null;
   while ((match = streamRegex.exec(raw)) !== null) {
@@ -275,7 +275,9 @@ export function extractPdfText(data: Buffer): PdfExtractionResult {
         text += '\n';
       }
     }
-    streamRegex.lastIndex = endMarker;
+    // NB: endMarker is the start of "endstream", NOT "stream" — so we must skip
+    // the full keyword to avoid re-matching "stream" inside "endstream".
+    streamRegex.lastIndex = endMarker + 'endstream'.length;
   }
 
   return {

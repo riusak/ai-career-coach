@@ -33,13 +33,13 @@ export function validateResumeFile(file: ResumeFileLike): string | null {
   const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
 
   if (!ALLOWED_RESUME_EXTENSIONS.includes(extension as (typeof ALLOWED_RESUME_EXTENSIONS)[number])) {
-    return `Invalid file type "${extension || file.name}". Only PDF and TXT files are allowed.`;
+    return `Type de fichier non supporté "${extension || file.name}". Formats acceptés : PDF (.pdf), Word (.docx) et texte (.txt).`;
   }
 
   const mimeAllowed = (ALLOWED_RESUME_MIME_TYPES as readonly string[]).includes(file.type);
   // Some browsers report an empty MIME type; trust the extension in that case.
   if (file.type !== '' && !mimeAllowed) {
-    return `Invalid file content type "${file.type}". Only PDF and TXT files are allowed.`;
+    return `Type de contenu non supporté "${file.type}". Formats acceptés : PDF (.pdf), Word (.docx) et texte (.txt).`;
   }
 
   if (file.size <= 0) {
