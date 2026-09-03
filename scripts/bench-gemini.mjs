@@ -124,11 +124,11 @@ const PROMPT = [
 /* -------------------------------------------------------------------------- */
 
 const MODELS = [
-  'gemini-3.5-flash',
+  // Modèles 3.x valides (les générations 2.0/2.5 sont DÉCOMMISSIONNÉES par
+  // Google — HTTP 404 systématique — et ont été retirées de cette liste).
   'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
-  'gemini-2.5-flash-lite',
-  'gemini-2.5-flash',
+  'gemini-3.5-flash',
+  'gemini-3.6-flash',
 ];
 
 const VARIANTS = [

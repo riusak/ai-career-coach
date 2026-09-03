@@ -1,34 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ForPro AI
 
-## Getting Started
+Coach de carrière assisté par IA : analyse de CV (Quick Test public + analyse approfondie pour les comptes), dashboard candidat et console d'administration.
 
-First, run the development server:
+Stack : **Next.js (App Router) · TypeScript strict · Tailwind CSS · Supabase (SSR + RLS) · Gemini (Google AI) · Vitest · Playwright**.
+
+## Démarrage
 
 ```bash
+npm ci
+cp .env.example .env.local   # renseigner les variables (Supabase, GEMINI_API_KEY…)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Scripts utiles : `npm run lint` · `npm run type-check` · `npm test` · `npm run build` · `node scripts/test-gemini.mjs` (diagnostic LLM).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Architecture LLM (analyse de CV)
 
-## Learn More
+Le pipeline de validation documentaire est à couches, partagé par les deux parcours
+(Quick Test public `/api/quick-test` et analyse authentifiée `/api/resume/analyze`) :
 
-To learn more about Next.js, take a look at the following resources:
+1. **Format** — magic-bytes serveur (`%PDF-`, ZIP DOCX, texte) + taille (5 Mo max) ;
+2. **Extraction** — parseur PDF sans dépendance (WinAnsi/UTF-16) + `mammoth` pour DOCX ;
+3. **Guardrail sémantique « est-ce un CV ? »** — **fusionné dans l'appel LLM** via le
+   `responseSchema` (`is_cv`, `document_type`, `detected_language`, multilingue fr/en/de/…),
+   avec un filet heuristique local (`src/lib/quick-test/guardrail.ts`) lorsque l'IA est indisponible ;
+4. **Analyse** — Gemini Flash, schéma strict, fallback heuristique transparent (bandeau « mode dégradé » côté UI).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Modèles : **`gemini-3.5-flash-lite`** par défaut, fallback chaîne **`gemini-3.6-flash`**.
+⚠️ Les générations Gemini 2.0/2.5 sont **décommissionnées par Google** (HTTP 404) et
+`thinkingConfig` est rejeté (HTTP 400) par les modèles 3.x — ne pas les réintroduire.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Déploiement
 
-## Deploy on Vercel
+- **Vercel** (cible principale) — variables d'environnement via le dashboard.
+- **Docker** — `docker compose up --build` (le `Dockerfile` build avec les `NEXT_PUBLIC_*`
+  en build-args et injecte les secrets au runtime via `env_file: .env.local`).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

@@ -8,7 +8,8 @@
 
 import { readFileSync } from 'node:fs';
 
-const MODEL = process.argv[2] ?? process.env.GEMINI_MODEL ?? 'gemini-3.5-flash';
+const MODEL = process.argv[2]
+ ?? process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite';
 
 function loadApiKey() {
   if (process.env.GEMINI_API_KEY) {
