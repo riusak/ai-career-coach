@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAnalysisPrompt,
   coerceLlmAnalysis,
+  extractCvGate,
   extractGeminiText,
 } from '@/lib/quick-test/llm';
 
@@ -135,25 +136,33 @@ describe('coerceLlmAnalysis', () => {
   });
 });
 
-describe('extractGeminiText', () => {
-  it('joins the text parts of the first candidate', () => {
-    const body = {
-      candidates: [
-        {
-          content: {
-            parts: [{ text: '{"score": 80}' }, { text: ' suffix' }],
-          },
-        },
-      ],
-    };
-    expect(extractGeminiText(body)).toBe('{"score": 80} suffix');
+describe('extractCvGate', () => {
+  it('extracts the merged semantic gate fields', () => {
+    const gate = extractCvGate({
+      is_cv: false,
+      document_type: 'invoice',
+      detected_language: 'FR',
+    });
+    expect(gate).toEqual({ isCv: false, documentType: 'invoice', detectedLanguage: 'fr' });
   });
 
-  it('returns null for unexpected response shapes', () => {
-    expect(extractGeminiText(null)).toBeNull();
-    expect(extractGeminiText({})).toBeNull();
-    expect(extractGeminiText({ candidates: [] })).toBeNull();
-    expect(extractGeminiText({ candidates: [{ content: {} }] })).toBeNull();
+  it('treats a missing is_cv as true (never blocks a real CV on an absent field)', () => {
+    const gate = extractCvGate({ score: 80 });
+    expect(gate.isCv).toBe(true);
+    expect(gate.documentType).toBe('unknown');
+    expect(gate.detectedLanguage).toBe('unknown');
+  });
+
+  it('tolerates null/non-object payloads', () => {
+    const gate = extractCvGate(null);
+    expect(gate.isCv).toBe(true);
+    expect(gate.documentType).toBe('unknown');
+  });
+
+  it('only accepts a strict boolean true for is_cv', () => {
+    expect(extractCvGate({ is_cv: 'true' }).isCv).toBe(false);
+    expect(extractCvGate({ is_cv: 1 }).isCv).toBe(false);
+    expect(extractCvGate({ is_cv: true }).isCv).toBe(true);
   });
 });
 

@@ -1,0 +1,25 @@
+-- Sprint P1 — Allow DOCX uploads in the private "resumes" bucket
+--
+-- Aligns the Storage-level constraint with src/lib/resume-validation.ts,
+-- which accepts .docx uploads (PDF / DOCX / TXT). Without this, every
+-- dashboard .docx upload failed with a raw Storage MIME-policy error.
+-- Idempotent: safe to re-run.
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'resumes',
+  'resumes',
+  false,
+  5242880, -- 5 MB (must match MAX_RESUME_FILE_SIZE_BYTES in src/lib/resume-validation.ts)
+  array[
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+  ]
+)
+on conflict (id) do update
+  set file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+comment on bucket resumes is
+  'Private per-user resume files. MIME whitelist aligned with the app-level validation (PDF, DOCX, TXT — 5 MB max).';

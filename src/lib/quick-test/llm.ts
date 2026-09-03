@@ -14,35 +14,34 @@
  */
 
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-// Model selection (live-latency benchmarked 2026-09, 12k-char CV): the flash
-// tier is the best quality/speed tradeoff — flash-lite variants are faster
-// but produce inconsistent scores. gemini-2.5-* models return 404 on current
-// keys. Override with GEMINI_MODEL.
-const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
+// Model selection (validated live 2026-09 against the real API): the 2.0/2.5
+// generations have been DECOMMISSIONED by Google (HTTP 404 "no longer
+// available" on every call) — this was the root cause of the "LLM n'a pas pu
+// analyser" symptom. `gemini-3.5-flash-lite` answers in ~2 s with the full
+// deep-analysis schema; `gemini-3.6-flash` is the quality upgrade but is
+// periodically 503 (high demand), so it is used as the chain fallback.
+// Override with GEMINI_MODEL.
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const FALLBACK_GEMINI_MODEL = 'gemini-3.6-flash';
 const MAX_LLM_TEXT_CHARS = 12_000;
-// Thinking is explicitly DISABLED for the flash model: it silently emits
-// ~1200 internal "thought" tokens per call, doubling the latency
-// (9.7s → 4.7s measured on a 12k-char CV with the full analysis schema).
-const GEMINI_THINKING_CONFIG = { thinkingConfig: { thinkingBudget: 0 } } as const;
+// NOTE: `thinkingConfig` (e.g. { thinkingBudget: 0 }) is REJECTED with
+// HTTP 400 INVALID_ARGUMENT by the 3.x models — it must NOT be sent.
 // Hard cap on generated JSON size (measured output ≈ 850 tokens; the cap only
 // guards against runaway generations, which would hit the timeout anyway).
 const MAX_OUTPUT_TOKENS = 4096;
-// Timeout for a single analysis attempt — 4x the measured p95 (~5 s with
-// thinking disabled), yet bounded so the request always finishes well before
-// the 60 s Vercel maxDuration and the 45 s client fetch timeout.
+// Timeout for a single analysis attempt — bounded so the request always
+// finishes well before the 60 s Vercel maxDuration and the 45 s client fetch
+// timeout (measured p95 on 3.5-flash-lite ≈ 2-3 s).
 const LLM_TIMEOUT_MS = 20_000;
-// Total wall-clock budget for the full analyzeWithGemini call, including one
-// fast-failure retry. Must stay under the 45 s client timeout once the
-// guardrail call (8 s) and PDF extraction are accounted for.
+// Total wall-clock budget for the full analyzeWithGemini call, including the
+// model-chain fallback. Must stay under the 45 s client timeout once PDF
+// extraction is accounted for.
 const LLM_TOTAL_BUDGET_MS = 32_000;
 // A first attempt that fails quicker than this is considered a "fast failure"
-// (429/503/model-404/network refused) — worth one immediate retry. A timeout
-// already consumed most of the budget, so it is never retried.
+// (429/503/model-404/network refused) — worth one attempt on the next model
+// of the chain. A timeout already consumed most of the budget, so it is never
+// retried.
 const LLM_FAST_FAILURE_CEILING_MS = 10_000;
-// Shorter timeout for the guardrail validation call (fast-path). Bumped from
-// 5 s: the previous value aborted valid calls when the API was slow, forcing
-// the heuristic guardrail fallback more often than necessary.
-export const GUARDRAIL_TIMEOUT_MS = 8_000;
 
 export type AnalysisSource = 'llm' | 'heuristic';
 
@@ -50,6 +49,19 @@ export function isLlmConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
+/**
+ * Ordered model chain tried by analyzeWithGemini: the configured (or default)
+ * model first, then the fallback model. Deduplicated so an explicit
+ * GEMINI_MODEL override does not retry the same model twice.
+ */
+function getGeminiModels(): string[] {
+  const primary = process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
+  return primary === FALLBACK_GEMINI_MODEL
+    ? [primary]
+    : [primary, FALLBACK_GEMINI_MODEL];
+}
+
+/** Primary model — kept for the generic `callGeminiJson` helper. */
 function getGeminiModel(): string {
   return process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
 }
@@ -89,7 +101,6 @@ export async function callGeminiJson<T>(
           generationConfig: {
             temperature,
             responseMimeType: 'application/json',
-            ...GEMINI_THINKING_CONFIG,
           },
         }),
         signal: AbortSignal.timeout(timeoutMs),
@@ -139,9 +150,12 @@ export function buildAnalysisPrompt(cvText: string): string {
       ? `${cvText.slice(0, MAX_LLM_TEXT_CHARS)}\n[tronqué]`
       : cvText;
 
-  return `Tu es un recruteur expert. Analyse ce CV et renvoie UNIQUEMENT un JSON valide (sans texte autour) avec cette structure exacte :
+  return `Tu es un recruteur expert. Le document ci-dessous peut être rédigé dans N'IMPORTE QUELLE langue (français, anglais, allemand, espagnol…) — analyse-le dans sa langue, mais renvoie UNIQUEMENT un JSON valide (sans texte autour) avec cette structure exacte :
 {
-  "score": <0-100>,
+  "is_cv": <true si le document est un curriculum vitae / resume d'une personne physique, false sinon (facture, bulletin de paie, devis, lettre, manuel…)>,
+  "document_type": "<type détecté : 'cv', 'invoice', 'payslip', 'quote', 'letter', 'other'…>",
+  "detected_language": "<code ISO de la langue du document : 'fr', 'en', 'de'…>",
+  "score": <0-100 — 0 si is_cv est false>,
   "score_breakdown": [
     {"category": "<dimension>", "score": <0-100>, "comment": "<justification>"}
   ],
@@ -153,7 +167,7 @@ export function buildAnalysisPrompt(cvText: string): string {
   "impact_metrics_advice": "<conseil chiffrage>"
 }
 
-Règles : 5 dimensions minimum (Structure, Impact chiffré, Clarté missions, Adéquation poste, Mots-clés ATS) ; 2-4 éléments par liste ; conseils concrets et spécifiques au CV ; français ; pas d'invention.
+Règles : si et seulement si is_cv est true, 5 dimensions minimum (Structure, Impact chiffré, Clarté missions, Adéquation poste, Mots-clés ATS) ; 2-4 éléments par liste ; conseils concrets et spécifiques au CV ; pas d'invention. Si is_cv est false, remplis les listes avec des tableaux vides et score 0.
 
 CV :
 ${truncated}`;
@@ -162,6 +176,9 @@ ${truncated}`;
 const GEMINI_RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {
+    is_cv: { type: 'BOOLEAN' },
+    document_type: { type: 'STRING' },
+    detected_language: { type: 'STRING' },
     score: { type: 'NUMBER' },
     score_breakdown: {
       type: 'ARRAY',
@@ -204,6 +221,9 @@ const GEMINI_RESPONSE_SCHEMA = {
     impact_metrics_advice: { type: 'STRING' },
   },
   required: [
+    'is_cv',
+    'document_type',
+    'detected_language',
     'score',
     'score_breakdown',
     'strengths',
@@ -366,9 +386,42 @@ interface GeminiAttemptResult {
   reason: string | null;
 }
 
+/** Semantic gate returned alongside the analysis by the merged LLM call. */
+export interface CvGate {
+  isCv: boolean;
+  documentType: string;
+  detectedLanguage: string;
+}
+
+/** Full LLM outcome: coerced analysis + semantic CV gate. */
+export interface GeminiAnalysisResult {
+  analysis: QuickTestAnalysis;
+  gate: CvGate;
+}
+
 /**
- * Runs the deep analysis through Gemini, synchronously, in real time, with a
- * built-in retry: a second attempt is made when the first one failed FAST
+ * Extracts the semantic CV gate (`is_cv` / `document_type` /
+ * `detected_language`) from a raw LLM payload. Missing fields degrade
+ * gracefully: an absent `is_cv` is treated as `true` (the schema requires it,
+ * but older/looser generations may omit it — never block a real CV on a
+ * missing optional detail).
+ */
+export function extractCvGate(raw: unknown): CvGate {
+  const record = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+  const documentType = typeof record.document_type === 'string' ? record.document_type.trim() : '';
+  const detectedLanguage =
+    typeof record.detected_language === 'string' ? record.detected_language.trim().toLowerCase() : '';
+  return {
+    isCv: record.is_cv === undefined ? true : record.is_cv === true,
+    documentType: documentType.length > 0 ? documentType : 'unknown',
+    detectedLanguage: detectedLanguage.length > 0 ? detectedLanguage : 'unknown',
+  };
+}
+
+/**
+ * Runs the deep analysis through Gemini, synchronously, in real time, walking
+ * a MODEL CHAIN: the configured (or default) model first, then the fallback
+ * model. A model is skipped to the next one when the attempt failed FAST
  * (HTTP 429/503/model-404, connection refused…) within
  * LLM_FAST_FAILURE_CEILING_MS, while the remaining wall-clock budget allows
  * it. Timeouts are never retried (they already consumed the budget).
@@ -378,7 +431,9 @@ interface GeminiAttemptResult {
  * the heuristic analyzer is never silent. Returns null on any final failure
  * (network, timeout, malformed output) so the caller can fall back.
  */
-export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalysis | null> {
+export async function analyzeWithGemini(
+  cvText: string
+): Promise<GeminiAnalysisResult | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn(
@@ -387,35 +442,37 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
     return null;
   }
 
+  const models = getGeminiModels();
   const overallStartedAt = Date.now();
   let lastReason = 'unknown';
 
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  for (const model of models) {
     const elapsedMs = Date.now() - overallStartedAt;
     const remainingBudgetMs = LLM_TOTAL_BUDGET_MS - elapsedMs;
     if (remainingBudgetMs < 5_000) {
       console.warn(
-        `[quick-test] Gemini retry skipped — remaining budget ${remainingBudgetMs}ms too small.`
+        `[quick-test] Gemini chain exhausted — remaining budget ${remainingBudgetMs}ms too small.`
       );
       break;
     }
 
-    const { analysis, reason } = await analyzeWithGeminiOnce(
+    const { analysis, raw, reason } = await analyzeWithGeminiOnce(
       cvText,
       apiKey,
+      model,
       Math.min(LLM_TIMEOUT_MS, remainingBudgetMs)
     );
     if (analysis) {
-      return analysis;
+      return { analysis, gate: extractCvGate(raw) };
     }
     lastReason = reason ?? 'unknown';
 
-    // Only worth retrying when the attempt failed quickly — a timeout or a
-    // slow failure already consumed most of the wall-clock budget.
+    // Only worth trying the next model when the attempt failed quickly — a
+    // timeout or a slow failure already consumed most of the wall-clock budget.
     const attemptElapsedMs = Date.now() - overallStartedAt - elapsedMs;
-    if (attempt === 1 && attemptElapsedMs <= LLM_FAST_FAILURE_CEILING_MS) {
+    if (attemptElapsedMs <= LLM_FAST_FAILURE_CEILING_MS) {
       console.warn(
-        `[quick-test] Gemini attempt 1 failed fast in ${attemptElapsedMs}ms (${lastReason}) — retrying once within the remaining budget…`
+        `[quick-test] Gemini model=${model} failed fast in ${attemptElapsedMs}ms (${lastReason}) — trying next model in the chain…`
       );
       await new Promise((resolve) => setTimeout(resolve, 500));
       continue;
@@ -424,22 +481,23 @@ export async function analyzeWithGemini(cvText: string): Promise<QuickTestAnalys
   }
 
   console.error(
-    `[quick-test] Gemini FAILED after all attempts in ${Date.now() - overallStartedAt}ms — ` +
+    `[quick-test] Gemini FAILED after all models in ${Date.now() - overallStartedAt}ms — ` +
       `last reason: ${lastReason}. Falling back to heuristic.`
   );
   return null;
 }
 
 /**
- * Runs ONE analysis attempt against Gemini. Returns the coerced analysis on
- * success, or a structured failure reason for the retry/fallback logic.
+ * Runs ONE analysis attempt against a single Gemini model. Returns the coerced
+ * analysis + raw payload on success, or a structured failure reason for the
+ * model-chain/fallback logic.
  */
 async function analyzeWithGeminiOnce(
   cvText: string,
   apiKey: string,
+  model: string,
   timeoutMs: number
-): Promise<GeminiAttemptResult> {
-  const model = getGeminiModel();
+): Promise<GeminiAttemptResult & { raw?: unknown }> {
   const startedAt = Date.now();
   console.time(`[quick-test] Gemini (analysis) model=${model}`);
   console.info(
@@ -462,7 +520,6 @@ async function analyzeWithGeminiOnce(
             responseMimeType: 'application/json',
             responseSchema: GEMINI_RESPONSE_SCHEMA,
             maxOutputTokens: MAX_OUTPUT_TOKENS,
-            ...GEMINI_THINKING_CONFIG,
           },
         }),
         signal: AbortSignal.timeout(timeoutMs),
@@ -515,7 +572,7 @@ async function analyzeWithGeminiOnce(
         `weaknesses=${analysis.weaknesses.length}, recommendations=${analysis.recommendations.length} (source=llm)`
     );
     console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
-    return { analysis, reason: null };
+    return { analysis, raw: parsed, reason: null };
   } catch (error) {
     const elapsedMs = Date.now() - startedAt;
     console.error(

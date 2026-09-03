@@ -1,5 +1,10 @@
 import { createClient } from '@/utils/supabase/server';
-import { sanitizeFileName, validateResumeFile } from '@/lib/resume-validation';
+import {
+  resumeContentTypeForExtension,
+  sanitizeFileName,
+  validateResumeBuffer,
+  validateResumeFile,
+} from '@/lib/resume-validation';
 import type {
   DeepAnalysisOutput,
   DeepAnalysisProcessingMarker,
@@ -49,6 +54,14 @@ export async function uploadResume(file: File): Promise<ResumeResponse<Resume>> 
       return { data: null, error: validationError };
     }
 
+    // Server-authoritative magic-byte check: the client-reported MIME type and
+    // extension can both be spoofed. Mirrors the Quick Test pipeline.
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const bufferError = validateResumeBuffer(file.name, buffer);
+    if (bufferError) {
+      return { data: null, error: bufferError };
+    }
+
     const supabase = await createClient();
 
     const {
@@ -75,9 +88,15 @@ export async function uploadResume(file: File): Promise<ResumeResponse<Resume>> 
 
     const isPrimary = (count ?? 0) === 0;
 
+    // Content type derived server-side from the (already validated) extension —
+    // never trust the client-supplied file.type.
+    const contentType =
+      resumeContentTypeForExtension(file.name.slice(file.name.lastIndexOf('.')).toLowerCase()) ??
+      'application/octet-stream';
+
     const { error: uploadError } = await supabase.storage
       .from(RESUME_BUCKET)
-      .upload(filePath, file, { contentType: file.type, upsert: false });
+      .upload(filePath, buffer, { contentType, upsert: false });
 
     if (uploadError) {
       return { data: null, error: uploadError.message };

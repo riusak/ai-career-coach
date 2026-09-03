@@ -68,3 +68,63 @@ export function sanitizeFileName(fileName: string): string {
   const base = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
   return base.length > 0 ? base : 'resume';
 }
+
+/** Maps a resume extension to the authoritative server-side content type. */
+export function resumeContentTypeForExtension(extension: string): string | null {
+  switch (extension) {
+    case '.pdf':
+      return 'application/pdf';
+    case '.docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case '.txt':
+      return 'text/plain';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Server-authoritative magic-byte validation. The client-reported MIME type
+ * AND file extension can both be spoofed, so the actual byte content is
+ * verified before anything reaches Storage. Mirrors the Quick Test pipeline
+ * (isPdfBuffer / isDocxBuffer) for PDF and DOCX; plain-text files are checked
+ * for binary content (NUL bytes in the first chunk).
+ * Returns an error message when the buffer is invalid, or null when valid.
+ */
+export function validateResumeBuffer(fileName: string, buffer: Buffer): string | null {
+  const extension = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
+
+  if (buffer.length === 0) {
+    return 'Le fichier est vide.';
+  }
+
+  if (buffer.length > MAX_RESUME_FILE_SIZE_BYTES) {
+    return `Fichier trop volumineux (${formatBytes(buffer.length)}). Maximum : ${formatBytes(
+      MAX_RESUME_FILE_SIZE_BYTES
+    )}.`;
+  }
+
+  if (extension === '.pdf') {
+    if (buffer.subarray(0, 1024).toString('latin1').indexOf('%PDF-') === -1) {
+      return 'Ce fichier n\'est pas un véritable PDF (signature invalide).';
+    }
+  } else if (extension === '.docx') {
+    if (
+      buffer[0] !== 0x50 ||
+      buffer[1] !== 0x4b ||
+      buffer[2] !== 0x03 ||
+      buffer[3] !== 0x04
+    ) {
+      return 'Ce fichier n\'est pas un véritable document Word (.docx) (signature invalide).';
+    }
+  } else if (extension === '.txt') {
+    const head = buffer.subarray(0, 1024);
+    if (head.includes(0)) {
+      return 'Ce fichier n\'est pas un document texte valide (contenu binaire détecté).';
+    }
+  } else {
+    return `Type de fichier non supporté "${extension || fileName}". Formats acceptés : PDF (.pdf), Word (.docx) et texte (.txt).`;
+  }
+
+  return null;
+}

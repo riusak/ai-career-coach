@@ -8,7 +8,7 @@
  *   2) Extraction texte PDF/DOCX.
  *   3) Vérification que le texte est extractible (rejette les scans/images).
  *   4) Analyse LLM (Gemini Flash — see llm.ts for the benchmarked model) → fallback heuristique transparent.
- *   5) Tracking anonyme (quick_test_events) + rate-limiting léger (non bloquant).
+ *   5) Tracking anonyme (quick_test_events) + rate-limiting bloquant (429).
  *
  * Conformité :
  *   - Aucune donnée persistante côté backend (hors logs d'audit anonymes).
@@ -22,35 +22,61 @@ import { PdfExtractionError, countWords, extractPdfText, isPdfBuffer } from '@/l
 import { DocxExtractionError, extractDocxText, isDocxBuffer } from '@/lib/quick-test/docx-extract';
 import { analyzeWithGemini, isLlmConfigured } from '@/lib/quick-test/llm';
 import { analyzeResumeText } from '@/lib/quick-test/analysis';
+import { heuristicCvGate } from '@/lib/quick-test/guardrail';
 import { logQuickTestEvent, checkRateLimit } from '@/lib/quick-test/track';
 import type { QuickTestAnalysis, QuickTestResponse, QuickTestSource } from '@/types/quick-test';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-function errorResponse(message: string, status: number): Response {
+function errorResponse(
+  message: string,
+  status: number,
+  extraHeaders: Record<string, string> = {}
+): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
   });
 }
 
 function clientIp(request: Request): string {
-  const h = (request as Request & { headers: Headers }).headers;
-  const xff = h.get('x-forwarded-for');
+  const h = request.headers;
+  // `x-real-ip` est posé par la plateforme (Vercel/proxy inverse) depuis le
+  // pair socket réel : il n'est PAS falsifiable par le client, contrairement à
+  // `x-forwarded-for` (premier maillon chaînable). Les deux suivants ne sont
+  // que des replis best-effort pour les déploiements self-hosted.
+  const realIp = h.get('x-real-ip');
+  if (realIp) {
+    return realIp.trim();
+  }
   const cf = h.get('cf-connecting-ip');
-  return xff?.split(',')[0]?.trim() || cf || 'unknown';
+  if (cf) {
+    return cf.trim();
+  }
+  const xff = h.get('x-forwarded-for');
+  return xff?.split(',')[0]?.trim() || 'unknown';
 }
 
 export async function POST(request: Request): Promise<Response> {
   console.time('[quick-test] Total request');
   const ip = clientIp(request);
-  const userAgent = (request as Request & { headers: Headers }).headers.get('user-agent') || undefined;
+  const userAgent = request.headers.get('user-agent') || undefined;
 
-  // 1) Rate limiting (non bloquant — loggué mais on laisse passer)
-  const rateOk = await checkRateLimit(ip).catch(() => true);
+  // 1) Rate limiting — BLOQUANT (429) : chaque analyse réussie engage le
+  //    quota/facturation Gemini, l'endpoint ne peut plus rester un gouffre
+  //    financier ouvert. Fail-open uniquement sur erreur technique du check.
+  const rateOk = await checkRateLimit(ip).catch((err) => {
+    console.error('[quick-test] rate-limit check failed (fail-open):', (err as Error)?.message);
+    return true;
+  });
   if (!rateOk) {
-    console.warn(`[quick-test] Rate limit exceeded for ip_hash=${ip.slice(0, 3)}...`);
+    console.warn(`[quick-test] ⛔ Rate limit exceeded for ip_hash-prefix=${ip.slice(0, 3)}...`);
+    return errorResponse(
+      'Trop de tests depuis cette adresse. Réessayez dans 24 heures.',
+      429,
+      { 'Retry-After': '86400' }
+    );
   }
 
   // 2) Extraction du formulaire
@@ -138,15 +164,37 @@ export async function POST(request: Request): Promise<Response> {
   // 5) Tracking de l'upload
   await logQuickTestEvent({ eventType: 'upload', source: 'heuristic', ip, userAgent });
 
-  // 6) Analyse LLM (Gemini) → fallback heuristique transparent
+  // 6) Analyse LLM (Gemini) → fallback heuristique transparent.
+  //    Le guardrail sémantique « est-ce un CV ? » est FUSIONNÉ dans l'appel
+  //    LLM (champ `is_cv` du responseSchema — un seul appel, latence divisée
+  //    par deux). Le filet heuristique (guardrail.ts) ne sert que lorsque le
+  //    LLM est indisponible, afin qu'un résultat heuristique ne soit jamais
+  //    présenté pour un document qui n'est pas un CV.
   let analysis: QuickTestAnalysis | null = null;
   let source: QuickTestSource = 'heuristic';
 
   if (isLlmConfigured()) {
     console.time('[quick-test] LLM analysis');
-    analysis = await analyzeWithGemini(text);
+    const llmResult = await analyzeWithGemini(text);
     console.timeEnd('[quick-test] LLM analysis');
-    if (analysis) {
+    if (llmResult) {
+      if (!llmResult.gate.isCv) {
+        console.warn(
+          `[quick-test] ❌ Non-CV rejeté par le guardrail LLM (type=${llmResult.gate.documentType}, langue=${llmResult.gate.detectedLanguage})`
+        );
+        await logQuickTestEvent({
+          eventType: 'rejected_non_cv',
+          source: 'heuristic',
+          score: null,
+          ip,
+          userAgent,
+        });
+        return errorResponse(
+          `Ce document ne semble pas être un CV (type détecté : ${llmResult.gate.documentType}). Veuillez télécharger un curriculum vitæ valide.`,
+          422
+        );
+      }
+      analysis = llmResult.analysis;
       source = 'llm';
     } else {
       console.warn(
@@ -158,6 +206,21 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!analysis) {
+    // Fallback heuristique : le filet sémantique local remplace le guardrail LLM.
+    const gate = heuristicCvGate(text);
+    if (!gate.ok) {
+      await logQuickTestEvent({
+        eventType: 'rejected_non_cv',
+        source: 'heuristic',
+        score: null,
+        ip,
+        userAgent,
+      });
+      return errorResponse(
+        `Ce document ne semble pas être un CV (${gate.reason}). Veuillez télécharger un curriculum vitæ valide.`,
+        422
+      );
+    }
     analysis = analyzeResumeText(text);
   }
 

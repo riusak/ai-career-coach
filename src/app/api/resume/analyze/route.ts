@@ -24,6 +24,7 @@ import { PdfExtractionError, countWords, extractPdfText } from '@/lib/quick-test
 import { DocxExtractionError, extractDocxText } from '@/lib/quick-test/docx-extract';
 import { analyzeWithGemini } from '@/lib/quick-test/llm';
 import { analyzeResumeText } from '@/lib/quick-test/analysis';
+import { heuristicCvGate } from '@/lib/quick-test/guardrail';
 import {
   claimQueuedResumeAnalysis,
   completeResumeAnalysis,
@@ -34,11 +35,14 @@ import {
   markResumeParsed,
 } from '@/lib/supabase/resumes';
 import type { DeepAnalysisProcessingMarker } from '@/types/resume';
-import type { QuickTestSource } from '@/types/quick-test';
+import type { QuickTestAnalysis, QuickTestSource } from '@/types/quick-test';
 import type { ParsedResumeContent } from '@/types/resume';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+/** A queued analysis whose source document is not a resume at all (422). */
+class NotACvError extends Error {}
 
 /** A claim older than this is considered abandoned and may be reclaimed. */
 const STALE_CLAIM_MS = 90_000;
@@ -166,19 +170,33 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // 5) Gemini Flash (single call, bounded timeout, strict responseSchema)
-    // with transparent heuristic fallback — the queue always drains.
+    // with transparent heuristic fallback — the queue always drains. The
+    // semantic CV gate (`is_cv`) is MERGED into the same LLM call; the local
+    // heuristic gate (guardrail.ts) only backs the fallback path.
     let source: QuickTestSource = 'heuristic';
-    let analysis = await analyzeWithGemini(text);
-    if (analysis) {
+    let analysis: QuickTestAnalysis;
+    const llmResult = await analyzeWithGemini(text);
+    if (llmResult) {
+      if (!llmResult.gate.isCv) {
+        throw new NotACvError(
+          `This document does not look like a resume (detected type: ${llmResult.gate.documentType}).`
+        );
+      }
+      analysis = llmResult.analysis;
       source = 'llm';
     } else {
       console.warn(
         `[analyze] HEURISTIC FALLBACK — Gemini unavailable for analysis ${latest.id} (${text.length} chars)`
       );
-      analysis = analyzeResumeText(text);
-    }
-    if (!analysis) {
-      throw new Error('The extracted text is too short to produce a reliable analysis.');
+      const gate = heuristicCvGate(text);
+      if (!gate.ok) {
+        throw new NotACvError(`This document does not look like a resume (${gate.reason}).`);
+      }
+      const heuristic = analyzeResumeText(text);
+      if (!heuristic) {
+        throw new Error('The extracted text is too short to produce a reliable analysis.');
+      }
+      analysis = heuristic;
     }
 
     // 6) Persist the result (score null → filled; the polling UI picks it up).
@@ -222,8 +240,9 @@ export async function POST(request: Request): Promise<Response> {
       `[analyze] ❌ Analysis ${latest.id} failed (queued row removed=${cleanup.deleted}):`,
       error
     );
+    const isNotACv = error instanceof NotACvError;
     const message =
       error instanceof Error ? error.message : 'The analysis pipeline failed unexpectedly.';
-    return jsonResponse({ error: message }, 500);
+    return jsonResponse({ error: message }, isNotACv ? 422 : 500);
   }
 }

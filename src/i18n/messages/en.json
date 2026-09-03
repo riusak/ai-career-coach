@@ -74,6 +74,7 @@
     "errorEmpty": "The file is empty.",
     "errorTitle": "Analysis failed",
     "errorGeneric": "An error occurred during the analysis.",
+    "errorScannedPdf": "This PDF looks like a scanned document (image): no text could be extracted. Upload a text-based version (export as \"PDF\" from Word) or use your Word file directly.",
     "errorTimeout": "The server is taking too long to respond. Check your connection and try again — your resume was not stored.",
     "resultsHeading": "Analysis results",
     "resultsBadge": "Analysis complete",

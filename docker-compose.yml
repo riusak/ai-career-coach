@@ -3,11 +3,35 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # NEXT_PUBLIC_* vars are inlined at BUILD time. docker compose reads
+      # them from the `.env` file in this directory (compose does NOT read
+      # `.env.local` automatically): create a `.env` with at least
+      #   NEXT_PUBLIC_SUPABASE_URL=...        NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+      # All other secrets are injected at RUNTIME via env_file below.
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     container_name: forpro-ai-web
     restart: unless-stopped
     ports:
       - '3000:3000'
+    # Runtime secrets/keys (SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY,
+    # IP_HASH_SECRET, ...) — see .env.example.
+    env_file:
+      - .env.local
     environment:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

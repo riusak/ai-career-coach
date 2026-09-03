@@ -74,6 +74,7 @@
     "errorEmpty": "Die Datei ist leer.",
     "errorTitle": "Analyse fehlgeschlagen",
     "errorGeneric": "Während der Analyse ist ein Fehler aufgetreten.",
+    "errorScannedPdf": "Diese PDF scheint ein eingescanntes Dokument (Bild) zu sein: Es konnte kein Text extrahiert werden. Laden Sie eine Textversion hoch (als „PDF“ aus Word exportiert) oder verwenden Sie direkt Ihre Word-Datei.",
     "errorTimeout": "Der Server antwortet zu langsam. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
     "resultsHeading": "Analyseergebnisse",
     "resultsBadge": "Analyse abgeschlossen",
