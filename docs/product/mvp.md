@@ -60,10 +60,10 @@ expérience enrichie pour les utilisateurs authentifiés (Catalogue de CVs).
 [ Écran de traitement ]  ── pipeline léger : extraction texte + check automatisé
         │
         ▼
-[ Résultat gratuit limité ]
-   • Score global (0–100)
-   • 2–3 points forts / 2–3 points faibles
-   • 1 à 2 recommandations (tronquées)
+[ Résultat gratuit (v2) ]
+   • Rapport complet : score global + par dimension
+   • Points forts / points faibles / recommandations
+   • Conseils d'expert ciblés
         │
         ▼
 [ CTA de conversion ]
@@ -77,10 +77,13 @@ expérience enrichie pour les utilisateurs authentifiés (Catalogue de CVs).
 - **Formats acceptés :** PDF et Word (.docx) en mode visiteur (limite 5 Mo).
 - **Aucune persistance :** le fichier et le résultat ne sont ni stockés en base,
   ni dans Storage. Le traitement est éphémère (durée de vie = la session de requête).
-- **Rate limiting :** 1 test gratuit par IP / 24 h (anti-abus du pipeline IA).
-- **Le résultat tronqué est la vitrine.** Les sections complètes (recommandations
-  détaillées, comparaison offre, plan d'action) sont visuellement floutées/masquées
-  avec un overlay de conversion.
+- **Rate limiting :** plafond d'analyses par IP / 24 h, configurable via
+  `QUICK_TEST_RATE_LIMIT` — cible production : 1 / IP / 24 h ; défaut MVP : 30
+  (démo). Seuls les événements d'analyse consomment le quota.
+- **Le rapport complet est la vitrine (v2).** Le visiteur reçoit la même
+  profondeur d'analyse qu'un compte (score global + par dimension, forces /
+  faiblesses, recommandations, conseils d'expert) ; les fonctions au-delà
+  (matching offre, bibliothèque, historique) restent des CTA de conversion.
 
 ### 2.3 Points de conversion
 
@@ -139,10 +142,10 @@ expérience enrichie pour les utilisateurs authentifiés (Catalogue de CVs).
 
 | Ressource | Limite |
 |---|---|
-| Tests de CV (Quick Test) | 1 / IP / 24 h |
+| Tests de CV (Quick Test) | Configurable `QUICK_TEST_RATE_LIMIT` — cible prod : 1 / IP / 24 h (défaut MVP : 30) |
 | Formats | PDF + Word (.docx) |
 | Taille fichier | 5 Mo max |
-| Profondeur d'analyse | Score global + 2–3 forces/faiblesses + 1–2 recommandations |
+| Profondeur d'analyse | Rapport complet, identique au tier gratuit (v2) |
 | Persistance / historique | Aucun |
 | Matching offre | Non disponible |
 | Simulations d'entretien | Non disponibles |
@@ -247,8 +250,9 @@ Règles RLS à reproduire sur toutes les tables enfants : **select/insert limit�
 - Le champ `analysis_type = 'light'` est prévu dans `resume_analyses` pour que,
   à terme, une analyse visiteur "reprise" après inscription puisse être historisée
   avec la même entité que les analyses profondes.
-- Le rate-limiting visiteur (1 / IP / 24 h) est un mécanisme applicatif/edge,
-  **pas** une table.
+- Le rate-limiting visiteur est un mécanisme applicatif adossé à la table
+  `quick_test_events` (comptage par `ip_hash` sur 24 h, événements d'analyse
+  uniquement — voir `RATE_LIMITED_EVENT_TYPES`).
 
 ---
 

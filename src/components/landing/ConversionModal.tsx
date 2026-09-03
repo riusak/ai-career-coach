@@ -65,7 +65,12 @@ export default function ConversionModal({ isOpen, onClose }: ConversionModalProp
         <div className="flex flex-col gap-3">
           <Link
             href="/signup"
-            onClick={onClose}
+            onClick={() => {
+              // Tracking de conversion fire-and-forget : ne doit jamais
+              // gêner la navigation (échec réseau silencieux).
+              void fetch('/api/quick-test/cta', { method: 'POST' }).catch(() => {});
+              onClose();
+            }}
             className="rounded-lg bg-gradient-to-r from-orange-400 to-orange-500 px-6 py-2.5 text-center text-sm font-semibold text-slate-950 shadow-md transition-all hover:from-orange-500 hover:to-orange-600"
           >
             {t('conversionModal.cta')}

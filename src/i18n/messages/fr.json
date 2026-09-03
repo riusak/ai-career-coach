@@ -70,7 +70,6 @@
     "resultSubtext": "Votre aperçu détaillé vous attend juste en dessous — faites défiler pour le consulter.",
     "testAnother": "Tester un autre CV",
     "errorTooLarge": "Fichier trop volumineux ({size}). Maximum : {max}.",
-    "errorNotPdf": "Format non supporté : le test rapide accepte uniquement les fichiers PDF et Word (.docx).",
     "errorEmpty": "Le fichier est vide.",
     "errorTitle": "Échec de l'analyse",
     "errorGeneric": "Une erreur est survenue pendant l'analyse.",
@@ -101,9 +100,9 @@
     "ephemeral": "Éphémère — rien n'est enregistré",
     "filesParseError": "Le fichier n'est pas un véritable PDF (signature magic bytes invalide).",
     "analysisSteps": {
-      "stepExtract": "Extraction du texte en cours",
-      "stepSkills": "Analyse des compétences par l’IA",
-      "stepRecommendations": "Génération des recommandations"
+      "stepExtract": "Vérification et lecture intelligente du document...",
+      "stepSkills": "Inspection approfondie et analyse stratégique par l’IA...",
+      "stepRecommendations": "Génération du rapport et des recommandations personnalisées."
     },
     "analyzingHeading": "Analyse de votre CV en cours…",
     "servicesEyebrow": "Services",
@@ -302,9 +301,9 @@
     "avatarUploadHint": "PNG / JPG / WebP, 2 Mo max. Image carrée recommandée.",
     "primarySelector": "Statut principal",
     "queuedSteps": [
-      "Extraction du texte du CV",
-      "Analyse IA des compétences",
-      "Génération du rapport complet"
+      "Vérification et lecture intelligente du document...",
+      "Inspection approfondie et analyse stratégique par l'IA...",
+      "Génération du rapport et des recommandations personnalisées."
     ],
     "latestCard": {
       "queued": "En file d’attente",
@@ -531,5 +530,27 @@
     "socialGithub": "GitHub",
     "socialLinkedin": "LinkedIn",
     "socialX": "X (Twitter)"
+  },
+  "errors": {
+    "rejectionTitle": "Document non conforme",
+    "analysisFailedTitle": "Échec de l'analyse",
+    "actionFailedTitle": "L'opération a échoué",
+    "unsupportedFormat": "Format de fichier non pris en charge. Veuillez uniquement téléverser un fichier PDF ou Word (.docx).",
+    "notCvTyped": "Ce document ne semble pas être un curriculum vitæ. Il s'agirait plutôt d'un(e) {type}. Veuillez téléverser un CV valide.",
+    "notCvGeneric": "Le document téléversé ne contient pas la structure d'un CV. Veuillez vérifier votre fichier et téléverser un curriculum vitæ valide pour l'analyse.",
+    "technicalFailure": "L'analyse IA n'a pas abouti après plusieurs tentatives. Veuillez réessayer dans un instant.",
+    "retryChooseFile": "Choisir un autre fichier",
+    "retryAnalysis": "Réessayer",
+    "docType": {
+      "cv": "un CV",
+      "invoice": "une facture",
+      "payslip": "un bulletin de salaire",
+      "quote": "un devis",
+      "letter": "une lettre",
+      "administrative_form": "un formulaire administratif",
+      "generic_text": "un document texte non pertinent",
+      "empty": "un document vide",
+      "other": "un document non pertinent"
+    }
   }
 }

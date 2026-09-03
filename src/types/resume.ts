@@ -44,6 +44,7 @@ export type ResumeResponse<T> = {
 };
 
 import type { QuickTestAnalysis, QuickTestSource } from '@/types/quick-test';
+import type { AnalysisStage } from '@/lib/analysis/pipeline';
 
 /**
  * Payload persisted in `resume_analyses.structured_output` once the deep
@@ -64,4 +65,11 @@ export interface DeepAnalysisOutput {
 export interface DeepAnalysisProcessingMarker {
   status: 'processing';
   claimed_at: string;
+  /**
+   * Dernier stade réellement atteint par le pipeline (reading → analyzing →
+   * reporting), écrit au fil de l'eau par le worker pour que le polling du
+   * dashboard traduise la progression RÉELLE. Absent sur les marqueurs
+   * historiques — le client retombe alors sur sa cadence de secours.
+   */
+  stage?: AnalysisStage;
 }

@@ -28,18 +28,11 @@ interface QuickTestResultSectionProps {
 }
 
 /** "Billet d'attente" step keys — translated at render time via
- *  `useTranslations('landing.analysisSteps')`. The constant FR defaults are
- *  kept exported so server-side callers (e.g. metadata hints) still work. */
+ *  `useTranslations('landing.analysisSteps')`. */
 export const ANALYSIS_STEP_KEYS = [
   'stepExtract',
   'stepSkills',
   'stepRecommendations',
-] as const;
-
-export const ANALYSIS_STEPS = [
-  'Extraction du texte en cours',
-  'Analyse des compétences par l’IA',
-  'Génération des recommandations',
 ] as const;
 
 /** Skeleton shown while the analysis runs — mirrors the bento grid shape so

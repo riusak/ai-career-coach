@@ -219,7 +219,7 @@ export function buildAnalysisPrompt(documentText: string | null): string {
   return `Tu es un recruteur expert (10+ ans en cabinet) ET un spécialiste du design documentaire. Le document ci-dessous peut être rédigé dans N'IMPORTE QUELLE langue (français, anglais, allemand, espagnol…) — analyse-le dans sa langue, mais renvoie UNIQUEMENT un JSON valide (sans texte autour) avec cette structure exacte :
 {
   "is_cv": <true si le document est un curriculum vitae / resume d'une personne physique, false sinon (facture, bulletin de paie, devis, lettre, manuel…)>,
-  "document_type": "<type détecté : 'cv', 'invoice', 'payslip', 'quote', 'letter', 'other'…>",
+  "document_type": "<type détecté, STRICTEMENT une de ces valeurs : 'cv', 'invoice', 'payslip', 'quote', 'letter', 'administrative_form', 'generic_text', 'empty', 'other'>",
   "detected_language": "<code ISO de la langue du document : 'fr', 'en', 'de'…>",
   "score": <0-100 — 0 si is_cv est false>,
   "score_breakdown": [

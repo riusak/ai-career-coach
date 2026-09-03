@@ -7,14 +7,14 @@ import {
   formatBytes,
   validateResumeFile,
 } from '@/lib/resume-validation';
-import ErrorState from '@/components/ui/ErrorState';
+import ErrorModal from '@/components/ui/ErrorModal';
 import Skeleton from '@/components/ui/Skeleton';
 import SuccessBanner from '@/components/ui/SuccessBanner';
 import { uploadResumeAction, type ResumeUploadState } from './actions';
 
 export default function ResumeUploader() {
   const t = useTranslations('dashboard');
-  const tCommon = useTranslations('common');
+  const tErrors = useTranslations('errors');
   const initialState: ResumeUploadState = { success: false, message: null, data: null };
   const [state, formAction, isPending] = useActionState(uploadResumeAction, initialState);
 
@@ -22,6 +22,8 @@ export default function ResumeUploader() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  /** Server action error already dismissed through the blocking modal. */
+  const [dismissedActionMessage, setDismissedActionMessage] = useState<string | null>(null);
 
   const clearSelection = () => {
     setSelectedFile(null);
@@ -29,6 +31,20 @@ export default function ResumeUploader() {
     if (inputRef.current) {
       inputRef.current.value = '';
     }
+  };
+
+  // Server-side upload failures surface through the same blocking modal as
+  // client-side validation errors; dismissal keeps them from re-popping.
+  const actionError =
+    state.message && !state.success && state.message !== dismissedActionMessage
+      ? state.message
+      : null;
+  const isModalOpen = Boolean(clientError || actionError);
+  const isRejection = Boolean(clientError);
+
+  const closeErrorModal = () => {
+    setClientError(null);
+    setDismissedActionMessage(state.message);
   };
 
   // Clears the local selection up-front; server feedback (success or error)
@@ -79,25 +95,22 @@ export default function ResumeUploader() {
 
   return (
     <form action={handleFormAction} className="space-y-4">
-      {clientError || (state.message && !state.success) && (
-        <div className="mb-4">
-          <ErrorState
-            title={clientError ? t('uploadResumeTitle') : tCommon('errorGeneric')}
-            description={clientError ?? (state.message ?? tCommon('errorGeneric'))}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                clearSelection();
-                inputRef.current?.click();
-              }}
-              className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
-            >
-              {t('changeFile') ?? 'Choisir un autre fichier'}
-            </button>
-          </ErrorState>
-        </div>
-      )}
+      {/* Blocking centered error modal — replaces the old inline banner.
+          Validation errors are document rejections; upload failures are
+          technical errors. Both invite choosing another file. */}
+      <ErrorModal
+        open={isModalOpen}
+        title={isRejection ? tErrors('rejectionTitle') : tErrors('actionFailedTitle')}
+        description={clientError ?? actionError ?? ''}
+        actionLabel={tErrors('retryChooseFile')}
+        onAction={() => {
+          closeErrorModal();
+          clearSelection();
+          inputRef.current?.click();
+        }}
+        onClose={closeErrorModal}
+        titleId="resume-uploader-error-modal-title"
+      />
 
       {state.success && state.message && (
         <div className="mb-4">

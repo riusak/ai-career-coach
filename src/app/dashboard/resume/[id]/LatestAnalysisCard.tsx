@@ -3,14 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import EmptyState from '@/components/ui/EmptyState';
-import ErrorState from '@/components/ui/ErrorState';
+import ErrorModal from '@/components/ui/ErrorModal';
 import LoadingSteps from '@/components/ui/LoadingSteps';
 import Skeleton from '@/components/ui/Skeleton';
 import DeepAnalysisReport, {
   parseDeepAnalysisOutput,
 } from '@/components/analysis/DeepAnalysisReport';
+import { parseQuickTestError, QUICK_TEST_DOCUMENT_TYPES } from '@/lib/quick-test/error-codes';
+import type { QuickTestErrorPayload } from '@/lib/quick-test/error-codes';
 import type { ResumeAnalysis } from '@/types/resume';
-import { getLatestAnalysisAction } from '../actions';
+import { analyzeResumeAction, getLatestAnalysisAction } from '../actions';
 
 /** How often the latest analysis row is re-fetched while queued. */
 const POLL_INTERVAL_MS = 3_000;
@@ -47,23 +49,33 @@ export default function LatestAnalysisCard({
   initialAnalysis,
 }: LatestAnalysisCardProps) {
   const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
+  const tErrors = useTranslations('errors');
   const locale = useLocale();
   const queuedSteps = t.raw('queuedSteps') as string[];
   const [analysis, setAnalysis] = useState<ResumeAnalysis | null>(initialAnalysis);
   const [pollTimedOut, setPollTimedOut] = useState(false);
-  /** Number of completed poll ticks — drives the progressive waiting ticket. */
+  /** Number of completed poll ticks — fallback cadence of the waiting ticket. */
   const [pollCount, setPollCount] = useState(0);
+  /** Last REAL pipeline stage reported by the worker (waiting-ticket index). */
+  const [serverStage, setServerStage] = useState<number | null>(null);
   /** Non-null when the analysis pipeline reported a terminal error (e.g. the
    *  document is not a resume → 422). The queue row is deleted server-side on
-   *  such failures, so polling stops and the message is shown instead. */
-  const [pipelineError, setPipelineError] = useState<string | null>(null);
+   *  such failures, so polling stops and the blocking modal is shown instead. */
+  const [pipelineError, setPipelineError] = useState<QuickTestErrorPayload | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const isQueued = analysis !== null && analysis.score === null;
 
-  // Poll ticks every 3s; advance one "billet d'attente" step every 4 ticks
-  // (≈12s per stage) so the wait feels progressive instead of frozen.
+  // Poll ticks every 3s; advance one "billet d'attente" step every 3 ticks
+  // (≈9s per stage) so the wait feels progressive instead of frozen.
+  // Waiting ticket: the deep worker persists the REAL pipeline stage into the
+  // transient `structured_output` marker, so the ticket advances in lockstep
+  // with the actual API work whenever a stage is available. The poll-count
+  // cadence (≈9s per stage) is only the fallback for legacy markers — both
+  // paths are clamped and can only ever move forward.
   const queuedStep = Math.min(
-    Math.floor(pollCount / 4),
+    Math.max(serverStage ?? 0, Math.floor(pollCount / 3)),
     queuedSteps.length - 1,
   );
 
@@ -92,6 +104,31 @@ export default function LatestAnalysisCard({
           return;
         }
         setAnalysis(latest);
+
+        // Live stage sync: the worker persists the transient processing
+        // marker carrying the last REAL pipeline stage (reading → analyzing
+        // → reporting). Map it to the waiting-ticket index (forward-only).
+        if (latest.score === null) {
+          const marker: unknown = latest.structured_output;
+          if (
+            typeof marker === 'object' &&
+            marker !== null &&
+            (marker as Record<string, unknown>).status === 'processing'
+          ) {
+            const stage = (marker as Record<string, unknown>).stage;
+            const stageIndex =
+              stage === 'analyzing'
+                ? 1
+                : stage === 'reporting'
+                  ? 2
+                  : stage === 'reading'
+                    ? 0
+                    : null;
+            if (stageIndex !== null) {
+              setServerStage((prev) => Math.max(prev ?? 0, stageIndex));
+            }
+          }
+        }
       } catch {
         // Transient network/server error: keep polling until the timeout.
       }
@@ -138,13 +175,25 @@ export default function LatestAnalysisCard({
       body: JSON.stringify({ resumeId }),
     })
       .then(async (res) => {
-        // Terminal failures (500 / 422) delete the queued row server-side: the
-        // polling loop would spin uselessly for 2 minutes. Surface the message
-        // immediately instead (e.g. "This document does not look like a resume").
-        if (res.status === 500 || res.status === 422) {
-          const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-          if (payload?.error) {
-            setPipelineError(payload.error);
+        // Terminal failures delete the queued row server-side — the polling
+        // loop would spin uselessly for 2 minutes. These span every status the
+        // unified pipeline can emit (400 empty file, 413 too large, 415
+        // unsupported format, 422 non-CV/unreadable, 502/503 LLM unavailable).
+        // Surface the structured error (code / documentType / documentKind)
+        // immediately through the blocking modal instead.
+        if (
+          res.status === 400 ||
+          res.status === 413 ||
+          res.status === 415 ||
+          res.status === 422 ||
+          res.status === 500 ||
+          res.status === 502 ||
+          res.status === 503
+        ) {
+          const payload = (await res.json().catch(() => null)) as unknown;
+          const parsed = parseQuickTestError(payload);
+          if (parsed) {
+            setPipelineError(parsed);
             setPollTimedOut(true);
           }
         }
@@ -157,17 +206,58 @@ export default function LatestAnalysisCard({
       });
   }, [analysis, isQueued, pollTimedOut, pipelineError, resumeId]);
 
+  /** Builds the precise, localized message for the blocking modal. */
+  const rejectionMessage = (): string => {
+    const err = pipelineError;
+    if (!err) {
+      return '';
+    }
+    if (err.code === 'not_a_cv') {
+      if (err.documentKind === 'pdf') {
+        // Multimodal PDF: dynamic, typed rejection message.
+        const key = (QUICK_TEST_DOCUMENT_TYPES as readonly string[]).includes(
+          err.documentType ?? ''
+        )
+          ? err.documentType!
+          : 'other';
+        return tErrors('notCvTyped', { type: tErrors(`docType.${key}`) });
+      }
+      // DOCX/TXT (text-extraction path): clean, elegant generic rejection.
+      return tErrors('notCvGeneric');
+    }
+    if (err.code === 'llm_failed' || err.code === 'llm_unavailable') {
+      return tErrors('technicalFailure');
+    }
+    return err.error;
+  };
+
+  /** Re-queues the deep analysis after a technical failure (explicit retry). */
+  const retryAnalysis = async (): Promise<void> => {
+    if (isRetrying) {
+      return;
+    }
+    setIsRetrying(true);
+    try {
+      const formData = new FormData();
+      formData.set('resumeId', resumeId);
+      await analyzeResumeAction({ success: false, message: null }, formData);
+      // Re-queued: clear the terminal error and restore the processing UI.
+      // The page revalidation also remounts this card with the new row.
+      const latest = await getLatestAnalysisAction(resumeId);
+      setPipelineError(null);
+      setPollTimedOut(false);
+      setPollCount(0);
+      if (latest) {
+        setAnalysis(latest);
+      }
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
   return (
     <div className="mt-4 text-sm" aria-live="polite">
-      {pipelineError ? (
-        <div className="space-y-3">
-          <ErrorState
-            title={t('latestCard.pipelineErrorTitle')}
-            description={pipelineError}
-          />
-          <p className="text-sm text-navy-600">{t('latestCard.pipelineErrorHint')}</p>
-        </div>
-      ) : analysis ? (
+      {analysis ? (
         analysis.score === null ? (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -236,6 +326,33 @@ export default function LatestAnalysisCard({
           description={t('latestCard.emptyDesc')}
         />
       )}
+
+      {/* Blocking centered modal — document rejections ("Document non
+          conforme" + dynamic typed message) and analysis failures
+          ("Échec de l'analyse"). Replaces the old inline error banner. */}
+      <ErrorModal
+        open={pipelineError !== null}
+        title={
+          pipelineError?.code === 'not_a_cv'
+            ? tErrors('rejectionTitle')
+            : tErrors('analysisFailedTitle')
+        }
+        description={rejectionMessage()}
+        actionLabel={
+          pipelineError?.code === 'not_a_cv' ? tCommon('close') : tErrors('retryAnalysis')
+        }
+        onAction={() => {
+          if (pipelineError?.code === 'not_a_cv') {
+            // Retrying the same document would fail identically — the user
+            // re-uploads a valid CV instead (the hint stays in the page).
+            setPipelineError(null);
+            return;
+          }
+          void retryAnalysis();
+        }}
+        onClose={() => setPipelineError(null)}
+        titleId="latest-analysis-error-modal-title"
+      />
     </div>
   );
 }

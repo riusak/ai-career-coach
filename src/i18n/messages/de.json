@@ -70,7 +70,6 @@
     "resultSubtext": "Ihre detaillierte Vorschau finden Sie direkt unten — scrollen Sie, um sie zu sehen.",
     "testAnother": "Anderen Lebenslauf testen",
     "errorTooLarge": "Datei zu groß ({size}). Maximum: {max}.",
-    "errorNotPdf": "Nicht unterstütztes Format: Der Schnelltest akzeptiert nur PDF- und Word-Dateien (.docx).",
     "errorEmpty": "Die Datei ist leer.",
     "errorTitle": "Analyse fehlgeschlagen",
     "errorGeneric": "Während der Analyse ist ein Fehler aufgetreten.",
@@ -100,10 +99,10 @@
     "sourceLocalLegacy": "Lokale Analyse (Verlauf)",
     "ephemeral": "Kurzlebig — nichts wird gespeichert",
     "filesParseError": "Die Datei ist keine echte PDF (ungültige Magic-Bytes-Signatur).",
-    "analysisSteps": {
-      "stepExtract": "Text wird extrahiert",
-      "stepSkills": "KI-Fähigkeitsanalyse",
-      "stepRecommendations": "Empfehlungen werden generiert"
+        "analysisSteps": {
+      "stepExtract": "Dokument wird verifiziert und intelligent gelesen...",
+      "stepSkills": "Tiefergehende Inspektion & strategische KI-Analyse...",
+      "stepRecommendations": "Bericht und personalisierte Empfehlungen werden generiert."
     },
     "analyzingHeading": "Ihr Lebenslauf wird analysiert…",
     "servicesEyebrow": "Leistungen",
@@ -302,9 +301,9 @@
     "avatarUploadHint": "PNG / JPG / WebP, max. 2 MB. Quadratisches Bild empfohlen.",
     "primarySelector": "Hauptstatus",
     "queuedSteps": [
-      "Extrahiere Lebenslauf-Text",
-      "KI-Kompetenzanalyse",
-      "Generiere vollständigen Bericht"
+      "Dokument wird verifiziert und intelligent gelesen...",
+      "Tiefergehende Inspektion & strategische KI-Analyse...",
+      "Bericht und personalisierte Empfehlungen werden generiert."
     ],
     "latestCard": {
       "queued": "In Warteschlange",
@@ -531,5 +530,27 @@
     "socialGithub": "GitHub",
     "socialLinkedin": "LinkedIn",
     "socialX": "X (Twitter)"
+  },
+  "errors": {
+    "rejectionTitle": "Dokument nicht geeignet",
+    "analysisFailedTitle": "Analyse fehlgeschlagen",
+    "actionFailedTitle": "Aktion fehlgeschlagen",
+    "unsupportedFormat": "Dateiformat nicht unterstützt. Bitte laden Sie ausschließlich eine PDF- oder Word-Datei (.docx) hoch.",
+    "notCvTyped": "Dieses Dokument scheint kein Lebenslauf zu sein. Es handelt sich offenbar um: {type}. Bitte laden Sie einen gültigen Lebenslauf hoch.",
+    "notCvGeneric": "Das hochgeladene Dokument enthält nicht die Struktur eines Lebenslaufs. Bitte überprüfen Sie Ihre Datei und laden Sie einen gültigen Lebenslauf zur Analyse hoch.",
+    "technicalFailure": "Die KI-Analyse wurde nach mehreren Versuchen nicht abgeschlossen. Bitte versuchen Sie es gleich erneut.",
+    "retryChooseFile": "Andere Datei wählen",
+    "retryAnalysis": "Erneut versuchen",
+    "docType": {
+      "cv": "ein Lebenslauf",
+      "invoice": "eine Rechnung",
+      "payslip": "eine Gehaltsabrechnung",
+      "quote": "ein Angebot",
+      "letter": "ein Brief",
+      "administrative_form": "ein Verwaltungsformular",
+      "generic_text": "ein unpassendes Textdokument",
+      "empty": "ein leeres Dokument",
+      "other": "ein unpassendes Dokument"
+    }
   }
 }

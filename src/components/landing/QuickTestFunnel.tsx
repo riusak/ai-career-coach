@@ -9,7 +9,8 @@ import { MAX_RESUME_FILE_SIZE_BYTES, formatBytes } from '@/lib/resume-validation
 import SignupModal from '@/components/landing/SignupModal';
 import ConversionModal from '@/components/landing/ConversionModal';
 import QuickTestResultSection, { ANALYSIS_STEP_KEYS } from '@/components/landing/QuickTestResult';
-import ErrorState from '@/components/ui/ErrorState';
+import ErrorModal from '@/components/ui/ErrorModal';
+import { parseQuickTestError, QUICK_TEST_DOCUMENT_TYPES } from '@/lib/quick-test/error-codes';
 import type { QuickTestResponse } from '@/types/quick-test';
 
 /**
@@ -20,21 +21,37 @@ import type { QuickTestResponse } from '@/types/quick-test';
 
 type FunnelStep = 'idle' | 'ready' | 'analyzing' | 'result';
 
+interface RejectionState {
+  title: string;
+  message: string;
+  actionLabel: string;
+  action: 'reset' | 'retry';
+}
+
 interface QuickTestFunnelProps {
   isAuthenticated: boolean;
 }
 
-const STEP_DURATIONS_MS = [1600, 3400, 8000] as const;
+/**
+ * Wraps a structured API error payload (code / documentType / documentKind)
+ * so the catch block can build the precise rejection message.
+ */
+class ApiAnalysisError extends Error {
+  constructor(readonly apiPayload: ReturnType<typeof parseQuickTestError>) {
+    super('api-analysis-error');
+  }
+}
 
 export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProps) {
   const t = useTranslations('landing');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
+  const tErrors = useTranslations('errors');
   const [step, setStep] = useState<FunnelStep>('idle');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [clientError, setClientError] = useState<string | null>(null);
-  const [serverError, setServerError] = useState<string | null>(null);
-    const [result, setResult] = useState<QuickTestResponse | null>(null);
+  /** Non-null when the blocking error modal is displayed (rejection or failure). */
+  const [rejection, setRejection] = useState<RejectionState | null>(null);
+  const [result, setResult] = useState<QuickTestResponse | null>(null);
   const [showConversionModal, setShowConversionModal] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,27 +74,34 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
    *  Re-targets the inner `#resultats-analyse` once it mounts so the user
    *  always lands on the freshly-painted result card. */
   const scrollToResults = useCallback(() => {
-    const target =
-      document.getElementById('resultats-analyse') ?? getPortalTarget();
+    const target = document.getElementById('resultats-analyse') ?? getPortalTarget();
     if (!target) {
       return;
     }
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [getPortalTarget]);
 
-  // "Billet d'attente": advance the progress steps on a timer while the
-  // analysis request is in flight (perceived performance — the UI keeps
-  // moving forward instead of freezing on a spinner).
+  // "Billet d'attente" — the server streams the REAL pipeline stages
+  // (reading → analyzing → reporting) and each `progress` NDJSON line
+  // advances the ticket in lockstep with the actual API work. The timers
+  // below are a pure FALLBACK for hosts that buffer streamed responses:
+  // they only ever move FORWARD, so genuine stage events always win and
+  // the ticket can never freeze on step 1.
   useEffect(() => {
     if (step !== 'analyzing') {
       return;
     }
-    const timers = [
-      setTimeout(() => setAnalysisStep(1), STEP_DURATIONS_MS[0]),
-      setTimeout(() => setAnalysisStep(2), STEP_DURATIONS_MS[1]),
-    ];
+    const toAnalyzing = setTimeout(
+      () => setAnalysisStep((current) => (current < 1 ? 1 : current)),
+      3_500,
+    );
+    const toReporting = setTimeout(
+      () => setAnalysisStep((current) => (current < 2 ? 2 : current)),
+      9_500,
+    );
     return () => {
-      timers.forEach(clearTimeout);
+      clearTimeout(toAnalyzing);
+      clearTimeout(toReporting);
     };
   }, [step]);
 
@@ -91,7 +115,7 @@ export default function QuickTestFunnel({ isAuthenticated }: QuickTestFunnelProp
     return undefined;
   }, [step, result, isAuthenticated]);
 
-const clearSelection = useCallback(() => {
+  const clearSelection = useCallback(() => {
     setSelectedFile(null);
     // Back to the dropzone: leaving `step` on 'ready' with a null file would
     // unmount the whole block and freeze the funnel on a blank screen (the
@@ -104,41 +128,78 @@ const clearSelection = useCallback(() => {
 
   const resetFunnel = useCallback(() => {
     clearSelection();
-    setClientError(null);
-    setServerError(null);
+    setRejection(null);
     setResult(null);
     setStep('idle');
   }, [clearSelection]);
 
+  /** Closes the modal and either resets the funnel or lets the user retry. */
+  const handleRejectionAction = useCallback(() => {
+    const current = rejection;
+    setRejection(null);
+    if (current?.action === 'reset') {
+      resetFunnel();
+      // Reopen the OS file picker: the smooth "invite to try again" gesture.
+      inputRef.current?.click();
+    }
+    // action 'retry': the modal simply closes on the 'ready' step, where the
+    // "Analyser mon CV" button re-runs the analysis with the selected file.
+  }, [rejection, resetFunnel]);
+
+  /** Localized label for an LLM-detected document type (safe fallback). */
+  const documentTypeLabel = useCallback(
+    (documentType: string): string => {
+      const key = (QUICK_TEST_DOCUMENT_TYPES as readonly string[]).includes(documentType)
+        ? documentType
+        : 'other';
+      return tErrors(`docType.${key}`);
+    },
+    [tErrors]
+  );
+
   const selectFile = useCallback(
     (file: File | null | undefined) => {
-      setClientError(null);
-      setServerError(null);
+      setRejection(null);
 
       if (!file) {
         return;
       }
 
       // Visitor mode: PDF + Word (.docx), 5 MB max (mvp.md §2.2).
-const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name.toLowerCase().endsWith('.docx');
-if (!isPdf && !isDocx) {
-        setClientError(t('errorNotPdf'));
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isDocx =
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        file.name.toLowerCase().endsWith('.docx');
+      if (!isPdf && !isDocx) {
+        setRejection({
+          title: tErrors('rejectionTitle'),
+          message: tErrors('unsupportedFormat'),
+          actionLabel: tErrors('retryChooseFile'),
+          action: 'reset',
+        });
         clearSelection();
         return;
       }
       if (file.size <= 0) {
-        setClientError(t('errorEmpty'));
+        setRejection({
+          title: tErrors('rejectionTitle'),
+          message: t('errorEmpty'),
+          actionLabel: tErrors('retryChooseFile'),
+          action: 'reset',
+        });
         clearSelection();
         return;
       }
       if (file.size > MAX_RESUME_FILE_SIZE_BYTES) {
-        setClientError(
-          t('errorTooLarge', {
+        setRejection({
+          title: tErrors('rejectionTitle'),
+          message: t('errorTooLarge', {
             size: formatBytes(file.size),
             max: formatBytes(MAX_RESUME_FILE_SIZE_BYTES),
-          })
-        );
+          }),
+          actionLabel: tErrors('retryChooseFile'),
+          action: 'reset',
+        });
         clearSelection();
         return;
       }
@@ -146,7 +207,7 @@ if (!isPdf && !isDocx) {
       setSelectedFile(file);
       setStep('ready');
     },
-    [clearSelection, t]
+    [clearSelection, t, tErrors]
   );
 
   const runAnalysis = useCallback(async () => {
@@ -154,7 +215,7 @@ if (!isPdf && !isDocx) {
       return;
     }
 
-    setServerError(null);
+    setRejection(null);
     // Reset the "billet d'attente" before each new run (also handles the
     // retry case where a previous analysis already advanced the steps).
     setAnalysisStep(0);
@@ -168,54 +229,198 @@ if (!isPdf && !isDocx) {
     window.setTimeout(scrollToResults, 120);
     window.setTimeout(scrollToResults, 1200);
 
+    // Declared OUTSIDE the try block so the `finally` below can always
+    // release the stream lock (result, error, timeout or abort).
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
       // Client-side safety net: never leave the visitor stuck on the loading
-      // state if the network or the LLM pipeline hangs.
+      // state if the network or the LLM pipeline hangs. The server streams NDJSON
+      // (one message per pipeline stage + a single terminal `result`/`error`),
+      // so we parse it line-by-line and advance the progress ticket in real time.
       const response = await fetch('/api/quick-test', {
         method: 'POST',
         body: formData,
         signal: AbortSignal.timeout(45_000),
       });
 
+      // HTTP-level failure (bad request, server error before streaming) :
+      // mirror the legacy JSON-payload rejection path.
       if (!response.ok) {
-        const payload: { error?: string } = await response.json().catch(() => ({}));
-        throw new Error(payload.error ?? t('errorGeneric'));
+        const payload = (await response.json().catch(() => null)) as unknown;
+        throw new ApiAnalysisError(parseQuickTestError(payload));
       }
 
-      const payload: QuickTestResponse = await response.json();
-      // Successful API call: the report is always a real LLM analysis —
-      // heuristic fallbacks no longer exist (failures surface as errors).
-      setResult(payload);
-      setStep('result');
+      if (!response.body) {
+        throw new ApiAnalysisError(parseQuickTestError(null));
+      }
+
+      reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+
+        // NDJSON = newline-delimited JSON: a complete message ends with '\n',
+        // so flush one JSON object per complete line and keep the remainder.
+        let newlineIndex: number;
+        while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+          if (line === '') {
+            continue;
+          }
+
+          let message: unknown;
+          try {
+            message = JSON.parse(line);
+          } catch {
+            continue; // Defensive: skip a malformed line, keep reading.
+          }
+
+          if (
+            typeof message === 'object' &&
+            message !== null &&
+            'type' in message
+          ) {
+            const msg = message as Record<string, unknown>;
+            const type = msg.type;
+
+            if (type === 'progress') {
+              const stage = typeof msg.stage === 'string' ? msg.stage : '';
+              // Advance the visible ticket in lockstep with the pipeline:
+              // reading → analyzing → reporting.
+              if (stage === 'analyzing') {
+                setAnalysisStep(1);
+              } else if (stage === 'reporting') {
+                setAnalysisStep(2);
+              }
+              continue;
+            }
+
+            if (type === 'result') {
+              const payload = msg as unknown as QuickTestResponse;
+              // Successful API call: the report is always a real LLM analysis —
+              // heuristic fallbacks no longer exist (failures surface as errors).
+              setResult(payload);
+              setStep('result');
+              return; // terminal — stop reading.
+            }
+
+            if (type === 'error') {
+              const err = msg as {
+                error?: string;
+                code?: string;
+                documentType?: string;
+                documentKind?: string;
+              };
+              throw new ApiAnalysisError(
+                parseQuickTestError({
+                  error: err.error,
+                  code: err.code,
+                  ...(err.documentType ? { documentType: err.documentType } : {}),
+                  ...(err.documentKind ? { documentKind: err.documentKind } : {}),
+                }),
+              );
+            }
+          }
+        }
+      }
+
+      // Stream closed without a terminal message → guard against a pipeline
+      // that ended abruptly (should not happen, but never hang the UI).
+      throw new ApiAnalysisError(parseQuickTestError(null));
     } catch (error) {
-      let message = t('errorGeneric');
-      if (error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError')) {
-        message = t('errorTimeout');
-      } else if (error instanceof Error) {
-        message = error.message;
+      // Blocking centered modal — never an inline banner. Rejections
+      // (not_a_cv, unsupported_format) invite choosing another file;
+      // technical failures invite retrying the analysis.
+      if (
+        error instanceof DOMException &&
+        (error.name === 'TimeoutError' || error.name === 'AbortError')
+      ) {
+        setRejection({
+          title: tErrors('analysisFailedTitle'),
+          message: t('errorTimeout'),
+          actionLabel: tErrors('retryAnalysis'),
+          action: 'retry',
+        });
+        setStep('ready');
+        return;
       }
-      setServerError(message);
-      setStep('ready');
-    }
-  }, [selectedFile, scrollToResults, t]);
 
-  const errorMessage = clientError ?? serverError;
+      if (error instanceof ApiAnalysisError && error.apiPayload) {
+        const payload = error.apiPayload;
+        if (payload.code === 'not_a_cv' && payload.documentKind === 'pdf') {
+          // Multimodal PDF: dynamic, typed rejection message.
+          setRejection({
+            title: tErrors('rejectionTitle'),
+            message: tErrors('notCvTyped', {
+              type: documentTypeLabel(payload.documentType ?? 'other'),
+            }),
+            actionLabel: tErrors('retryChooseFile'),
+            action: 'reset',
+          });
+          setStep('ready');
+          return;
+        }
+        if (payload.code === 'not_a_cv') {
+          // DOCX (text extraction path): clean, elegant generic rejection.
+          setRejection({
+            title: tErrors('rejectionTitle'),
+            message: tErrors('notCvGeneric'),
+            actionLabel: tErrors('retryChooseFile'),
+            action: 'reset',
+          });
+          setStep('ready');
+          return;
+        }
+        if (payload.code === 'unsupported_format') {
+          setRejection({
+            title: tErrors('rejectionTitle'),
+            message: tErrors('unsupportedFormat'),
+            actionLabel: tErrors('retryChooseFile'),
+            action: 'reset',
+          });
+          setStep('ready');
+          return;
+        }
+        // Technical failure (llm_failed / llm_unavailable / rate_limited /
+        // server_error): server fallback message + explicit retry.
+        setRejection({
+          title: tErrors('analysisFailedTitle'),
+          message: payload.error || t('errorGeneric'),
+          actionLabel: tErrors('retryAnalysis'),
+          action: 'retry',
+        });
+        setStep('ready');
+        return;
+      }
+
+      setRejection({
+        title: tErrors('analysisFailedTitle'),
+        message: t('errorGeneric'),
+        actionLabel: tErrors('retryAnalysis'),
+        action: 'retry',
+      });
+      setStep('ready');
+    } finally {
+      // Always release the stream lock — result, error, timeout or abort.
+      reader?.releaseLock();
+    }
+  }, [selectedFile, scrollToResults, t, tErrors, documentTypeLabel]);
 
   return (
     <div className="rounded-2xl border border-orange-200 bg-white p-6 shadow-xl shadow-orange-100/60 sm:p-8">
       {step === 'idle' && (
         <div>
-          {/* Local validation errors (non-PDF, empty, oversized file) are set
-              by selectFile right before clearSelection() returns here — they
-              must stay visible on the dropzone, not vanish with the card. */}
-          {clientError && (
-            <div className="mb-4">
-              <ErrorState title={t('errorTitle')} description={clientError} />
-            </div>
-          )}
           <div
             role="button"
             tabIndex={0}
@@ -256,9 +461,7 @@ if (!isPdf && !isDocx) {
             >
               <path d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
             </svg>
-            <p className="mt-4 text-base font-semibold text-slate-900">
-              {t('dragDrop')}
-            </p>
+            <p className="mt-4 text-base font-semibold text-slate-900">{t('dragDrop')}</p>
             <p className="mt-1 text-sm text-slate-500">
               {tCommon('or')}{' '}
               <span className="font-medium text-orange-700 underline decoration-orange-300 underline-offset-2">
@@ -287,41 +490,13 @@ if (!isPdf && !isDocx) {
 
       {step === 'ready' && selectedFile && (
         <div aria-live="polite">
-          {errorMessage && (
-            <div className="mb-4">
-              <ErrorState
-                title={t('errorTitle')}
-                description={errorMessage}
-              >
-                {serverError && selectedFile && (
-                  <button
-                    type="button"
-                    onClick={runAnalysis}
-                    className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-red-700"
-                  >
-                    {tCommon('retry')}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-100"
-                >
-                  {tCommon('cancel')}
-                </button>
-              </ErrorState>
-            </div>
-          )}
-
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-xs font-bold uppercase text-orange-700">
                 {t('fileLabel')}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">
-                  {selectedFile.name}
-                </p>
+                <p className="truncate text-sm font-semibold text-slate-900">{selectedFile.name}</p>
                 <p className="text-xs text-slate-500">
                   {t('readySize', { size: formatBytes(selectedFile.size) })}
                 </p>
@@ -360,18 +535,13 @@ if (!isPdf && !isDocx) {
         </div>
       )}
 
-{step === 'analyzing' && (
+      {step === 'analyzing' && (
         <div aria-live="polite" className="flex items-center gap-3 py-2">
-          <span
-            aria-hidden="true"
-            className="relative flex h-2.5 w-2.5 shrink-0"
-          >
+          <span aria-hidden="true" className="relative flex h-2.5 w-2.5 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-500" />
           </span>
-          <p className="text-sm font-semibold text-slate-900">
-            {t('analyzingInline')}
-          </p>
+          <p className="text-sm font-semibold text-slate-900">{t('analyzingInline')}</p>
           <p className="text-xs text-slate-500">
             {t(`analysisSteps.${ANALYSIS_STEP_KEYS[analysisStep]}`)}
           </p>
@@ -411,9 +581,7 @@ if (!isPdf && !isDocx) {
             className="animate-fade-up h-28 w-auto object-contain sm:h-36"
           />
 
-          <p className="max-w-xs text-xs text-navy-600">
-            {t('resultSubtext')}
-          </p>
+          <p className="max-w-xs text-xs text-navy-600">{t('resultSubtext')}</p>
 
           <button
             type="button"
@@ -456,10 +624,27 @@ if (!isPdf && !isDocx) {
       )}
 
       <SignupModal open={isModalOpen} onClose={() => setIsModalOpen(false)} />
-<ConversionModal
-  isOpen={showConversionModal}
-  onClose={() => setShowConversionModal(false)}
-/>
+      <ConversionModal isOpen={showConversionModal} onClose={() => setShowConversionModal(false)} />
+
+      {/* Global blocking error modal: document rejections ("Document non
+          conforme" + precise dynamic message) and analysis failures
+          ("Échec de l'analyse"). Replaces the old inline banners.
+          PORTALED to document.body: the funnel sits inside a landing
+          <Reveal> wrapper whose `translate`/`transform` creates a CSS
+          containing block — that would hijack the modal's `position: fixed`
+          and offset it from the viewport once the user scrolls. */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <ErrorModal
+            open={rejection !== null}
+            title={rejection?.title ?? ''}
+            description={rejection?.message ?? ''}
+            actionLabel={rejection?.actionLabel ?? ''}
+            onAction={handleRejectionAction}
+            titleId="quick-test-error-modal-title"
+          />,
+          document.body
+        )}
 
       <input
         ref={inputRef}

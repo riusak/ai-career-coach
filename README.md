@@ -17,7 +17,12 @@ Scripts utiles : `npm run lint` · `npm run type-check` · `npm test` · `npm ru
 ## Architecture LLM (analyse de CV)
 
 Le pipeline d'analyse est **document-native (multimodal)**, partagé par les deux parcours
-(Quick Test public `/api/quick-test` et analyse authentifiée `/api/resume/analyze`) :
+(Quick Test public `/api/quick-test` et analyse authentifiée `/api/resume/analyze`).
+**Toute la logique métier vit dans un module UNIQUE : `src/lib/analysis/pipeline.ts`** —
+les deux routes ne sont que des adaptateurs HTTP minces (tracking/rate-limit anonyme pour
+le funnel public ; file d'attente/ownership pour le parcours authentifié). Il n'existe
+qu'**un seul** pipeline d'ingestion → validation → extraction → conversion multimodale →
+appel LLM, donc chaque document bénéficie exactement de la même logique stable :
 
 1. **Format** — magic-bytes serveur (`%PDF-`, ZIP DOCX, texte) + taille (5 Mo max) ;
 2. **Extraction légère** — le texte extrait (parseur PDF sans dépendance + `mammoth` pour
@@ -39,6 +44,17 @@ Le pipeline d'analyse est **document-native (multimodal)**, partagé par les deu
 Modèles : **`gemini-3.5-flash-lite`** par défaut, fallback chaîne **`gemini-3.6-flash`**.
 ⚠️ Les générations Gemini 2.0/2.5 sont **décommissionnées par Google** (HTTP 404) et
 `thinkingConfig` est rejeté (HTTP 400) par les modèles 3.x — ne pas les réintroduire.
+
+### Progression temps réel (« billet d'attente »)
+
+`/api/quick-test` répond en **flux NDJSON** (`application/ndjson`) : chaque stade réel du
+pipeline (`reading` → `analyzing` → `reporting`) est diffusé sous forme de ligne `progress`,
+puis une ligne terminale `result` (ou `error`) porte le rapport ou l'erreur machine. Le
+« billet d'attente » du funnel avance donc en lockstep avec les vrais appels (lecture
+multimodale, parsing sémantique / scoring, génération du rapport), avec un repli
+« forward-only » côté client si l'hébergeur bufferise le flux. Le parcours authentifié
+(`/api/resume/analyze`) persiste en plus un marqueur de stade dans `structured_output`
+que le polling du dashboard traduit en progression réelle.
 
 ## Déploiement
 

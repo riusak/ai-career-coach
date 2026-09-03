@@ -13,6 +13,26 @@ export function isIpHashSecretConfigured(): boolean {
 }
 
 /**
+ * Extraction best-effort de l'IP client depuis les en-têtes proxy.
+ * `x-real-ip` est posé par la plateforme (Vercel / reverse proxy) depuis le
+ * pair socket réel : il n'est PAS falsifiable par le client ; `x-forwarded-for`
+ * n'est qu'un repli best-effort pour les déploiements self-hosted.
+ * Partagé par les routes du funnel (analyse + tracking CTA).
+ */
+export function clientIpFromHeaders(headers: Headers): string {
+  const realIp = headers.get('x-real-ip');
+  if (realIp) {
+    return realIp.trim();
+  }
+  const cf = headers.get('cf-connecting-ip');
+  if (cf) {
+    return cf.trim();
+  }
+  const xff = headers.get('x-forwarded-for');
+  return xff?.split(',')[0]?.trim() || 'unknown';
+}
+
+/**
  * Hache l’adresse IP avec une clé secrète serveur pour le respect du RGPD.
  * Retourne un identifiant anonyme stable par IP+clé, tronqué à 32 caractères.
  *

@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
+import type { AnalysisStage } from '@/lib/analysis/pipeline';
 import {
   resumeContentTypeForExtension,
   sanitizeFileName,
@@ -669,6 +670,51 @@ export async function completeResumeAnalysis(
         ? err.message
         : 'An unexpected error occurred while saving the analysis.';
     return { completed: false, error: message };
+  }
+}
+
+/**
+ * Persiste le dernier stade réellement atteint par le pipeline dans le
+ * marqueur transitoire de `structured_output` (score toujours null — la policy
+ * 007 l'autorise, et le guard `score is null` garantit qu'un résultat déjà
+ * écrit n'est jamais écrasé par un marqueur tardif). Best-effort : la
+ * complétion finale réécrit de toute façon `structured_output`.
+ */
+export async function updateAnalysisStage(
+  analysisId: string,
+  claimedAt: string,
+  stage: AnalysisStage
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return;
+    }
+
+    const marker: DeepAnalysisProcessingMarker = {
+      status: 'processing',
+      claimed_at: claimedAt,
+      stage,
+    };
+
+    const { error } = await supabase
+      .from('resume_analyses')
+      .update({ structured_output: marker })
+      .eq('id', analysisId)
+      .eq('user_id', user.id)
+      .is('score', null);
+
+    if (error) {
+      console.warn(`[analyze] Stage update failed (${stage}):`, error.message);
+    }
+  } catch {
+    // Best-effort : jamais bloquant pour l'analyse.
   }
 }
 

@@ -70,7 +70,6 @@
     "resultSubtext": "Your detailed preview is just below — scroll to view it.",
     "testAnother": "Test another resume",
     "errorTooLarge": "File too large ({size}). Maximum: {max}.",
-    "errorNotPdf": "Unsupported format: the quick test only accepts PDF and Word (.docx) files.",
     "errorEmpty": "The file is empty.",
     "errorTitle": "Analysis failed",
     "errorGeneric": "An error occurred during the analysis.",
@@ -100,10 +99,10 @@
     "sourceLocalLegacy": "Local analysis (legacy)",
     "ephemeral": "Ephemeral — nothing is stored",
     "filesParseError": "The file is not a real PDF (invalid magic-bytes signature).",
-    "analysisSteps": {
-      "stepExtract": "Extracting text",
-      "stepSkills": "AI skill analysis",
-      "stepRecommendations": "Generating recommendations"
+        "analysisSteps": {
+      "stepExtract": "Verifying and intelligently reading your document...",
+      "stepSkills": "Deep inspection & strategic AI analysis...",
+      "stepRecommendations": "Generating your report and personalized recommendations."
     },
     "analyzingHeading": "Analyzing your resume…",
     "servicesEyebrow": "Services",
@@ -302,9 +301,9 @@
     "avatarUploadHint": "PNG / JPG / WebP, 2 MB max. Square image recommended.",
     "primarySelector": "Primary status",
     "queuedSteps": [
-      "Extracting resume text",
-      "AI skill analysis",
-      "Generating full report"
+      "Verifying and intelligently reading your document...",
+      "Deep inspection & strategic AI analysis...",
+      "Generating your report and personalized recommendations."
     ],
     "latestCard": {
       "queued": "Queued",
@@ -531,5 +530,27 @@
     "socialGithub": "GitHub",
     "socialLinkedin": "LinkedIn",
     "socialX": "X (Twitter)"
+  },
+  "errors": {
+    "rejectionTitle": "Document not suitable",
+    "analysisFailedTitle": "Analysis failed",
+    "actionFailedTitle": "The action failed",
+    "unsupportedFormat": "Unsupported file format. Please upload only a PDF or Word (.docx) file.",
+    "notCvTyped": "This document does not look like a curriculum vitæ. It appears to be: {type}. Please upload a valid resume.",
+    "notCvGeneric": "The uploaded document does not contain the structure of a resume. Please check your file and upload a valid curriculum vitæ for analysis.",
+    "technicalFailure": "The AI analysis did not complete after several attempts. Please try again in a moment.",
+    "retryChooseFile": "Choose another file",
+    "retryAnalysis": "Retry",
+    "docType": {
+      "cv": "a resume",
+      "invoice": "an invoice",
+      "payslip": "a payslip",
+      "quote": "a quote",
+      "letter": "a letter",
+      "administrative_form": "an administrative form",
+      "generic_text": "an irrelevant text document",
+      "empty": "an empty document",
+      "other": "an irrelevant document"
+    }
   }
 }

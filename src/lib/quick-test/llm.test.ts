@@ -56,6 +56,23 @@ describe('buildAnalysisPrompt', () => {
     expect(prompt).toContain('AU MOINS 6 dimensions');
   });
 
+  it('locks the canonical document_type vocabulary for dynamic rejections', () => {
+    const prompt = buildAnalysisPrompt(null);
+    for (const docType of [
+      'cv',
+      'invoice',
+      'payslip',
+      'quote',
+      'letter',
+      'administrative_form',
+      'generic_text',
+      'empty',
+      'other',
+    ]) {
+      expect(prompt).toContain(`'${docType}'`);
+    }
+  });
+
   it('truncates very long CV texts', () => {
     const prompt = buildAnalysisPrompt('x'.repeat(20_000));
     expect(prompt).toContain('[tronqué]');
