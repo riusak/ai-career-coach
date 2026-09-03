@@ -21,5 +21,8 @@ on conflict (id) do update
   set file_size_limit = excluded.file_size_limit,
       allowed_mime_types = excluded.allowed_mime_types;
 
-comment on bucket resumes is
-  'Private per-user resume files. MIME whitelist aligned with the app-level validation (PDF, DOCX, TXT — 5 MB max).';
+-- NOTE: les buckets Supabase Storage vivent dans la table `storage.buckets`
+-- (schéma `storage`) ; PostgreSQL n'a pas de syntaxe `COMMENT ON BUCKET` —
+-- la documentation est donc portée par ces commentaires SQL.
+-- Whitelist alignée avec la validation applicative
+-- (src/lib/resume-validation.ts : PDF, DOCX, TXT — 5 Mo max).
