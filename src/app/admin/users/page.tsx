@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import UsersTable from '@/components/admin/UsersTable';
 import Pagination from '@/components/admin/Pagination';
 import ErrorState from '@/components/ui/ErrorState';
@@ -23,14 +24,14 @@ interface AdminUsersPageProps {
 }
 
 export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
-  const admin = await getCurrentAdmin();
+  const [admin, t] = await Promise.all([getCurrentAdmin(), getTranslations('admin')]);
 
   // The layout guarantees admin access; this is defensive (self-contained) only.
   if (!admin.ok) {
     return (
       <ErrorState
-        title="Access denied"
-        description="Only administrators can manage users."
+        title={t('accessDenied.titleShort')}
+        description={t('accessDenied.onlyAdmins')}
       />
     );
   }
@@ -49,14 +50,14 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
   if (list === null) {
     return (
       <ErrorState
-        title="Unable to load users"
-        description="The user directory could not be read. Try again in a moment."
+        title={t('users.loadError')}
+        description={t('users.loadErrorDesc')}
       >
         <Link
           href="/admin/users"
           className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
         >
-          Retry
+          {t('users.retry')}
         </Link>
       </ErrorState>
     );
@@ -71,18 +72,17 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-navy-900">
-            Registered users
+            {t('users.title')}
           </h1>
           <p className="mt-1 text-sm text-navy-500">
-            {list.total} account{list.total === 1 ? '' : 's'} registered
-            (showing {list.users.length} on this page).
+            {t('users.subtitle', { total: list.total, shown: list.users.length })}
           </p>
         </div>
         <Link
           href="/admin"
           className="rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
         >
-          ← Overview
+          {t('users.back')}
         </Link>
       </div>
 
@@ -93,7 +93,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
             type="search"
             name="q"
             defaultValue={q ?? ''}
-            placeholder="Search by full name…"
+            placeholder={t('users.searchPlaceholder')}
             className="block w-full rounded-md border border-navy-200 bg-white pl-3 pr-9 py-2 text-sm text-navy-900 placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600"
           />
           <svg
@@ -114,22 +114,22 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
           defaultValue={(role ?? '') as string}
           className="block w-full min-w-[140px] rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 sm:w-auto"
         >
-          <option value="">All roles</option>
-          <option value="admin">Admin</option>
-          <option value="user">User</option>
+          <option value="">{t('users.allRoles')}</option>
+          <option value="admin">{t('users.roleAdmin')}</option>
+          <option value="user">{t('users.roleUser')}</option>
         </select>
         <button
           type="submit"
           className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
         >
-          Apply
+          {t('users.apply')}
         </button>
         {q || role ? (
           <Link
             href="/admin/users"
             className="rounded-md border border-navy-200 bg-white px-3 py-2 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
           >
-            Reset
+            {t('users.reset')}
           </Link>
         ) : null}
       </form>
@@ -137,11 +137,9 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
       {/* Table */}
       {list.users.length === 0 ? (
         <EmptyState
-          title="No users found"
+          title={t('users.noUsers')}
           description={
-            q || role
-              ? 'Try adjusting the search or role filter.'
-              : 'There are no registered users yet.'
+            q || role ? t('users.noUsersFiltered') : t('users.noUsersRegistered')
           }
           icon="users"
         />

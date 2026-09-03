@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { useTranslations } from 'next-intl';
 import { updateUserRoleAction, type AdminActionResult } from '@/app/admin/actions';
 import type { UserRole } from '@/types/admin';
 
@@ -25,15 +26,16 @@ export default function RoleToggleForm({
   disabled,
 }: RoleToggleFormProps) {
   const [state, formAction, isPending] = useActionState(updateUserRoleAction, initialState);
+  const t = useTranslations('admin');
   const isAdmin = currentRole === 'admin';
   const nextRole: UserRole = isAdmin ? 'user' : 'admin';
-  const label = isAdmin ? 'Revoke admin' : 'Make admin';
+  const label = isAdmin ? t('common.revokeAdmin') : t('common.makeAdmin');
 
   if (disabled) {
     return (
       <span
         className="text-xs text-navy-400"
-        title="You cannot change your own role."
+        title={t('common.cannotChangeRoleTitle')}
         aria-disabled
       >
         {label}
@@ -59,7 +61,7 @@ export default function RoleToggleForm({
         disabled={isPending}
         className="inline-flex items-center rounded-md border border-orange-300 bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-800 opacity-90 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isPending ? 'Saving…' : label}
+        {isPending ? t('common.saving') : label}
       </button>
     </form>
   );

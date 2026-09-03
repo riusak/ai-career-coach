@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import BarChart from '@/components/admin/BarChart';
 import StatCard from '@/components/admin/StatCard';
 import ErrorState from '@/components/ui/ErrorState';
@@ -12,14 +13,6 @@ import { QUICK_TEST_EVENT_TYPES, type QuickTestEventType } from '@/types/admin';
 export const metadata = {
   title: 'Overview — Admin Dashboard | ForPro AI',
   description: 'Live metrics, user management and audit trail.',
-};
-
-const EVENT_LABELS: Record<QuickTestEventType, string> = {
-  upload: 'Uploads',
-  analysis_success: 'Analyses (LLM)',
-  analysis_fallback: 'Analyses (heuristic)',
-  conversion_cta: 'Signup CTA clicks',
-  rejected_non_cv: 'Rejected (non-CV)',
 };
 
 const TABLE_TH =
@@ -52,19 +45,22 @@ function FunnelItem({
 }
 
 export default async function AdminOverviewPage() {
-  const stats = await getAdminStats();
+  const [stats, t] = await Promise.all([getAdminStats(), getTranslations('admin')]);
+
+  const eventLabel = (eventType: QuickTestEventType): string =>
+    t(`eventTypes.${eventType}`);
 
   if (!stats) {
     return (
       <ErrorState
-        title="Metrics unavailable"
-        description="The analytics backend could not be reached. Try refreshing the page."
+        title={t('overview.metricsUnavailable')}
+        description={t('overview.metricsUnavailableDesc')}
       >
         <Link
           href="/admin"
           className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
         >
-          Refresh
+          {t('overview.refresh')}
         </Link>
       </ErrorState>
     );
@@ -77,17 +73,17 @@ export default async function AdminOverviewPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-navy-900">
-            Admin Dashboard
+            {t('title')}
           </h1>
           <p className="mt-1 text-sm text-navy-600">
-            Live metrics, user management and the audit trail for ForPro AI.
+            {t('subtitle')}
           </p>
         </div>
         <Link
           href="/admin/users"
           className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
         >
-          Manage users
+          {t('overview.manageUsers')}
         </Link>
       </div>
 
@@ -95,27 +91,27 @@ export default async function AdminOverviewPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           accent
-          label="Registered users"
+          label={t('overview.registeredUsers')}
           value={stats.totalUsers}
-          hint={`+${stats.users30d} over the last 30 days`}
+          hint={t('overview.users30d', { count: stats.users30d })}
         />
         <StatCard
-          label="Quick tests run"
+          label={t('overview.quickTests')}
           value={stats.totalEvents}
-          hint={`${stats.events30d} over the last 30 days`}
+          hint={t('overview.events30d', { count: stats.events30d })}
         />
         <StatCard
-          label="Analyses completed"
+          label={t('overview.analysesCompleted')}
           value={stats.analysesCompleted}
-          hint="LLM + heuristic combined"
+          hint="LLM + heuristic"
         />
         <StatCard
-          label="Test → CTA conversion"
+          label={t('overview.conversionRate')}
           value={formatPercent(stats.conversionRate)}
           hint={
             stats.signupRate30d === null
-              ? 'No visitor traffic yet'
-              : `≈ ${formatPercent(stats.signupRate30d)} signup proxy (30d)`
+              ? '—'
+              : `≈ ${formatPercent(stats.signupRate30d)}`
           }
         />
       </div>
@@ -124,32 +120,32 @@ export default async function AdminOverviewPage() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg font-semibold text-navy-900">Quick Test activity</h2>
+            <h2 className="text-lg font-semibold text-navy-900">{t('overview.quickTestActivity')}</h2>
             <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-navy-400">
-              14 derniers jours
+              {t('overview.last14Days')}
             </span>
           </div>
           <div className="mt-4">
             <BarChart
               data={stats.dailyEvents}
               tone="orange"
-              ariaLabel="Événements Quick Test quotidiens sur les 14 derniers jours"
+              ariaLabel={t('overview.dailyQtEvents')}
             />
           </div>
         </div>
 
         <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-lg font-semibold text-navy-900">Nouveaux comptes</h2>
+            <h2 className="text-lg font-semibold text-navy-900">{t('overview.newAccounts')}</h2>
             <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-navy-400">
-              14 derniers jours
+              {t('overview.last14Days')}
             </span>
           </div>
           <div className="mt-4">
             <BarChart
               data={stats.dailyUsers}
               tone="navy"
-              ariaLabel="Nouvelles inscriptions quotidiennes sur les 14 derniers jours"
+              ariaLabel={t('overview.dailySignups')}
             />
           </div>
         </div>
@@ -157,15 +153,15 @@ export default async function AdminOverviewPage() {
 
       {/* 3. Quick Test funnel */}
       <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-navy-900">Quick Test funnel</h2>
+        <h2 className="text-lg font-semibold text-navy-900">{t('overview.funnel')}</h2>
         <p className="mt-1 text-sm text-navy-500">
-          Anonymous visitor events (privacy-preserving: IPs are HMAC-hashed).
+          {t('overview.funnelDesc')}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {QUICK_TEST_EVENT_TYPES.map((eventType) => (
             <FunnelItem
               key={eventType}
-              label={EVENT_LABELS[eventType]}
+              label={eventLabel(eventType)}
               value={stats.eventsByType[eventType] ?? 0}
               max={funnelMax}
             />
@@ -177,23 +173,25 @@ export default async function AdminOverviewPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* 3a. Recent visitor Quick Test events */}
         <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-navy-900">Recent visitor tests</h2>
+          <h2 className="text-lg font-semibold text-navy-900">{t('overview.recentEvents')}</h2>
           {stats.recentEvents.length === 0 ? (
             <EmptyState
               icon="chart"
-              title="No tests yet"
-              description="The Quick Test funnel has no recorded events."
+              title={t('overview.noEvents')}
+              description=""
             />
           ) : (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr>
-                    <th className={TABLE_TH}>Date</th>
-                    <th className={TABLE_TH}>Type</th>
-                    <th className={TABLE_TH}>Source</th>
-                    <th className={TABLE_TH}>Score</th>
-                    <th className={TABLE_TH}>Visitor</th>
+                    <th className={TABLE_TH}>{t('overview.date')}</th>
+                    <th className={TABLE_TH}>{t('overview.action')}</th>
+                    <th className={TABLE_TH}>{t('overview.source')}</th>
+                    <th className={TABLE_TH}>{t('overview.score')}</th>
+                    <th className={TABLE_TH} title={t('overview.ipHash')}>
+                      {t('overview.visitor')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -222,22 +220,22 @@ export default async function AdminOverviewPage() {
 
         {/* 3b. Recent audit log entries */}
         <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-navy-900">Recent audit activity</h2>
+          <h2 className="text-lg font-semibold text-navy-900">{t('overview.recentAudit')}</h2>
           {stats.recentAuditLogs.length === 0 ? (
             <EmptyState
               icon="users"
-              title="No audit entries yet"
-              description="Privileged admin actions (role changes, deletions) will be recorded here."
+              title={t('overview.noAuditEntries')}
+              description={t('overview.noAuditDesc')}
             />
           ) : (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr>
-                    <th className={TABLE_TH}>Date</th>
-                    <th className={TABLE_TH}>Actor</th>
-                    <th className={TABLE_TH}>Action</th>
-                    <th className={TABLE_TH}>Target</th>
+                    <th className={TABLE_TH}>{t('overview.date')}</th>
+                    <th className={TABLE_TH}>{t('overview.actor')}</th>
+                    <th className={TABLE_TH}>{t('overview.action')}</th>
+                    <th className={TABLE_TH}>{t('overview.target')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -279,7 +277,7 @@ export default async function AdminOverviewPage() {
               href="/admin/audit"
               className="text-xs font-medium text-orange-700 hover:text-orange-800"
             >
-              View full audit log →
+              {t('overview.viewFullAudit')}
             </Link>
           </div>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { useTranslations } from 'next-intl';
 import { deleteUserAction, type AdminActionResult } from '@/app/admin/actions';
 
 interface DeleteUserButtonProps {
@@ -20,23 +21,24 @@ const initialState: AdminActionResult = { success: false, message: null };
  */
 export default function DeleteUserButton({ userId, userName, disabled }: DeleteUserButtonProps) {
   const [state, formAction, isPending] = useActionState(deleteUserAction, initialState);
+  const t = useTranslations('admin');
   const label = userName ?? userId;
 
   if (disabled) {
     return (
       <span
         className="inline-flex items-center rounded-md border border-navy-200 bg-white px-2.5 py-1 text-xs font-medium text-navy-400 opacity-60"
-        title="You cannot delete your own account."
+        title={t('common.cannotDeleteSelfTitle')}
         aria-disabled
       >
-        Delete
+        {t('common.delete')}
       </span>
     );
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     const confirmed = window.confirm(
-      `Permanently delete "${label}"?\n\nThis removes the account, every CV, and all analysis/matching logs. This cannot be undone.`
+      `${t('common.confirmDelete', { name: label })}\n\n${t('common.confirmDeleteBody')}`
     );
     if (!confirmed) {
       event.preventDefault();
@@ -54,7 +56,7 @@ export default function DeleteUserButton({ userId, userName, disabled }: DeleteU
         disabled={isPending}
         className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800 opacity-90 shadow-sm transition-colors hover:border-red-400 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isPending ? 'Removing…' : 'Delete'}
+        {isPending ? t('common.removing') : t('common.delete')}
       </button>
     </form>
   );

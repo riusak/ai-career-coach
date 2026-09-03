@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import Pagination from '@/components/admin/Pagination';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
@@ -40,7 +41,7 @@ function PayloadPreview({ payload }: { payload: Record<string, unknown> | null }
 }
 
 export default async function AdminAuditPage({ searchParams }: AdminAuditPageProps) {
-  const sp = await searchParams;
+  const [sp, t] = await Promise.all([searchParams, getTranslations('admin')]);
   const page = parsePositiveInt(
     typeof sp.page === 'string' ? sp.page : undefined,
     1,
@@ -52,14 +53,14 @@ export default async function AdminAuditPage({ searchParams }: AdminAuditPagePro
   if (!result) {
     return (
       <ErrorState
-        title="Unable to load the audit log"
-        description="The audit backend could not be reached. Try again in a moment."
+        title={t('audit.loadError')}
+        description={t('audit.loadErrorDesc')}
       >
         <Link
           href="/admin/audit"
           className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600"
         >
-          Retry
+          {t('common.retry')}
         </Link>
       </ErrorState>
     );
@@ -72,36 +73,36 @@ export default async function AdminAuditPage({ searchParams }: AdminAuditPagePro
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-navy-900">
-            Audit log
+            {t('audit.title')}
           </h1>
           <p className="mt-1 text-sm text-navy-500">
-            {result.total} entries — page {result.page} of {result.totalPages}
+            {t('audit.subtitle', { total: result.total, page: result.page, totalPages: result.totalPages })}
           </p>
         </div>
         <Link
           href="/admin"
           className="rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
         >
-          ← Overview
+          {t('users.back')}
         </Link>
       </div>
 
       {result.logs.length === 0 ? (
         <EmptyState
           icon="users"
-          title="No audit entries yet"
-          description="Privileged admin actions (role changes, deletions) are recorded here as they happen."
+          title={t('audit.noEntries')}
+          description={t('audit.noEntriesDesc')}
         />
       ) : (
         <div className="-mx-1 overflow-x-auto rounded-xl border border-navy-100 bg-white">
           <table className="w-full">
             <thead className="bg-navy-50">
               <tr>
-                <th className={TH}>Date</th>
-                <th className={TH}>Actor</th>
-                <th className={TH}>Action</th>
-                <th className={TH}>Target</th>
-                <th className={TH}>Details</th>
+                <th className={TH}>{t('audit.date')}</th>
+                <th className={TH}>{t('audit.actor')}</th>
+                <th className={TH}>{t('audit.action')}</th>
+                <th className={TH}>{t('audit.target')}</th>
+                <th className={TH}>{t('audit.details')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">

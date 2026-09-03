@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 interface PaginationProps {
   page: number;
@@ -13,12 +14,13 @@ interface PaginationProps {
  * Disabled states are real, non-interactive `<span>`s so they cannot be
  * followed with an empty request.
  */
-export default function Pagination({
+export default async function Pagination({
   page,
   totalPages,
   totalItems,
   buildHref,
 }: PaginationProps) {
+  const t = await getTranslations('admin.common');
   const canPrev = page > 1;
   const canNext = page < totalPages;
 
@@ -30,18 +32,16 @@ export default function Pagination({
   return (
     <div className="flex items-center justify-between">
       <p className="text-sm text-navy-500">
-        Page <span className="font-medium text-navy-700">{page}</span>{' '}
-        of <span className="font-medium text-navy-700">{totalPages}</span> —{' '}
-        <span className="font-medium text-navy-700">{totalItems}</span> results
+        {t('pageOf', { page, totalPages, totalItems })}
       </p>
       <nav className="flex items-center gap-2">
         {canPrev ? (
           <Link href={buildHref(page - 1)} className={baseBtn}>
-            Previous
+            {t('previous')}
           </Link>
         ) : (
           <span className={disabledBtn} aria-disabled>
-            Previous
+            {t('previous')}
           </span>
         )}
         <Link
@@ -49,7 +49,7 @@ export default function Pagination({
           className={canNext ? baseBtn : disabledBtn}
           aria-disabled={!canNext}
         >
-          Next
+          {t('next')}
         </Link>
       </nav>
     </div>

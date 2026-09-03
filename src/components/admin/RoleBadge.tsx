@@ -2,6 +2,8 @@ import type { UserRole } from '@/types/admin';
 
 interface RoleBadgeProps {
   role: UserRole;
+  /** Localized label — defaults to the raw role value when omitted. */
+  label?: string;
   size?: 'sm' | 'default';
 }
 
@@ -9,7 +11,7 @@ interface RoleBadgeProps {
  * Badge indicating a user's authorization role, in "Light & Gold".
  * Admin → gold, regular user → slate.
  */
-export default function RoleBadge({ role, size = 'default' }: RoleBadgeProps) {
+export default function RoleBadge({ role, label, size = 'default' }: RoleBadgeProps) {
   const isAdmin = role === 'admin';
   const base =
     'inline-flex items-center rounded-full font-semibold ring-1 capitalize';
@@ -18,5 +20,5 @@ export default function RoleBadge({ role, size = 'default' }: RoleBadgeProps) {
     ? `${base} ${sizeClass} bg-orange-100 text-orange-800 ring-orange-200`
     : `${base} ${sizeClass} bg-navy-100 text-navy-700 ring-slate-200`;
 
-  return <span className={style}>{role}</span>;
+  return <span className={style}>{label ?? role}</span>;
 }

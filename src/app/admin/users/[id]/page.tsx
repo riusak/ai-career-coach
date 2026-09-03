@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import RoleBadge from '@/components/admin/RoleBadge';
 import RoleToggleForm from '@/components/admin/RoleToggleForm';
 import DeleteUserButton from '@/components/admin/DeleteUserButton';
@@ -20,13 +21,13 @@ const TD = 'px-4 py-2 align-top text-sm text-navy-900';
 export default async function AdminUserDetailPage({
   params,
 }: AdminUserDetailPageProps) {
-  const admin = await getCurrentAdmin();
+  const [admin, t] = await Promise.all([getCurrentAdmin(), getTranslations('admin')]);
 
   if (!admin.ok) {
     return (
       <ErrorState
-        title="Access denied"
-        description="Only administrators can view user details."
+        title={t('accessDenied.titleShort')}
+        description={t('accessDenied.onlyAdminsView')}
       />
     );
   }
@@ -47,65 +48,65 @@ export default async function AdminUserDetailPage({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-navy-900">
-            {detail.user.full_name || 'Unnamed account'}
+            {detail.user.full_name || t('users.unnamed')}
           </h1>
           <p className="mt-1 text-sm text-navy-500">
-            {detail.user.email ?? 'no email'}
+            {detail.user.email ?? t('users.noEmail')}
           </p>
         </div>
         <Link
           href="/admin/users"
           className="ml-auto rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm font-medium text-navy-700 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-50 hover:text-orange-800"
         >
-          ← Back to users
+          {t('users.backToUsers')}
         </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left: identity */}
         <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm lg:col-span-1">
-          <h2 className="text-lg font-semibold text-navy-900">Profile</h2>
+          <h2 className="text-lg font-semibold text-navy-900">{t('users.profile')}</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div>
-              <dt className="font-medium text-navy-500">Role</dt>
+              <dt className="font-medium text-navy-500">{t('users.role')}</dt>
               <dd className="mt-1">
-                <RoleBadge role={detail.user.role} />
+                <RoleBadge role={detail.user.role} label={t(`roles.${detail.user.role}`)} />
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-navy-500">Full name</dt>
+              <dt className="font-medium text-navy-500">{t('users.fullName')}</dt>
               <dd className="mt-1 text-navy-900">
                 {detail.user.full_name || (
-                  <span className="italic text-navy-400">Not set</span>
+                  <span className="italic text-navy-400">{t('users.notSet')}</span>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="font-medium text-navy-500">Email</dt>
+              <dt className="font-medium text-navy-500">{t('users.email')}</dt>
               <dd className="mt-1 break-all text-navy-900">
                 {detail.user.email ?? '—'}
               </dd>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <dt className="font-medium text-navy-500">Created</dt>
+                <dt className="font-medium text-navy-500">{t('users.created')}</dt>
                 <dd className="mt-1 text-navy-900">
                   {formatDateTime(detail.user.created_at)}
                 </dd>
               </div>
               <div>
-                <dt className="font-medium text-navy-500">Updated</dt>
+                <dt className="font-medium text-navy-500">{t('users.updated')}</dt>
                 <dd className="mt-1 text-navy-900">
                   {formatDateTime(detail.user.updated_at)}
                 </dd>
               </div>
               <div className="col-span-2">
-                <dt className="font-medium text-navy-500">Last sign-in</dt>
+                <dt className="font-medium text-navy-500">{t('users.lastSignIn')}</dt>
                 <dd className="mt-1 text-navy-900">
                   {detail.user.last_sign_in_at ? (
                     formatDateTime(detail.user.last_sign_in_at)
                   ) : (
-                    <span className="italic text-navy-400">Never</span>
+                    <span className="italic text-navy-400">{t('users.never')}</span>
                   )}
                 </dd>
               </div>
@@ -115,20 +116,20 @@ export default async function AdminUserDetailPage({
                 {/* Middle: content summary */}
         <div className="rounded-xl border border-navy-100 bg-white p-6 shadow-sm lg:col-span-2">
           <h2 className="text-lg font-semibold text-navy-900">
-            Content catalogue
+            {t('users.resumesTitle')}
           </h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between">
-              <dt className="font-medium text-navy-500">Resumes</dt>
+              <dt className="font-medium text-navy-500">{t('users.resumesTitle')}</dt>
               <dd className="text-navy-900">{detail.resumes.length} CV(s)</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="font-medium text-navy-500">Analyses</dt>
+              <dt className="font-medium text-navy-500">{t('users.analysesCount', { count: 0 })}</dt>
               <dd className="text-navy-900">{detail.analysis_count}</dd>
             </div>
             {detail.latestAnalysis && (
               <div className="flex justify-between">
-                <dt className="font-medium text-navy-500">Latest analysis</dt>
+                <dt className="font-medium text-navy-500">{t('users.latestAnalysis')}</dt>
                 <dd className="text-right text-navy-900">
                   <span className="font-medium">
                     {detail.latestAnalysis.score ?? '—'}
@@ -147,8 +148,8 @@ export default async function AdminUserDetailPage({
                 <thead>
                   <tr>
                     <th className={TH}>CV</th>
-                    <th className={TH}>Format</th>
-                    <th className={TH}>Uploaded</th>
+                    <th className={TH}>{t('users.format')}</th>
+                    <th className={TH}>{t('users.uploaded')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -161,7 +162,7 @@ export default async function AdminUserDetailPage({
                         {resume.is_primary && (
                           <span
                             className="ml-1 inline-flex items-center text-orange-700"
-                            aria-label="Primary CV"
+                            aria-label={t('users.primaryCv')}
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"

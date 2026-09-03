@@ -1,7 +1,8 @@
-﻿import type { Metadata } from 'next';
+﻿﻿import type { Metadata } from 'next';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import AdminNav from '@/components/admin/AdminNav';
 import SignOutButton from '@/components/ui/SignOutButton';
 import { getCurrentAdmin } from '@/lib/admin/guard';
@@ -35,7 +36,10 @@ function getInitials(fullName: string | null): string {
 export default async function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const admin = await getCurrentAdmin();
+  const [admin, t] = await Promise.all([
+    getCurrentAdmin(),
+    getTranslations('admin'),
+  ]);
 
   if (!admin.ok) {
     if (admin.reason === 'unauthenticated') {
@@ -65,17 +69,16 @@ export default async function AdminLayout({
               </span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-red-900">
-              403 - Access denied
+              {t('accessDenied.title')}
             </h1>
             <p className="mt-2 text-navy-600">
-              You are authenticated but do not have administrator privileges. The
-              requested area is restricted to platform administrators.
+              {t('accessDenied.description')}
             </p>
             <Link
               href="/dashboard"
               className="mt-4 inline-block text-sm font-medium text-orange-700 hover:text-orange-800"
             >
-              &larr; Return to my dashboard
+              {t('accessDenied.returnDashboard')}
             </Link>
           </div>
         </div>
@@ -99,7 +102,7 @@ export default async function AdminLayout({
             />
             <span className="text-sm font-bold text-white">ForPro AI</span>
             <span className="rounded bg-orange px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-              Admin
+              {t('roles.admin')}
             </span>
           </div>
           <SignOutButton className="rounded-lg border border-white/20 px-2.5 py-1 text-xs font-medium text-navy-200 transition-colors hover:border-orange-400 hover:text-orange-300" />
@@ -122,7 +125,7 @@ export default async function AdminLayout({
             <div className="min-w-0">
               <p className="text-sm font-bold text-white">ForPro AI</p>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-400">
-                Admin Console
+                {t('brand.console')}
               </p>
             </div>
           </div>
@@ -136,7 +139,7 @@ export default async function AdminLayout({
                 {getInitials(admin.fullName)}
               </span>
               <span className="min-w-0 truncate text-xs font-medium text-white">
-                {admin.fullName ?? 'Administrator'}
+                {admin.fullName ?? t('roles.admin')}
               </span>
             </div>
             <SignOutButton className="mt-3 w-full rounded-lg border border-white/15 px-3 py-1.5 text-xs font-medium text-navy-200 transition-colors hover:border-orange-400 hover:text-orange-300" />
