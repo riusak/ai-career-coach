@@ -290,7 +290,7 @@ export async function analyzeCvDocument(
     return failure(
       'llm_unavailable',
       503,
-      "Le service d'analyse IA est momentanément indisponible (configuration serveur incomplète).",
+      "Configuration serveur incomplète : la clé d'API IA (GEMINI_API_KEY) n'est pas définie sur le serveur.",
       kind
     );
   }

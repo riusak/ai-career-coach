@@ -79,7 +79,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!isIpHashSecretConfigured()) {
     console.error('[quick-test] IP_HASH_SECRET missing in production — refusing to serve.');
     return errorResponse(
-      'Service temporairement indisponible (configuration serveur incomplète.)',
+      'Configuration serveur incomplète : la variable IP_HASH_SECRET est requise en production (anonymisation des IP / RGPD).',
       500,
       { code: 'server_error' }
     );

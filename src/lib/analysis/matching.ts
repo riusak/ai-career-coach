@@ -177,7 +177,7 @@ export async function analyzeJobMatch(
     return failure(
       'llm_unavailable',
       503,
-      'Le service de matching IA est momentanément indisponible (configuration serveur incomplète).'
+      "Configuration serveur incomplète : la clé d'API IA (GEMINI_API_KEY) n'est pas définie sur le serveur."
     );
   }
 
