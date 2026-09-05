@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type {
   Profile,
@@ -18,6 +18,7 @@ import {
   deleteEducationAction,
   deleteExperienceAction,
   deleteSkillAction,
+  updateExperienceAction,
   updateProfileAction,
   type ProfileFormState,
   type SectionActionResult,
@@ -100,6 +101,180 @@ function bindAction(
   return fn.bind(null, INITIAL_SECTION_STATE) as unknown as FormAction;
 }
 
+/** Migration-010 domain options (shared by create + inline edit forms). */
+const EXPERIENCE_DOMAIN_OPTIONS = [
+  { value: 'frontend', labelKey: 'domainFrontend' },
+  { value: 'backend', labelKey: 'domainBackend' },
+  { value: 'architecture', labelKey: 'domainArchitecture' },
+  { value: 'devops', labelKey: 'domainDevops' },
+  { value: 'mobile', labelKey: 'domainMobile' },
+  { value: 'data', labelKey: 'domainData' },
+  { value: 'other', labelKey: 'domainOther' },
+] as const;
+
+const DOMAIN_LABEL_KEYS: Record<string, string> = Object.fromEntries(
+  EXPERIENCE_DOMAIN_OPTIONS.map((option) => [option.value, option.labelKey])
+);
+
+/** Renders the migration-010 fields: domain select + technologies + missions. */
+function ExperienceEnrichmentFields({
+  prefix,
+  experience,
+}: {
+  prefix: string;
+  experience?: ProfileExperience;
+}) {
+  const t = useTranslations('profile');
+  const domainId = `${prefix}-domain`;
+  return (
+    <>
+      <Field id={domainId} label={t('domain')}>
+        <select
+          id={domainId}
+          name="domain"
+          defaultValue={experience?.domain ?? ''}
+          className={selectClasses}
+        >
+          <option value="">{t('domainPlaceholder')}</option>
+          {EXPERIENCE_DOMAIN_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {t(option.labelKey as (typeof EXPERIENCE_DOMAIN_OPTIONS)[number]['labelKey'])}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field id={`${prefix}-technologies`} label={t('technologies')}>
+        <input
+          id={`${prefix}-technologies`}
+          name="technologies"
+          type="text"
+          placeholder={t('technologiesHint')}
+          defaultValue={experience?.technologies?.join(', ') ?? ''}
+          className={inputClasses}
+        />
+      </Field>
+      <div className="sm:col-span-2">
+        <Field id={`${prefix}-key-missions`} label={t('keyMissions')}>
+          <textarea
+            id={`${prefix}-key-missions`}
+            name="key_missions"
+            rows={3}
+            placeholder={t('keyMissionsHint')}
+            defaultValue={experience?.key_missions?.join('\n') ?? ''}
+            className={inputClasses}
+          />
+        </Field>
+      </div>
+    </>
+  );
+}
+
+/** Inline edit form for an existing experience (routes through updateExperienceAction). */
+function ExperienceEditForm({
+  experience,
+  onDone,
+}: {
+  experience: ProfileExperience;
+  onDone: () => void;
+}) {
+  const t = useTranslations('profile');
+  const [state, action, pending] = useActionState(updateExperienceAction, INITIAL_SECTION_STATE);
+  const suffix = experience.id;
+  return (
+    <form
+      action={action}
+      className="mt-3 grid gap-3 rounded-xl border border-orange-200 bg-white p-4 sm:grid-cols-2"
+    >
+      <input type="hidden" name="id" value={experience.id} />
+      <Field id={`edit-company-${suffix}`} label={t('companyName')}>
+        <input
+          id={`edit-company-${suffix}`}
+          name="company"
+          defaultValue={experience.company}
+          disabled={pending}
+          className={inputClasses}
+        />
+      </Field>
+      <Field id={`edit-role-${suffix}`} label={t('role')}>
+        <input
+          id={`edit-role-${suffix}`}
+          name="role"
+          defaultValue={experience.role}
+          disabled={pending}
+          className={inputClasses}
+        />
+      </Field>
+      <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+        <Field id={`edit-start-${suffix}`} label={t('startDate')}>
+          <input
+            id={`edit-start-${suffix}`}
+            name="start_date"
+            type="date"
+            defaultValue={experience.start_date ?? ''}
+            disabled={pending}
+            className={inputClasses}
+          />
+        </Field>
+        <Field id={`edit-end-${suffix}`} label={t('endDate')}>
+          <input
+            id={`edit-end-${suffix}`}
+            name="end_date"
+            type="date"
+            defaultValue={experience.end_date ?? ''}
+            disabled={pending}
+            className={inputClasses}
+          />
+        </Field>
+      </div>
+      <label className="inline-flex items-center gap-2 text-sm text-navy-700 sm:col-span-2">
+        <input
+          type="checkbox"
+          name="is_current"
+          defaultChecked={experience.is_current}
+          disabled={pending}
+          className="rounded border-navy-300 text-orange-600 focus:ring-orange-600"
+        />
+        {t('current')}
+      </label>
+      <div className="sm:col-span-2">
+        <Field id={`edit-desc-${suffix}`} label={t('description')}>
+          <textarea
+            id={`edit-desc-${suffix}`}
+            name="description"
+            rows={3}
+            defaultValue={experience.description ?? ''}
+            disabled={pending}
+            className={inputClasses}
+          />
+        </Field>
+      </div>
+      <ExperienceEnrichmentFields prefix={`edit-${suffix}`} experience={experience} />
+      {state.error && (
+        <p role="alert" className="text-xs text-red-600 sm:col-span-2">
+          {state.error}
+        </p>
+      )}
+      <div className="flex items-center justify-end gap-2 sm:col-span-2">
+        <button
+          type="button"
+          onClick={onDone}
+          disabled={pending}
+          className="cursor-pointer rounded-md px-4 py-2 text-sm font-semibold text-navy-600 transition-colors hover:bg-navy-50 hover:text-navy-900 disabled:opacity-50"
+        >
+          {t('cancel')}
+        </button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex items-center justify-center rounded-md bg-orange px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {pending ? `${t('save')}…` : t('save')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function ProfileForm({
   initialProfile,
   educations,
@@ -125,6 +300,9 @@ export default function ProfileForm({
   const [expState, expAction, expPending] = useActionState(createExperienceAction, INITIAL_SECTION_STATE);
   const [skillState, skillAction, skillPending] = useActionState(createSkillAction, INITIAL_SECTION_STATE);
   const [certState, certAction, certPending] = useActionState(createCertificationAction, INITIAL_SECTION_STATE);
+
+  // Which experience is currently being edited inline (null = none).
+  const [editingExpId, setEditingExpId] = useState<string | null>(null);
 
   // Bound action variants for delete forms (revalidatePath handles refresh).
   const eduDeleteBound = bindAction(deleteEducationAction);
@@ -184,6 +362,44 @@ export default function ProfileForm({
               className={inputClasses}
             />
           </Field>
+          <SubmitRow label={tCommon('save')} pending={profilePending} />
+        </form>
+      </Section>
+
+      {/* Career goal (migration 012) — anchors the roadmap « summit » node */}
+      <Section title={t('sectionCareerGoal')}>
+        <form action={profileAction} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <Field id="target_role" label={t('targetRole')}>
+                <input
+                  id="target_role"
+                  name="target_role"
+                  type="text"
+                  maxLength={120}
+                  defaultValue={initialProfile?.target_role ?? ''}
+                  placeholder={t('targetRolePlaceholder')}
+                  disabled={profilePending}
+                  className={inputClasses}
+                />
+              </Field>
+            </div>
+            <Field id="target_year" label={t('targetYear')}>
+              <input
+                id="target_year"
+                name="target_year"
+                type="number"
+                min={2020}
+                max={2100}
+                step={1}
+                defaultValue={initialProfile?.target_year ?? ''}
+                placeholder={t('targetYearPlaceholder')}
+                disabled={profilePending}
+                className={inputClasses}
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-navy-500">{t('careerGoalHint')}</p>
           <SubmitRow label={tCommon('save')} pending={profilePending} />
         </form>
       </Section>
@@ -361,30 +577,65 @@ export default function ProfileForm({
                   {experience.description && (
                     <p className="mt-2 text-xs text-navy-600">{experience.description}</p>
                   )}
+                  {/* Migration-010 enrichments: domain + technologies chips. */}
+                  {(experience.domain || (experience.technologies ?? []).length > 0) && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {experience.domain && DOMAIN_LABEL_KEYS[experience.domain] && (
+                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">
+                          {t(DOMAIN_LABEL_KEYS[experience.domain] as 'domainFrontend')}
+                        </span>
+                      )}
+                      {(experience.technologies ?? []).map((tech) => (
+                        <span
+                          key={tech}
+                          className="rounded-full bg-navy-100 px-2 py-0.5 text-[10px] font-semibold text-navy-700"
+                        >
+                          {tech}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <form action={expDeleteBound}>
-                  <input type="hidden" name="id" value={experience.id} />
+                <div className="flex shrink-0 items-center gap-1">
                   <button
-                    type="submit"
-                    className="rounded-md p-1.5 text-navy-500 transition-colors hover:bg-red-50 hover:text-red-600"
-                    aria-label={tCommon('delete')}
+                    type="button"
+                    onClick={() =>
+                      setEditingExpId((current) => (current === experience.id ? null : experience.id))
+                    }
+                    className="cursor-pointer rounded-md px-2.5 py-1.5 text-xs font-semibold text-navy-600 transition-colors hover:bg-orange-50 hover:text-orange-800"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      className="h-4 w-4"
-                    >
-                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    </svg>
+                    {editingExpId === experience.id ? t('cancel') : t('edit')}
                   </button>
-                </form>
+                  <form action={expDeleteBound}>
+                    <input type="hidden" name="id" value={experience.id} />
+                    <button
+                      type="submit"
+                      className="rounded-md p-1.5 text-navy-500 transition-colors hover:bg-red-50 hover:text-red-600"
+                      aria-label={tCommon('delete')}
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                      >
+                        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      </svg>
+                    </button>
+                  </form>
+                </div>
               </div>
+              {editingExpId === experience.id && (
+                <ExperienceEditForm
+                  experience={experience}
+                  onDone={() => setEditingExpId(null)}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -416,6 +667,8 @@ export default function ProfileForm({
               className={inputClasses}
             />
           </Field>
+          {/* Migration-010 career-roadmap enrichments. */}
+          <ExperienceEnrichmentFields prefix="exp" />
           {expState.error && (
             <p role="alert" className="sm:col-span-2 text-xs text-red-600">
               {expState.error}

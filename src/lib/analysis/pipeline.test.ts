@@ -230,6 +230,21 @@ describe('analyzeCvDocument — extraction & LLM', () => {
       expect(result.error.documentKind).toBe('txt');
     }
   });
+
+  it('maps a gate-rejected outcome with a NULL analysis to not_a_cv — the real production shape', async () => {
+    // The LLM is instructed to return empty lists + score 0 for is_cv:false,
+    // so coerceLlmAnalysis legitimately yields null there. The pipeline must
+    // turn this into the precise not_a_cv rejection (never llm_failed).
+    analyzeWithGeminiMock.mockResolvedValue({ analysis: null, gate: nonCvGate });
+    const result = await analyzeCvDocument({ buffer: FAKE_TXT, fileName: 'cv.txt' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('not_a_cv');
+      expect(result.error.httpStatus).toBe(422);
+      expect(result.error.documentType).toBe('invoice');
+      expect(result.error.documentKind).toBe('txt');
+    }
+  });
 });
 
 

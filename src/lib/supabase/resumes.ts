@@ -460,6 +460,82 @@ export async function createResumeAnalysis(
 }
 
 /**
+ * Fetches the latest COMPLETED (score NOT NULL) analysis row per resume for
+ * the authenticated user, keyed by resume id. One RLS-safe query ordered
+ * newest-first, reduced to the first row of each resume — avoids N sequential
+ * auth roundtrips when the dashboard needs every CV's ATS score at once.
+ */
+export async function getLatestCompletedAnalysesByResume(): Promise<
+  ResumeResponse<Record<string, ResumeAnalysis>>
+> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError?.message ?? 'No authenticated user found.' };
+    }
+
+    const { data, error } = await supabase
+      .from('resume_analyses')
+      .select('id, resume_id, user_id, analysis_type, score, structured_output, created_at')
+      .eq('user_id', user.id)
+      .not('score', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    const byResume: Record<string, ResumeAnalysis> = {};
+    for (const row of (data ?? []) as ResumeAnalysis[]) {
+      if (!byResume[row.resume_id]) {
+        byResume[row.resume_id] = row;
+      }
+    }
+    return { data: byResume, error: null };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to load the resume analyses.';
+    return { data: null, error: message };
+  }
+}
+
+/**
+ * Returns a short-lived signed URL for downloading the user's own resume
+ * file from the private `resumes` bucket (ownership re-checked server-side).
+ */
+export async function getResumeDownloadUrl(
+  resumeId: string
+): Promise<{ url: string | null; error: string | null }> {
+  try {
+    const { data: resume, error: resumeError } = await getResumeById(resumeId);
+    if (resumeError || !resume) {
+      return { url: null, error: resumeError ?? 'Resume not found.' };
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase.storage
+      .from(RESUME_BUCKET)
+      .createSignedUrl(resume.file_path, 60);
+
+    if (error || !data) {
+      return { url: null, error: error?.message ?? 'Failed to create the download link.' };
+    }
+    return { url: data.signedUrl, error: null };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Failed to create the download link.';
+    return { url: null, error: message };
+  }
+}
+
+/**
  * Fetches the most recent analysis log row of a resume (null if never analyzed).
  */
 export async function getLatestResumeAnalysis(

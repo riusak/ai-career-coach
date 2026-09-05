@@ -3,6 +3,7 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import ResumeUploader from './ResumeUploader';
 import ConfirmSubmitButton from './ConfirmSubmitButton';
 import EmptyState from '@/components/ui/EmptyState';
+import MatchOfferButton from './MatchWithOfferModal';
 import ErrorState from '@/components/ui/ErrorState';
 import {
   deleteResumeAction,
@@ -69,7 +70,7 @@ function ResumeCard({ resume, locale, labels }: ResumeCardProps) {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold text-navy-900">{resume.file_name}</p>
+            <p className="max-w-full truncate text-sm font-semibold text-navy-900" title={resume.file_name}>{resume.file_name}</p>
             {resume.is_primary && (
               <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-800">
                 <PrimaryBadgeIcon />
@@ -101,6 +102,7 @@ function ResumeCard({ resume, locale, labels }: ResumeCardProps) {
           >
             {labels.openPreview}
           </Link>
+          <MatchOfferButton resumeName={resume.file_name} canMatch={Boolean(resume.parsed_content)} />
           {resume.is_primary ? (
             <form action={unsetPrimaryResumeAction}>
               <input type="hidden" name="resumeId" value={resume.id} />
@@ -191,15 +193,25 @@ export default async function ResumePage() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-bg px-4 py-8 sm:px-6 lg:px-8">
+    <div className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-navy-900">
-            {tNav('myResumes')}
-          </h1>
-          <p className="mt-1 text-sm text-navy-600">
-            {t('resumeCatalogue')}
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-orange-700">{t('resumeCatalogue')}</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-navy-900 sm:text-3xl">{tNav('myResumes')}</h1>
+            <p className="mt-1 text-sm text-navy-600">{t('myResumesSubtitle')}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-800">
+              {t('resumeCount', { count: resumeList.length })}
+            </span>
+            <Link
+              href="#upload"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-orange px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-orange-600"
+            >
+              {t('quickUpload')}
+            </Link>
+          </div>
         </div>
 
         {error && (
@@ -236,7 +248,7 @@ export default async function ResumePage() {
             </span>
           </div>
           {resumeList.length > 0 ? (
-            <ul className="mt-4 space-y-4">
+            <ul className="mt-6 grid gap-5 sm:grid-cols-2">
               {resumeList.map((resume) => (
                 <ResumeCard
                   key={resume.id}

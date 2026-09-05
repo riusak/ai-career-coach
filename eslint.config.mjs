@@ -19,6 +19,9 @@ const eslintConfig = defineConfig([
     // k9/harness working-tree mirror (e.g. .kilo/worktrees/<branch>) — not
     // project source; linting it double-counts files and flags stale scripts.
     '.kilo/**',
+    // Imported UI template kept as a design reference — not compiled, not
+    // built, and not part of the production bundle (see tsconfig exclude).
+    'forpro-ai-career-User-dashboard/**',
   ]),
 ]);
 

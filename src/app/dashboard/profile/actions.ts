@@ -36,6 +36,8 @@ export async function updateProfileAction(
     linkedin_url: strOrNull(formData.get('linkedin_url')),
     github_url: strOrNull(formData.get('github_url')),
     website_url: strOrNull(formData.get('website_url')),
+    target_role: strOrNull(formData.get('target_role')),
+    target_year: parseTargetYear(formData.get('target_year')),
   };
 
   const localeRaw = formData.get('preferred_locale');
@@ -62,6 +64,20 @@ function strOrNull(value: FormDataEntryValue | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * Parses the target year of the career goal (migration 012). Anything
+ * outside the DB-check window (2020–2100) degrades to NULL instead of
+ * failing the whole profile save.
+ */
+function parseTargetYear(value: FormDataEntryValue | null): number | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  const year = Number.parseInt(trimmed, 10);
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) return null;
+  return year;
+}
+
 // ---------------------------------------------------------------------------
 // Career-history CRUD server actions (the form posts multipart/form-data with
 // a hidden `_action` discriminator so each section reuses the same endpoint).
@@ -73,6 +89,44 @@ function parseDate(value: FormDataEntryValue | null): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Sprint 5 / migration 010 — career-roadmap domain whitelist. Kept in sync
+ * with the CHECK constraint in supabase/migrations/010_profile_experiences_enrichment.sql.
+ */
+const EXPERIENCE_DOMAINS = [
+  'frontend',
+  'backend',
+  'architecture',
+  'devops',
+  'mobile',
+  'data',
+  'other',
+] as const;
+
+export type ExperienceDomain = (typeof EXPERIENCE_DOMAINS)[number];
+
+/** Parses a domain submitted by the form; returns null unless it is allowed. */
+function parseDomain(value: FormDataEntryValue | null): ExperienceDomain | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim() as ExperienceDomain;
+  return EXPERIENCE_DOMAINS.includes(trimmed) ? trimmed : null;
+}
+
+/**
+ * Parses a free-text list (one item per line, or comma/semicolon separated)
+ * into a clean non-empty string array (NULL when nothing was provided). These
+ * arrays are stored in the migration-010 jsonb columns (key_missions,
+ * technologies).
+ */
+function parseStringArray(value: FormDataEntryValue | null): string[] | null {
+  if (typeof value !== 'string') return null;
+  const items = value
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  return items.length > 0 ? items.slice(0, 50) : null;
 }
 
 export async function createEducationAction(
@@ -128,11 +182,16 @@ export async function createExperienceAction(
     start_date: parseDate(formData.get('start_date')),
     end_date: parseDate(formData.get('end_date')),
     is_current: formData.get('is_current') === 'on',
+    // Sprint 5 / migration 010 career-roadmap enrichments.
+    key_missions: parseStringArray(formData.get('key_missions')),
+    technologies: parseStringArray(formData.get('technologies')),
+    domain: parseDomain(formData.get('domain')),
     display_order: 0,
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
   revalidatePath('/dashboard/profile');
+  revalidatePath('/dashboard');
   return { error: null };
 }
 
@@ -146,6 +205,7 @@ export async function deleteExperienceAction(
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
   revalidatePath('/dashboard/profile');
+  revalidatePath('/dashboard');
   return { error: null };
 }
 
@@ -250,16 +310,32 @@ export async function updateExperienceAction(
 ): Promise<SectionActionResult> {
   const id = formData.get('id');
   if (typeof id !== 'string') return { error: 'id is required' };
+  // `formData.has` guards let the user actually CLEAR a previously set value
+  // (setting NULL) instead of silently skipping the column.
+  const companyInput = formData.has('company') ? strOrNull(formData.get('company')) : undefined;
+  const roleInput = formData.has('role') ? strOrNull(formData.get('role')) : undefined;
+  if (companyInput === null || roleInput === null) {
+    return { error: 'company and role are required' };
+  }
   const result = await updateExperience(id, {
-    company: strOrNull(formData.get('company')) ?? undefined,
-    role: strOrNull(formData.get('role')) ?? undefined,
+    company: companyInput ?? undefined,
+    role: roleInput ?? undefined,
     description: formData.has('description') ? strOrNull(formData.get('description')) : undefined,
     start_date: formData.has('start_date') ? parseDate(formData.get('start_date')) : undefined,
     end_date: formData.has('end_date') ? parseDate(formData.get('end_date')) : undefined,
     is_current: typeof formData.get('is_current') === 'string' ? formData.get('is_current') === 'on' : undefined,
+    // Sprint 5 / migration 010 career-roadmap enrichments (nullable clears).
+    key_missions: formData.has('key_missions')
+      ? parseStringArray(formData.get('key_missions'))
+      : undefined,
+    technologies: formData.has('technologies')
+      ? parseStringArray(formData.get('technologies'))
+      : undefined,
+    domain: formData.has('domain') ? parseDomain(formData.get('domain')) : undefined,
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
   revalidatePath('/dashboard/profile');
+  revalidatePath('/dashboard');
   return { error: null };
 }

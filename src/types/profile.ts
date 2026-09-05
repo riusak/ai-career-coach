@@ -16,6 +16,13 @@ export interface Profile {
   github_url: string | null;
   website_url: string | null;
   preferred_locale: AppLocaleCode | null;
+  /**
+   * Aspirational career goal (migration 012): target job title + year
+   * (e.g. « Lead Architect by 2030 »). Rendered as the flag-icon « Goal »
+   * milestone at the end of the career-roadmap timeline.
+   */
+  target_role: string | null;
+  target_year: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +39,8 @@ export type ProfileUpdate = Partial<
     | 'github_url'
     | 'website_url'
     | 'preferred_locale'
+    | 'target_role'
+    | 'target_year'
   >
 >;
 
@@ -70,6 +79,13 @@ export interface ProfileExperience {
   end_date: string | null;
   is_current: boolean;
   display_order: number;
+  /**
+   * Career-roadmap enrichments (migration 010). Nullable until the profile
+   * form populates them; the dashboard renders fine without them.
+   */
+  key_missions?: string[] | null;
+  technologies?: string[] | null;
+  domain?: string | null;
   created_at: string;
   updated_at: string;
 }

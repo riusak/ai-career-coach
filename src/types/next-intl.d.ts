@@ -11,6 +11,7 @@ declare module 'next-intl' {
       dashboard: Record<string, string>;
       profile: Record<string, string>;
       footer: Record<string, string>;
+      onboarding: Record<string, string>;
     };
   }
 }

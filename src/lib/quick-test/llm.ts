@@ -468,9 +468,16 @@ export interface CvGate {
   detectedLanguage: string;
 }
 
-/** Full LLM outcome: coerced analysis + semantic CV gate. */
+/**
+ * Full LLM outcome: coerced analysis + semantic CV gate.
+ *
+ * `analysis` is null ONLY when the gate rejected the document (`isCv: false`):
+ * the model is then explicitly instructed to emit empty lists + a zero score,
+ * which `coerceLlmAnalysis` rejects by design. In that case the gate alone
+ * drives the precise `not_a_cv` rejection — never a misleading `llm_failed`.
+ */
 export interface GeminiAnalysisResult {
-  analysis: QuickTestAnalysis;
+  analysis: QuickTestAnalysis | null;
   gate: CvGate;
 }
 
@@ -531,6 +538,11 @@ function buildRequestParts(document: AnalysisDocument): Array<Record<string, unk
  * payload statistics) and FAILURE (with the exact reason). There is NO
  * silent heuristic fallback: on final failure the function returns null and
  * the caller MUST surface an explicit error to the user.
+ *
+ * A non-CV verdict is a SUCCESS, not a failure: the model is instructed to
+ * emit `is_cv:false` with empty lists + score 0 (which coerceLlmAnalysis
+ * rejects by design), so the function returns `{ analysis: null, gate }` —
+ * the caller turns it into the precise `not_a_cv` rejection.
  */
 export async function analyzeWithGemini(
   document: AnalysisDocument
@@ -572,6 +584,21 @@ export async function analyzeWithGemini(
       );
       if (analysis) {
         return { analysis, gate: extractCvGate(raw) };
+      }
+      // Non-CV documents are NOT failed calls: the model is instructed to
+      // return `is_cv:false` with empty lists + score 0, and coerceLlmAnalysis
+      // rejects that payload by design. Surface the semantic gate so the
+      // pipeline emits the precise `not_a_cv` rejection (typed message for
+      // PDFs, generic otherwise) instead of retrying pointlessly and falling
+      // into the generic `llm_failed` ("Analysis failed").
+      if (raw !== undefined) {
+        const gate = extractCvGate(raw);
+        if (!gate.isCv) {
+          console.warn(
+            `[quick-test] Gemini: rejet non-CV (type=${gate.documentType}, langue=${gate.detectedLanguage}) — modèle ${model}, tentative ${attempt}.`
+          );
+          return { analysis: null, gate };
+        }
       }
       lastReason = reason ?? 'unknown';
 
@@ -702,7 +729,10 @@ async function analyzeWithGeminiOnce(
         `[quick-test] Gemini FAILED after ${elapsedMs}ms — payload failed schema coercion (missing/broken required fields).`
       );
       console.timeEnd(`[quick-test] Gemini (analysis) model=${model}`);
-      return { analysis: null, reason: 'schema coercion failed' };
+      // Keep the raw payload: a non-CV verdict (`is_cv:false` + empty lists, as
+      // instructed) legitimately fails coercion — the caller inspects the gate
+      // to surface the precise `not_a_cv` rejection instead of `llm_failed`.
+      return { analysis: null, reason: 'schema coercion failed', raw: parsed };
     }
 
     console.info(

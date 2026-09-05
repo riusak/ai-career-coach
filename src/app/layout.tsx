@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Plus_Jakarta_Sans } from 'next/font/google';
 import { getLocale } from 'next-intl/server';
 import { LocaleProvider } from '@/i18n/provider';
 import type { AppLocale } from '@/i18n/routing';
@@ -14,6 +14,18 @@ import './globals.css';
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  display: 'swap',
+});
+
+/**
+ * Plus Jakarta Sans is the design-system font of the « Career Dashboard »
+ * template (forpro-ai-career-User-dashboard). It is exposed as
+ * --font-plus-jakarta and applied to the dashboard shell so every page of
+ * that area renders with the exact template typography.
+ */
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-plus-jakarta',
   display: 'swap',
 });
 
@@ -34,7 +46,7 @@ export default async function RootLayout({
   const locale = (await getLocale()) as AppLocale;
 
   return (
-    <html lang={locale} className={inter.variable}>
+    <html lang={locale} className={`${inter.variable} ${plusJakartaSans.variable}`}>
       <body className="bg-brand-bg font-sans text-navy antialiased">
         <LocaleProvider serverLocale={locale}>{children}</LocaleProvider>
       </body>

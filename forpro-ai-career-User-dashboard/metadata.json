@@ -1,0 +1,6 @@
+{
+  "name": "ForPro AI - Career Dashboard",
+  "description": "Executive AI-powered career roadmap and professional dashboard for tech talents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

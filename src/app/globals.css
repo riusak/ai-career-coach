@@ -7,8 +7,8 @@
  * Brand palette (strictly enforced, exact hex codes):
  * - Primary Navy  #101F32  → text, structure, monogram      (token: navy)
  * - Dark Navy     #1E2A3A  → dark mode backgrounds          (token: navy-dark)
- * - Brand Orange  #D88318  → arrows, AI badges, primary CTAs (token: orange)
- * - Light BG      #F3F8FB  → app global background          (token: brand-bg)
+ * - Brand Orange  #D97706  → arrows, AI badges, primary CTAs (token: orange)
+ * - Light BG      #F8FAFC  → app global background          (token: brand-bg)
  * - Pure White    #FFFFFF  → cards, containers              (default white)
  *
  * Typography: Inter exclusively (self-hosted via next/font in src/app/layout.tsx,
@@ -26,10 +26,10 @@
  */
 @theme {
   /* — ForPro AI brand tokens (exact hex codes) — */
-  --color-navy: #101f32;
-  --color-navy-dark: #1e2a3a;
-  --color-orange: #d88318;
-  --color-brand-bg: #f3f8fb;
+  --color-navy: #0a192f;
+  --color-navy-dark: #101f32;
+  --color-orange: #d97706;
+  --color-brand-bg: #f8fafc;
 
   /* — Navy scale (anchored on brand hexes: 900 = #101F32, 800 = #1E2A3A) — */
   --color-navy-50: #f3f8fb;
@@ -41,8 +41,8 @@
   --color-navy-600: #354961;
   --color-navy-700: #27374a;
   --color-navy-800: #1e2a3a;
-  --color-navy-900: #101f32;
-  --color-navy-950: #0a1522;
+  --color-navy-900: #0a192f;
+  --color-navy-950: #060d18;
 
   /* — Orange scale (anchored on brand orange as 500) — */
   --color-orange-50: #fdf5e9;
@@ -50,15 +50,34 @@
   --color-orange-200: #f4d098;
   --color-orange-300: #eeb562;
   --color-orange-400: #e49b36;
-  --color-orange-500: #d88318;
-  --color-orange-600: #bc6c10;
+  --color-orange-500: #d97706;
+  --color-orange-600: #b45309;
   --color-orange-700: #9a560e;
   --color-orange-800: #7d460f;
   --color-orange-900: #673a10;
 
+  /* — « Career Dashboard » accent scale (template #FF7A00 as 500) —
+     Used by the migrated dashboard components (donut ring, sub-score bars,
+     roadmap nodes). Accessible dark counterparts for small text: brand-700+. */
+  --color-brand-50: #fff4ec;
+  --color-brand-100: #ffe6d5;
+  --color-brand-200: #feccaa;
+  --color-brand-300: #fdab74;
+  --color-brand-400: #fb8a3e;
+  --color-brand-500: #ff7a00;
+  --color-brand-600: #e66e00;
+  --color-brand-700: #b75702;
+  --color-brand-800: #91450c;
+  --color-brand-900: #763a0e;
+
   /* — Typography: Inter exclusively — */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', Roboto, sans-serif;
+
+  /* — « Career Dashboard » template typeface (Plus Jakarta Sans).
+   Consumes next/font's --font-plus-jakarta variable (applied on <html>). */
+  --font-jakarta: var(--font-plus-jakarta), ui-sans-serif, system-ui,
+    -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 @layer base {
@@ -219,4 +238,46 @@
     animation: grow-y 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
+/* — Dashboard « career ascent » motion toolkit — */
+
+  /* Slow rotating dashed ring (empty-state experience donut ghost). */
+  @keyframes spin-slow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 28s linear infinite;
+  }
+
+  /* SVG path draw-in (ascending career roadmap line., donut segments). */
+  @keyframes draw-path {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .animate-draw-path {
+    stroke-dasharray: 220;
+    stroke-dashoffset: 220;
+    animation: draw-path 1.4s ease-out forwards;
+
+  }
+
+  /* Milestone / segment pop-in (staggered entrance). */
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.7);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-pop-in {
+    animation: pop-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 

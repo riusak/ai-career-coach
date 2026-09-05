@@ -117,9 +117,13 @@ function ScoreCell({ result }: { result: QuickTestResponse }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-white p-4 sm:p-5">
       <ScoreRing score={result.analysis.score} />
-      <div className="min-w-0 text-center">
+      {/* `w-full` grounds the wrapper width inside the `flex-col items-center`
+          cell (a fit-content width would otherwise let the truncated filename
+          overflow the card); `min-w-0` allows the paragraph to shrink below
+          its intrinsic size so `truncate` clips with an ellipsis. */}
+      <div className="w-full min-w-0 text-center">
         <p
-          className="max-w-full truncate text-sm font-bold text-navy-900"
+          className="w-full truncate text-sm font-bold text-navy-900"
           title={result.metadata.fileName}
         >
           {result.metadata.fileName}

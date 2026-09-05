@@ -329,6 +329,21 @@ export async function analyzeCvDocument(
   }
 
   // Stage boundary — LLM call + CV-gate passed; compose the final report.
+  if (!llmResult.analysis) {
+    // Defensive: a null analysis only accompanies is_cv:false (handled above).
+    // If the gate says CV but the payload is unusable, fail explicitly —
+    // never a fake heuristic score.
+    console.error(
+      `[analysis] LLM returned a CV verdict without a usable analysis (${buffer.length} bytes, pages: ${pageCount}).`
+    );
+    return failure(
+      'llm_failed',
+      502,
+      "L'analyse IA n'a pas abouti après plusieurs tentatives (service momentanément saturé ou indisponible). Veuillez relancer l'analyse.",
+      kind
+    );
+  }
+
   onStage?.('reporting');
   return {
     ok: true,

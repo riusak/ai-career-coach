@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  analyzeWithGemini,
   buildAnalysisPrompt,
   coerceLlmAnalysis,
   extractCvGate,
@@ -216,5 +217,62 @@ describe('extractGeminiText', () => {
     expect(extractGeminiText({})).toBeNull();
     expect(extractGeminiText({ candidates: [] })).toBeNull();
     expect(extractGeminiText({ candidates: [{ content: {} }] })).toBeNull();
+  });
+});
+
+describe('analyzeWithGemini — non-CV verdict (is_cv:false)', () => {
+  // The model is explicitly instructed to emit empty lists + score 0 for a
+  // non-CV document, so coerceLlmAnalysis rejects the payload BY DESIGN. The
+  // gate must still surface as a decisive rejection verdict (analysis null)
+  // instead of degrading into a generic llm_failed.
+  const nonCvPayload = {
+    is_cv: false,
+    document_type: 'invoice',
+    detected_language: 'FR',
+    score: 0,
+    score_breakdown: [],
+    strengths: [],
+    weaknesses: [],
+    recommendations: [],
+    formatting_advice: '',
+    action_verbs_advice: '',
+    impact_metrics_advice: '',
+  };
+
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    vi.stubEnv('GEMINI_MODEL', 'gemini-3.5-flash-lite');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns a gate-rejected outcome (analysis null) instead of failing', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(nonCvPayload) }] } }],
+      }),
+    } as unknown as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await analyzeWithGemini({
+      buffer: Buffer.from('facture n° 123'),
+      mimeType: 'text/plain',
+      text: 'facture n° 123',
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.analysis).toBeNull();
+    expect(result!.gate).toEqual({
+      isCv: false,
+      documentType: 'invoice',
+      detectedLanguage: 'fr',
+    });
+    // A decisive non-CV verdict must NOT be retried nor run the model chain —
+    // it is the model's explicit answer, so a single API call suffices.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

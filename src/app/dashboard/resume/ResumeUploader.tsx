@@ -7,6 +7,7 @@ import {
   formatBytes,
   validateResumeFile,
 } from '@/lib/resume-validation';
+import { consumePendingCvUploadFile } from '@/lib/pending-cv-upload';
 import ErrorModal from '@/components/ui/ErrorModal';
 import Skeleton from '@/components/ui/Skeleton';
 import SuccessBanner from '@/components/ui/SuccessBanner';
@@ -18,8 +19,11 @@ export default function ResumeUploader() {
   const initialState: ResumeUploadState = { success: false, message: null, data: null };
   const [state, formAction, isPending] = useActionState(uploadResumeAction, initialState);
 
+  // File picked from the dashboard quick action — consumed exactly once.
+  const [primedFile] = useState(() => consumePendingCvUploadFile());
+
   const inputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(() => primedFile);
   const [clientError, setClientError] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   /** Server action error already dismissed through the blocking modal. */
@@ -93,6 +97,21 @@ export default function ResumeUploader() {
     selectFile(event.dataTransfer.files[0]);
   };
 
+  // Ref callback (no effect, no setState): syncs the DOM input with the file
+  // handed over from the dashboard quick action as soon as the input mounts.
+  const setResumeInput = (node: HTMLInputElement | null) => {
+    inputRef.current = node;
+    if (node && primedFile) {
+      try {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(primedFile);
+        node.files = dataTransfer.files;
+      } catch {
+        // DataTransfer unavailable: the user simply re-selects the file.
+      }
+    }
+  };
+
   return (
     <form action={handleFormAction} className="space-y-4">
       {/* Blocking centered error modal — replaces the old inline banner.
@@ -158,7 +177,7 @@ export default function ResumeUploader() {
       </div>
 
       <input
-        ref={inputRef}
+        ref={setResumeInput}
         type="file"
         name="file"
         id="resume-file"
