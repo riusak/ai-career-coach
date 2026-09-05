@@ -14,6 +14,7 @@ import ProfileOverview from '@/components/dashboard/ProfileOverview';
 import CVSection from '@/components/dashboard/CVSection';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import CVPreviewModal from '@/components/dashboard/CVPreviewModal';
+import AnalyseCvQuickModal from '@/components/dashboard/AnalyseCvQuickModal';
 import MilestoneModal from '@/components/dashboard/MilestoneModal';
 import JobMatchModal from '@/app/dashboard/matching/JobMatchModal';
 import MockInterviewQuickModal from '@/components/dashboard/MockInterviewQuickModal';
@@ -47,6 +48,7 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
   /** Client-side stand-in for a CV flash-uploaded during this session. */
   const [flashCv, setFlashCv] = useState<CvDetailData | null>(null);
   const [isFlashUploading, setIsFlashUploading] = useState(false);
+  const [analyseModalOpen, setAnalyseModalOpen] = useState(false);
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [mockModalOpen, setMockModalOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<MilestoneData | null>(null);
@@ -81,19 +83,33 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
   };
 
   /**
-   * Card 2 « Analyser mon CV » quick test — uploads the picked file through
-   * the standard secured pipeline (no redirect), then runs the ATS diagnostic
-   * on it and opens the preview modal on the analysis tab (fresh polling).
+   * Card 2 « Analyser mon CV » — opens the « Aperçu » selector modal. No CV
+   * is pre-selected: the user explicitly picks one from the list.
    */
-  const handleQuickTestFileSelected = async (file: File) => {
+  const handleAnalyseCv = () => {
+    setAnalyseModalOpen(true);
+  };
+
+  /** Opens the preview of an existing CV picked in the selector modal. */
+  const handleSelectCvForAnalyse = (cv: CvDetailData) => {
+    setAnalyseModalOpen(false);
+    setInitialTab('preview');
+    setAutoQueueAnalysis(false);
+    setPreviewCvId(cv.id);
+  };
+
+  /**
+   * Flash upload inside the selector modal — uploads the picked file through
+   * the standard secured pipeline (no redirect), then opens its preview
+   * immediately as a temporary document.
+   */
+  const handleAnalyseFlashUpload = async (file: File) => {
     setIsFlashUploading(true);
     try {
       const formData = new FormData();
       formData.set('file', file);
       const result = await flashUploadResumeAction(formData);
       if (result.error || !result.resumeId) {
-        setFlashCv(null);
-        setAutoQueueAnalysis(false);
         return;
       }
       const uploaded: CvDetailData = {
@@ -113,30 +129,15 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
         wordCount: null,
       };
       setFlashCv(uploaded);
-      setInitialTab('analysis');
-      setAutoQueueAnalysis(true);
+      setAnalyseModalOpen(false);
+      setInitialTab('preview');
+      setAutoQueueAnalysis(false);
       setPreviewCvId(uploaded.id);
       // Sync the server-rendered lists (recent activity, CV count…).
       router.refresh();
     } finally {
       setIsFlashUploading(false);
     }
-  };
-
-  /**
-   * Card 2 « Diagnostic ATS » — queues a fresh analysis for the selected CV
-   * (primary by default), persists it in `resume_analyses` and opens the
-   * preview modal on the analysis tab with live polling of the outcome.
-   */
-  const handleRunDiagnostic = () => {
-    const target = primaryCv;
-    if (!target) {
-      router.push('/dashboard/cvs#upload');
-      return;
-    }
-    setInitialTab('analysis');
-    setAutoQueueAnalysis(true);
-    setPreviewCvId(target.id);
   };
 
   const closeOnboarding = () => {
@@ -160,12 +161,9 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
     <>
       {/* Row 1 — Quick Actions */}
       <QuickActions
-        primaryCvName={primaryCv?.name ?? null}
         isFlashUploading={isFlashUploading}
-        canRunDiagnostic={primaryCv !== null}
         onUploadFileSelected={handleUploadFileSelected}
-        onQuickTestFileSelected={(file) => void handleQuickTestFileSelected(file)}
-        onRunDiagnostic={handleRunDiagnostic}
+        onAnalyseCv={handleAnalyseCv}
         onMatchJobs={() => setMatchModalOpen(true)}
         onMockInterview={() => setMockModalOpen(true)}
       />
@@ -218,6 +216,17 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
           }}
         />
       )}
+
+      {/* Quick-access « Aperçu » modal (card 2) — the user must pick a CV
+          (no default selection); a flash upload previews a temp document. */}
+      <AnalyseCvQuickModal
+        open={analyseModalOpen}
+        onClose={() => setAnalyseModalOpen(false)}
+        cvs={data.cvs}
+        onSelectCv={handleSelectCvForAnalyse}
+        onFlashUploadFile={(file) => void handleAnalyseFlashUpload(file)}
+        isUploading={isFlashUploading}
+      />
 
       {/* Quick-access matching modal (card 4) — queues the matching then
           redirects to the dedicated /dashboard/matching page for results. */}

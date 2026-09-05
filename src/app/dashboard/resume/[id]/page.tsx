@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getLocale } from 'next-intl/server';
 import EmptyState from '@/components/ui/EmptyState';
 import {
   createResumeSignedUrl,
@@ -26,6 +27,13 @@ function formatDateTime(iso: string): string {
 
 export default async function ResumePreviewPage({ params }: ResumePreviewPageProps) {
   const { id } = await params;
+  const locale = await getLocale();
+  const backLabel =
+    locale === 'fr'
+      ? 'Retour à Mes CVs'
+      : locale === 'de'
+        ? 'Zurück zu Meinen CVs'
+        : 'Back to My CVs';
   const { data: resume } = await getResumeById(id);
 
   // Unknown id, or a resume not owned by the caller (filtered by RLS) -> 404.
@@ -46,10 +54,10 @@ export default async function ResumePreviewPage({ params }: ResumePreviewPagePro
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <Link
-              href="/dashboard/resume"
+              href="/dashboard/cvs"
               className="text-sm font-medium text-orange-700 transition-colors hover:text-orange-800"
             >
-              &larr; Back to my resumes
+              &larr; {backLabel}
             </Link>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <h1 className="truncate text-2xl font-bold tracking-tight text-navy-900">

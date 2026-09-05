@@ -14,18 +14,12 @@ import {
 import { RESUME_ACCEPT_ATTRIBUTE, validateResumeFile } from '@/lib/resume-validation';
 
 interface QuickActionsProps {
-  /** Name of the CV the diagnostic targets by default (primary CV). */
-  primaryCvName: string | null;
   /** True while a flash upload is in flight (disables the pickers). */
   isFlashUploading: boolean;
   /** Upload card: file picked → park it + redirect to /dashboard/cvs. */
   onUploadFileSelected: (file: File) => void;
-  /** Analyse card: quick-test file picked → upload + run diagnostic. */
-  onQuickTestFileSelected: (file: File) => void;
-  /** Analyse card: run the ATS diagnostic on the selected CV. */
-  onRunDiagnostic: () => void;
-  /** Analyse card: disabled when no CV exists in the library. */
-  canRunDiagnostic: boolean;
+  /** Analyse card: opens the « Aperçu » selector modal (no preset CV). */
+  onAnalyseCv: () => void;
   /** Match card: opens the quick-access matching modal. */
   onMatchJobs: () => void;
   /** Mock card: opens the quick-access mock-interview modal. */
@@ -34,18 +28,15 @@ interface QuickActionsProps {
 
 /**
  * « Actions rapides » — port of the template's QuickActions.tsx wired to the
- * real flows: the upload & analyse cards open a native flash file picker
- * (no bulky dropzone), the analyse card targets the primary CV by default
- * and exposes the « Diagnostic ATS » action, and the match / mock cards open
- * dedicated quick-access modals before redirecting to their pages.
+ * real flows: the upload card opens a native flash file picker (parked for
+ * the CVs page), the analyse card opens the « Aperçu » selector modal, and
+ * the match / mock cards open dedicated quick-access modals before
+ * redirecting to their pages.
  */
 export default function QuickActions({
-  primaryCvName,
   isFlashUploading,
   onUploadFileSelected,
-  onQuickTestFileSelected,
-  onRunDiagnostic,
-  canRunDiagnostic,
+  onAnalyseCv,
   onMatchJobs,
   onMockInterview,
 }: QuickActionsProps) {
@@ -53,9 +44,7 @@ export default function QuickActions({
   const isFrench = locale !== 'en';
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const quickTestInputRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [quickTestError, setQuickTestError] = useState<string | null>(null);
 
   /** Reads (and resets) the picked file of a hidden input. */
   const pick = (input: HTMLInputElement | null): File | null => {
@@ -118,81 +107,24 @@ export default function QuickActions({
       id: 'analyse-cv',
       title: isFrench ? 'Analyser mon CV' : 'Analyse Your CV',
       desc: isFrench
-        ? primaryCvName
-          ? `CV sélectionné : ${primaryCvName}. Lancez le diagnostic ou testez un autre document.`
-          : 'Aucun CV pour le moment — lancez un test rapide avec votre document.'
-        : primaryCvName
-          ? `Selected CV: ${primaryCvName}. Run the diagnostic or quick-test another document.`
-          : 'No CV yet — quick-test with your own document.',
+        ? 'Sélectionnez l’un de vos CV ou téléversez-en un temporaire pour un aperçu immédiat.'
+        : 'Pick one of your CVs or flash-upload a temporary one for an instant preview.',
       icon: LineChart,
       iconColor: 'text-emerald-600',
       iconBg: 'bg-emerald-50',
-      error: quickTestError,
+      error: null,
       footer: (
-        <div className="space-y-2">
-          {/* Diagnostic ATS — runs a fresh analysis and displays the outcome. */}
+        <>
           <button
             id="btn-analyse-cv"
             type="button"
-            disabled={!canRunDiagnostic || isFlashUploading}
-            onClick={() => {
-              setQuickTestError(null);
-              onRunDiagnostic();
-            }}
-            title={
-              canRunDiagnostic
-                ? undefined
-                : isFrench
-                  ? 'Téléversez d’abord un CV.'
-                  : 'Upload a CV first.'
-            }
-            className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#0B1528] hover:bg-[#132238] text-white text-xs sm:text-[13px] font-semibold transition-all active:scale-98 cursor-pointer shadow-xs disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onAnalyseCv}
+            className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#0B1528] hover:bg-[#132238] text-white text-xs sm:text-[13px] font-semibold transition-all active:scale-98 cursor-pointer shadow-xs"
           >
             <Activity className="h-3.5 w-3.5 text-slate-300" />
-            <span>{isFrench ? 'Diagnostic ATS' : 'ATS Diagnostic'}</span>
+            <span>{isFrench ? 'Lancer le test' : 'Start the test'}</span>
           </button>
-
-          {/* Quick temporary test — flash upload without the dropzone. */}
-          <button
-            id="btn-analyse-cv-flash"
-            type="button"
-            disabled={isFlashUploading}
-            onClick={() => {
-              setQuickTestError(null);
-              quickTestInputRef.current?.click();
-            }}
-            className="inline-flex w-full items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-[13px] font-semibold transition-all active:scale-98 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Upload className="h-3.5 w-3.5 text-slate-600" />
-            <span>
-              {isFlashUploading
-                ? isFrench
-                  ? 'Analyse en préparation…'
-                  : 'Preparing analysis…'
-                : isFrench
-                  ? 'Test rapide (autre CV)'
-                  : 'Quick test (other CV)'}
-            </span>
-          </button>
-          <input
-            ref={quickTestInputRef}
-            type="file"
-            accept={RESUME_ACCEPT_ATTRIBUTE}
-            className="hidden"
-            onChange={() => {
-              const file = pick(quickTestInputRef.current);
-              if (!file) return;
-              const validationError = validateResumeFile(file);
-              if (validationError) {
-                setQuickTestError(validationError);
-                return;
-              }
-              setQuickTestError(null);
-              onQuickTestFileSelected(file);
-            }}
-            disabled={isFlashUploading}
-          />
-        </div>
+        </>
       ),
     },
     {

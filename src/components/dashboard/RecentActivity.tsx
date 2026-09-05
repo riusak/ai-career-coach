@@ -29,6 +29,13 @@ const TYPE_STYLES: Record<DashboardActivityType, { Icon: typeof Upload; bg: stri
 };
 
 /**
+ * Number of activity rows shown on the dashboard — kept in step with the CV
+ * cards (max 3) so the two side-by-side cards have harmoniously matching
+ * heights. The « Voir l'historique » link points to the full history.
+ */
+const ACTIVITY_DISPLAY_LIMIT = 3;
+
+/**
  * « Activité Récente » — migrated from the template. Entries are derived
  * server-side from existing row timestamps (no dedicated activity table for
  * the MVP); timestamps are rendered as locale-aware relative times.
@@ -36,6 +43,7 @@ const TYPE_STYLES: Record<DashboardActivityType, { Icon: typeof Upload; bg: stri
 export default function RecentActivity({ activities }: RecentActivityProps) {
   const t = useTranslations('dashboard');
   const locale = useLocale();
+  const visibleActivities = activities.slice(0, ACTIVITY_DISPLAY_LIMIT);
 
   return (
     <div
@@ -53,7 +61,7 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
         </Link>
       </div>
 
-      {activities.length === 0 ? (
+      {visibleActivities.length === 0 ? (
         <div className="my-auto flex flex-col items-center gap-1 py-6 text-center">
           <CheckCircle2 className="h-8 w-8 text-slate-300" />
           <p className="text-sm font-bold text-slate-700">{t('emptyActivityTitle')}</p>
@@ -61,7 +69,7 @@ export default function RecentActivity({ activities }: RecentActivityProps) {
         </div>
       ) : (
         <div className="my-auto flex flex-1 flex-col justify-around space-y-2">
-          {activities.map((activity) => {
+          {visibleActivities.map((activity) => {
             const { Icon, bg } = TYPE_STYLES[activity.type];
             return (
               <div

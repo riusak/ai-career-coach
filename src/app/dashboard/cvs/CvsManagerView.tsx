@@ -6,6 +6,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useFormStatus } from 'react-dom';
 import {
   ArrowUpRight,
+  Briefcase,
+  Clock,
   FileText,
   Sparkles,
   Star,
@@ -84,11 +86,19 @@ function AnalyzeCvForm({ cv }: { cv: CvSummaryData }) {
   const [state, formAction, pending] = useActionState(analyzeResumeAction, initialState);
 
   if (state.success) {
+    // Compact badge in the actions row + the full hint on its own line — a
+    // long inline paragraph would break the card's structured layout.
     return (
-      <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
-        <Sparkles className="h-3.5 w-3.5" />
-        {t('cvsQueuedHint')}
-      </p>
+      <>
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+          <Clock className="h-3.5 w-3.5" />
+          {t('cvsQueuedBadge')}
+        </span>
+        <p className="w-full text-[11px] font-medium leading-snug text-slate-500">
+          <Sparkles className="mr-1 inline h-3.5 w-3.5 text-brand-500" />
+          {t('cvsQueuedHint')}
+        </p>
+      </>
     );
   }
 
@@ -244,7 +254,7 @@ export default function CvsManagerView({ cvs }: { cvs: CvSummaryData[] }) {
                     )}
                   </div>
 
-                  <p className="mt-1.5 pl-6 text-[11px] text-slate-400">
+                  <p className="mt-1.5 truncate pl-6 text-[11px] leading-snug text-slate-400" title={formatRelativeTime(cv.createdAt, locale)}>
                     {t('uploadedOn', { date: formatRelativeTime(cv.createdAt, locale) })}
                   </p>
                 </div>
@@ -264,6 +274,13 @@ export default function CvsManagerView({ cvs }: { cvs: CvSummaryData[] }) {
                 {/* Actions row */}
                 <div className="flex flex-wrap items-center gap-2">
                   <AnalyzeCvForm cv={cv} />
+                  <Link
+                    href="/dashboard/matching"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-brand-300 hover:text-brand-600"
+                  >
+                    <Briefcase className="h-3 w-3 text-amber-500" />
+                    {t('cvsMatchOffer')}
+                  </Link>
                   <PrimaryToggleForm
                     cv={cv}
                     className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800 disabled:cursor-not-allowed disabled:opacity-50"

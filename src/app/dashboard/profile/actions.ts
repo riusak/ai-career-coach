@@ -27,21 +27,26 @@ export async function updateProfileAction(
   _prevState: ProfileFormState,
   formData: FormData
 ): Promise<ProfileFormState> {
-  const updates: ProfileUpdate = {
-    full_name: strOrNull(formData.get('fullName')),
-    headline: strOrNull(formData.get('headline')),
-    bio: strOrNull(formData.get('bio')),
-    phone: strOrNull(formData.get('phone')),
-    location: strOrNull(formData.get('location')),
-    linkedin_url: strOrNull(formData.get('linkedin_url')),
-    github_url: strOrNull(formData.get('github_url')),
-    website_url: strOrNull(formData.get('website_url')),
-    target_role: strOrNull(formData.get('target_role')),
-    target_year: parseTargetYear(formData.get('target_year')),
-  };
+  // Only fields PRESENT in the submitted form are written. Profile sections
+  // submit separate forms (identity, career goal, contact, preferences):
+  // building the updates object with every field would turn the absent ones
+  // into explicit NULLs and wipe the stored name/title/bio — exactly what
+  // happened when only the career goal was saved.
+  const updates: ProfileUpdate = {};
+
+  if (formData.has('fullName')) updates.full_name = strOrNull(formData.get('fullName'));
+  if (formData.has('headline')) updates.headline = strOrNull(formData.get('headline'));
+  if (formData.has('bio')) updates.bio = strOrNull(formData.get('bio'));
+  if (formData.has('phone')) updates.phone = strOrNull(formData.get('phone'));
+  if (formData.has('location')) updates.location = strOrNull(formData.get('location'));
+  if (formData.has('linkedin_url')) updates.linkedin_url = strOrNull(formData.get('linkedin_url'));
+  if (formData.has('github_url')) updates.github_url = strOrNull(formData.get('github_url'));
+  if (formData.has('website_url')) updates.website_url = strOrNull(formData.get('website_url'));
+  if (formData.has('target_role')) updates.target_role = strOrNull(formData.get('target_role'));
+  if (formData.has('target_year')) updates.target_year = parseTargetYear(formData.get('target_year'));
 
   const localeRaw = formData.get('preferred_locale');
-  if (typeof localeRaw === 'string' && ['fr', 'en', 'de'].includes(localeRaw)) {
+  if (formData.has('preferred_locale') && typeof localeRaw === 'string' && ['fr', 'en', 'de'].includes(localeRaw)) {
     updates.preferred_locale = localeRaw as ProfileUpdate['preferred_locale'];
   }
 
