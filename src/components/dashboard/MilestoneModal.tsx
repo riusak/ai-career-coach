@@ -1,6 +1,7 @@
 'use client';
 
-import { Building, Calendar, CheckCircle2, Flag, Layers, Sparkles, X } from 'lucide-react';
+import { Calendar, CheckCircle2, Flag, Layers, Target, X } from 'lucide-react';
+import CompanyLogo from '@/components/dashboard/CompanyLogo';
 import type { MilestoneData } from '@/types/dashboard';
 
 interface MilestoneModalProps {
@@ -36,13 +37,14 @@ export default function MilestoneModal({ milestone, onClose, locale }: Milestone
 
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 font-black text-sm shrink-0">
-              {milestone.isGoal ? (
+            {milestone.isGoal ? (
+              <div className="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-700 font-black text-sm shrink-0">
                 <Flag className="w-6 h-6 text-amber-600 fill-amber-500" />
-              ) : (
-                <Building className="w-6 h-6 text-amber-700" />
-              )}
-            </div>
+              </div>
+            ) : (
+              /* Chart 3 — dynamic company logo (Clearbit) with initials fallback. */
+              <CompanyLogo company={milestone.company} size="md" shape="rounded" />
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-lg text-slate-900 leading-tight">
@@ -55,7 +57,7 @@ export default function MilestoneModal({ milestone, onClose, locale }: Milestone
                 )}
                 {milestone.isGoal && (
                   <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-600" />
+                    <Target className="w-3 h-3 text-amber-600" />
                     {isFrench ? 'Cible / Goal' : 'Target / Goal'}
                   </span>
                 )}
@@ -108,23 +110,71 @@ export default function MilestoneModal({ milestone, onClose, locale }: Milestone
         <div className="mb-5">
           <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-blue-600" />
-            <span>{isFrench ? 'Technologies & Compétences' : 'Technologies & Skills'}</span>
+            <span>
+              {milestone.isGoal
+                ? isFrench
+                  ? 'Stack cible pour cet objectif'
+                  : 'Target stack for this goal'
+                : isFrench
+                  ? 'Technologies & Compétences'
+                  : 'Technologies & Skills'}
+            </span>
           </h4>
-          <div className="flex flex-wrap gap-1.5">
-            {milestone.technologies.map((tech) => (
-              <span
-                key={tech}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-800 text-xs font-semibold border border-slate-200 transition-colors"
-              >
-                {tech}
-              </span>
-            ))}
-          </div>
+
+          {milestone.isGoal ? (
+            // Chart 3 / migration 014 — the enriched career-objective baseline
+            // (target technologies + target skills) drives the goal detail.
+            <div className="space-y-2.5">
+              {milestone.targetTechnologies && milestone.targetTechnologies.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {milestone.targetTechnologies.map((tech) => (
+                    <span
+                      key={tech}
+                      className="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs font-semibold"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {milestone.targetSkills && milestone.targetSkills.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {milestone.targetSkills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {(!milestone.targetTechnologies || milestone.targetTechnologies.length === 0) &&
+                (!milestone.targetSkills || milestone.targetSkills.length === 0) && (
+                  <p className="text-xs text-slate-500">
+                    {isFrench
+                      ? 'Aucune techno/compétence cible renseignée pour le moment.'
+                      : 'No target technologies/skills defined yet.'}
+                  </p>
+                )}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {milestone.technologies.map((tech) => (
+                <span
+                  key={tech}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-amber-100 hover:text-amber-800 text-slate-800 text-xs font-semibold border border-slate-200 transition-colors"
+                >
+                  {tech}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+            <Target className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="text-xs font-bold text-slate-900">
               {isFrench
                 ? 'ForPro AI : Alignement 92% avec les attentes de votre objectif'

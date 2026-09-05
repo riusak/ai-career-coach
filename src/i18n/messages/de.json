@@ -544,7 +544,12 @@
     "targetRolePlaceholder": "z. B. Lead Architect",
     "targetYear": "Zieljahr",
     "targetYearPlaceholder": "z. B. 2030",
-    "careerGoalHint": "Dieses Ziel verankert den Gipfel Ihrer Karriere-Roadmap (goldene Flagge, z. B. „Lead Architect · Ziel 2030“).",
+    "targetDescription": "Beschreibung des Ziels",
+    "targetDescriptionPlaceholder": "Beschreiben Sie die Zielposition, den Verantwortungsbereich und die erwartete Wirkung.",
+    "targetTechnologies": "Ziel-Technologien",
+    "targetSkills": "Ziel-Kompetenzen",
+    "targetListPlaceholder": "Durch Kommas getrennt (z. B. TypeScript, AWS, Kafka)",
+    "careerGoalHint": "Dieses Ziel verankert den Gipfel Ihrer Karriere-Roadmap (goldene Flagge) und dient als Referenz für die Karriere-Fit-Bewertungen in Analytics.",
     "sectionContact": "Kontaktdaten",
     "sectionEducation": "Ausbildung",
     "sectionExperience": "Berufserfahrung",
@@ -804,6 +809,7 @@
     "welcomeClose": "Schließen",
     "welcomeExplore": "Frei erkunden",
     "welcomeStartTour": "Tour starten",
+    "welcomeImportProfile": "Lebenslauf / LinkedIn PDF importieren",
     "welcomeHowLink": "So funktioniert's",
     "howKicker": "ForPro-AI-Methodik",
     "howTitle": "Wie funktioniert ForPro AI?",
@@ -840,6 +846,32 @@
     "tourStep6Badge": "Schritt 6/7",
     "tourStep7Title": "Letzte Aktivitäten",
     "tourStep7Desc": "Ihre letzten Schritte: hochgeladene CVs, abgeschlossene Analysen, hinzugefügte Erfahrungen und Kompetenzen.",
-    "tourStep7Badge": "Schritt 7/7"
+    "tourStep7Badge": "Schritt 7/7",
+    "assistantTitle": "Startassistent",
+    "assistantDesc": "Vier kleine Schritte, um ForPro AI optimal zu nutzen. Sie können jederzeit wieder darauf zurückkommen.",
+    "assistantDismiss": "Dieses Panel ausblenden",
+    "assistantProgress": "Onboarding-Fortschritt",
+    "assistantImportCta": "Profil importieren (CV / LinkedIn)",
+    "assistantStep": {
+      "cv": "Lebenslauf importieren oder hochladen",
+      "profile": "Profil vervollständigen",
+      "analysis": "ATS-Diagnose starten",
+      "matching": "Stellenabgleich erkunden"
+    },
+    "assistantComplete": "Alles klar — dauerhaft ausblenden",
+    "importTitle": "Intelligenter Profilimport",
+    "importHint": "Laden Sie einen LinkedIn-Export (PDF) oder einen Standard-Lebenslauf hoch. Die KI extrahiert Ihren Werdegang, Ihre Kompetenzen und Ihre Ausbildung, um Ihr Profil und Ihre Roadmap vorzubefüllen.",
+    "importCta": "Profil importieren",
+    "importPending": "Import läuft…",
+    "importSuccessTitle": "Profil importiert!",
+    "importSuccessDesc": "Ihr Lebenslauf wurde Ihrer Bibliothek hinzugefügt und Ihr Profil wurde vorbefüllt. Prüfen und anpassen bei Bedarf.",
+    "importReviewProfile": "Profil prüfen",
+    "importDone": "Fertig",
+    "importCount": {
+      "experiences": "Erfahrungen",
+      "skills": "Kompetenzen",
+      "educations": "Ausbildung",
+      "certifications": "Zertifikate"
+    }
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { ArrowRight, GitBranch, Sparkles, Target, Upload, X } from 'lucide-react';
+import { ArrowRight, GitBranch, Target, Upload, Workflow, X } from 'lucide-react';
 
 interface HowItWorksModalProps {
   isOpen: boolean;
@@ -70,7 +70,7 @@ export default function HowItWorksModal({ isOpen, onClose, onGetStarted }: HowIt
 
         <div className="mb-2 flex items-center gap-2">
           <span className="rounded-md bg-amber-500/20 p-1 text-amber-700">
-            <Sparkles className="h-4 w-4" />
+            <Workflow className="h-4 w-4" />
           </span>
           <span className="text-xs font-bold uppercase tracking-wider text-amber-700">
             {t('howKicker')}

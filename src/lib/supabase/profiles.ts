@@ -1,12 +1,50 @@
 import { createClient } from '@/utils/supabase/server';
 import type { Profile, ProfileResponse, ProfileUpdate } from '@/types/profile';
 
+/**
+ * Marks the authenticated user's onboarding as completed/seen (migration 013).
+ * This is the durable DB record that makes the full-screen wizard appear
+ * strictly once per user, across browsers and reconnections.
+ */
+export async function markOnboardingCompleted(): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { error: authError?.message ?? 'No authenticated user found.' };
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ onboarding_completed_at: new Date().toISOString() })
+      .eq('id', user.id);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    return { error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error
+        ? err.message
+        : 'An unexpected error occurred while updating the profile.';
+    return { error: message };
+  }
+}
+
 /** Column list including the migration-012 career-goal columns. */
 const PROFILE_SELECT_WITH_GOAL =
-  'id, full_name, headline, bio, role, target_role, target_year, created_at, updated_at';
+  'id, full_name, headline, bio, role, target_role, target_year, target_description, target_technologies, target_skills, onboarding_completed_at, created_at, updated_at';
 
 /** Fallback column list when migration 012 has not been applied yet. */
-const PROFILE_SELECT_BASE = 'id, full_name, headline, bio, role, created_at, updated_at';
+const PROFILE_SELECT_BASE =
+  'id, full_name, headline, bio, role, onboarding_completed_at, created_at, updated_at';
 
 /** PostgreSQL 42703 = undefined_column (career-goal columns not migrated yet). */
 function isUndefinedColumnError(error: { code?: string }): boolean {
@@ -113,7 +151,14 @@ export async function updateProfileById(
 
     // The goal columns are written only when provided; a missing migration
     // (42703) retries without them so the rest of the profile still saves.
-    const hasGoalColumns = 'target_role' in updates || 'target_year' in updates;
+    const goesToGoalColumns = [
+      'target_role',
+      'target_year',
+      'target_description',
+      'target_technologies',
+      'target_skills',
+    ] as const;
+    const hasGoalColumns = goesToGoalColumns.some((column) => column in updates);
     const first = await write(payload, PROFILE_SELECT_WITH_GOAL);
 
     let data = first.data;
@@ -121,8 +166,9 @@ export async function updateProfileById(
 
     if (error && hasGoalColumns && isUndefinedColumnError(error)) {
       const basePayload: Record<string, unknown> = { ...payload };
-      delete basePayload.target_role;
-      delete basePayload.target_year;
+      for (const column of goesToGoalColumns) {
+        delete basePayload[column];
+      }
       const retry = await write(basePayload, PROFILE_SELECT_BASE);
       data = retry.data;
       error = retry.error;

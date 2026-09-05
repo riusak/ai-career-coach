@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { ArrowLeft, Sparkles, Video, Zap, Target, Clock } from 'lucide-react';
+import { ArrowLeft, Clock, Mic, Target, Video, Zap } from 'lucide-react';
 
 interface MockInterviewsViewProps {
   /** Target role passed from the dashboard quick-access modal (optional). */
@@ -43,7 +43,7 @@ export default function MockInterviewsView({ targetRole = null }: MockInterviews
           <div className="h-6 w-[1px] bg-slate-200 hidden sm:block" />
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-600 border border-purple-500/30">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-700 border border-brand-500/25">
               {isFrench ? 'Entraînement IA' : 'AI Practice'}
             </span>
             <span className="text-xs font-medium text-slate-400 hidden md:inline">
@@ -69,8 +69,8 @@ export default function MockInterviewsView({ targetRole = null }: MockInterviews
 
       {/* Quick-access context (role picked from the dashboard modal) */}
       {targetRole && (
-        <div className="flex items-center gap-2.5 rounded-2xl border border-purple-200/70 bg-purple-50/60 px-4 py-3">
-          <Target className="h-4 w-4 shrink-0 text-purple-600" />
+        <div className="flex items-center gap-2.5 rounded-2xl border border-brand-200/70 bg-brand-50/60 px-4 py-3">
+          <Target className="h-4 w-4 shrink-0 text-brand-600" />
           <p className="text-xs font-semibold text-slate-800">
             {isFrench
               ? `Préparation ciblée : ${targetRole}`
@@ -88,8 +88,8 @@ export default function MockInterviewsView({ targetRole = null }: MockInterviews
               key={stat.label}
               className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-3.5"
             >
-              <div className="w-11 h-11 rounded-2xl bg-purple-50 flex items-center justify-center shrink-0">
-                <Icon className="w-5 h-5 text-purple-600" />
+              <div className="w-11 h-11 rounded-2xl bg-brand-50 flex items-center justify-center shrink-0">
+                <Icon className="w-5 h-5 text-brand-600" />
               </div>
               <div className="min-w-0">
                 <span className="block text-xl font-black text-slate-900 leading-none">
@@ -106,8 +106,8 @@ export default function MockInterviewsView({ targetRole = null }: MockInterviews
 
       {/* Empty state */}
       <div className="flex-1 flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-white/60 px-6 py-14 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center">
-          <Sparkles className="w-7 h-7 text-purple-500" />
+        <div className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center">
+          <Mic className="w-7 h-7 text-brand-500" />
         </div>
         <h3 className="text-base font-bold text-slate-900">
           {isFrench ? 'Vos simulations apparaîtront ici' : 'Your practice sessions will appear here'}

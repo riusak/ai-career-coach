@@ -6,11 +6,11 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useFormStatus } from 'react-dom';
 import {
   ArrowUpRight,
+  BadgeCheck,
   Briefcase,
   Clock,
+  FileSearch,
   FileText,
-  Sparkles,
-  Star,
   Trash2,
 } from 'lucide-react';
 import ResumeUploader from '@/app/dashboard/resume/ResumeUploader';
@@ -51,7 +51,7 @@ function ActionSubmitButton({
   );
 }
 
-/** Star toggle promoting / demoting the CV's primary status. */
+/** Primary toggle promoting / demoting the CV's primary status. */
 function PrimaryToggleForm({ cv, className }: { cv: CvSummaryData; className: string }) {
   const t = useTranslations('dashboard');
   if (cv.isPrimary) {
@@ -62,7 +62,7 @@ function PrimaryToggleForm({ cv, className }: { cv: CvSummaryData; className: st
           title={t('removePrimary')}
           className={className}
         >
-          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+          <BadgeCheck className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
           {t('primaryBadge')}
         </ActionSubmitButton>
       </form>
@@ -72,7 +72,7 @@ function PrimaryToggleForm({ cv, className }: { cv: CvSummaryData; className: st
     <form action={bindAction(setPrimaryResumeAction)}>
       <input type="hidden" name="resumeId" value={cv.id} />
       <ActionSubmitButton title={t('setPrimary')} className={className}>
-        <Star className="h-3.5 w-3.5 text-slate-400" />
+        <BadgeCheck className="h-3.5 w-3.5 text-slate-400" />
         {t('setPrimary')}
       </ActionSubmitButton>
     </form>
@@ -95,7 +95,7 @@ function AnalyzeCvForm({ cv }: { cv: CvSummaryData }) {
           {t('cvsQueuedBadge')}
         </span>
         <p className="w-full text-[11px] font-medium leading-snug text-slate-500">
-          <Sparkles className="mr-1 inline h-3.5 w-3.5 text-brand-500" />
+          <Clock className="mr-1 inline h-3.5 w-3.5 text-brand-500" />
           {t('cvsQueuedHint')}
         </p>
       </>
@@ -110,7 +110,7 @@ function AnalyzeCvForm({ cv }: { cv: CvSummaryData }) {
         disabled={pending}
         className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-bold text-brand-700 shadow-sm transition-colors hover:border-brand-400 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <Sparkles className="h-3.5 w-3.5" />
+        <FileSearch className="h-3.5 w-3.5" />
         {pending ? t('cvsAnalyzePending') : t('cvsAnalyze')}
       </button>
     </form>
@@ -248,7 +248,7 @@ export default function CvsManagerView({ cvs }: { cvs: CvSummaryData[] }) {
                     </div>
                     {cv.isPrimary && (
                       <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                        <Star className="h-3 w-3 fill-emerald-600 text-emerald-600" />
+                        <BadgeCheck className="h-3 w-3 fill-emerald-600 text-emerald-600" />
                         {t('primaryBadge')}
                       </span>
                     )}

@@ -6,9 +6,9 @@ import {
   Activity,
   ArrowLeft,
   BarChart2,
+  Clock,
   FileText,
   Flame,
-  Sparkles,
   Target,
   TrendingUp,
 } from 'lucide-react';
@@ -37,6 +37,10 @@ export default function AnalyticsView({ data }: AnalyticsViewProps) {
     analyzedCvs.length > 0
       ? Math.round(analyzedCvs.reduce((acc, cv) => acc + (cv.score ?? 0), 0) / analyzedCvs.length)
       : 0;
+
+  // Chart 3 / migration 014 — the enriched career-objective baseline is the
+  // reference dataset of the future career-fit evaluations.
+  const goalMilestone = data.milestones.find((m) => m.isGoal) ?? null;
 
   const kpis = [
     {
@@ -164,6 +168,92 @@ export default function AnalyticsView({ data }: AnalyticsViewProps) {
         </div>
       </div>
 
+      {/* Chart 3 — career-objective baseline (reference for career-fit analytics) */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-7">
+        <div className="flex items-center gap-2.5 mb-5">
+          <Target className="w-5 h-5 text-[#FF7A00]" />
+          <div>
+            <h3 className="text-base font-bold text-slate-900">
+              {isFrench ? 'Objectif de carrière' : 'Career goal'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {isFrench
+                ? 'Référence de votre objectif — base des futures évaluations de compatibilité carrière.'
+                : 'Reference of your goal — baseline for future career-fit evaluations.'}
+            </p>
+          </div>
+        </div>
+
+        {goalMilestone ? (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-2xl bg-[#FAF8F5] border border-[#F2EDE4]/80 p-4">
+              <div className="min-w-0">
+                <p className="text-base font-black text-slate-900 truncate">{goalMilestone.role}</p>
+                {goalMilestone.year && (
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                    {isFrench ? `Objectif ${goalMilestone.year}` : `Goal ${goalMilestone.year}`}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {goalMilestone.description && (
+              <p className="text-sm text-slate-600 leading-relaxed">{goalMilestone.description}</p>
+            )}
+
+            {(goalMilestone.targetTechnologies?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
+                  {isFrench ? 'Technologies cibles' : 'Target technologies'}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {goalMilestone.targetTechnologies?.map((tech) => (
+                    <span
+                      key={tech}
+                      className="px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs font-semibold"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(goalMilestone.targetSkills?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
+                  {isFrench ? 'Compétences cibles' : 'Target skills'}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {goalMilestone.targetSkills?.map((skill) => (
+                    <span
+                      key={skill}
+                      className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center">
+            <p className="text-sm text-slate-500 leading-relaxed">
+              {isFrench
+                ? 'Définissez votre objectif de carrière (poste cible + technologies/compétences) dans votre profil — il deviendra la référence des évaluations de compatibilité carrière.'
+                : 'Set your career goal (target role + technologies/skills) in your profile — it will become the reference for career-fit evaluations.'}
+            </p>
+            <button
+              onClick={() => router.push('/dashboard/profile')}
+              className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF7A00] text-white text-xs font-bold hover:bg-[#E66E00] transition-colors cursor-pointer"
+            >
+              {isFrench ? 'Compléter mon objectif' : 'Complete my goal'}
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Empty state for upcoming analytics */}
       <div className="flex-1 flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
         <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
@@ -178,7 +268,7 @@ export default function AnalyticsView({ data }: AnalyticsViewProps) {
             : 'Simulation history and ATS score evolution will appear with your next analyses.'}
         </p>
         <div className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">
-          <Sparkles className="w-3.5 h-3.5 text-[#FF7A00]" />
+          <Clock className="w-3.5 h-3.5 text-[#FF7A00]" />
           {isFrench ? 'Bientôt disponible' : 'Coming soon'}
         </div>
       </div>

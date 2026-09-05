@@ -5,8 +5,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import {
   AlertTriangle,
   CheckCircle2,
+  FileSearch,
   Lightbulb,
-  Sparkles,
   Target,
   TrendingUp,
   Wrench,
@@ -231,7 +231,7 @@ export default function MatchingReport({
           )}
         </div>
         <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-700 ring-1 ring-inset ring-brand-200">
-          <Sparkles className="h-3.5 w-3.5" />
+          <FileSearch className="h-3.5 w-3.5" />
           {t('matchingReportAtsBadge')}
         </span>
       </div>

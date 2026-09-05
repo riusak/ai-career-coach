@@ -6,10 +6,10 @@ import { useLocale, useTranslations } from 'next-intl';
 import {
   Briefcase,
   Clock,
+  FileSearch,
   FileText,
   Loader2,
   Plus,
-  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { deleteJobMatchingAction, getLatestMatchingAction } from './actions';
@@ -185,7 +185,7 @@ export default function MatchingDashboardView({
             {cvs.map((cv) => (
               <option key={cv.id} value={cv.id}>
                 {cv.name}
-                {cv.isPrimary ? ' ⭐' : ''}
+                {cv.isPrimary ? ` · ${t('primaryBadge')}` : ''}
               </option>
             ))}
           </select>
@@ -196,7 +196,7 @@ export default function MatchingDashboardView({
       {autoQueuedId && (
         <section className="rounded-3xl border border-brand-200 bg-brand-50/40 p-5">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
-            <Sparkles className="h-4 w-4 text-brand-500" />
+            <FileSearch className="h-4 w-4 text-brand-500" />
             {t('matchingQuickResultTitle')}
           </h2>
           <LatestMatchingCard
@@ -229,7 +229,7 @@ export default function MatchingDashboardView({
         ) : matchings.length === 0 ? (
           <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/30 px-6 py-10 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-brand-500">
-              <Sparkles className="h-6 w-6" />
+              <FileSearch className="h-6 w-6" />
             </span>
             <h3 className="mt-4 text-base font-semibold text-slate-900">
               {t('matchingEmptyTitle')}
@@ -240,7 +240,7 @@ export default function MatchingDashboardView({
               onClick={() => setModalOpen(true)}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-600"
             >
-              <Sparkles className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
               {t('matchingNewCta')}
             </button>
           </div>

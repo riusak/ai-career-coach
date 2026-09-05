@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidateDashboardData } from '@/lib/dashboard/revalidate';
 import {
   createJobMatching,
   deleteJobMatching,
@@ -115,8 +115,7 @@ export async function queueJobMatchingAction(
     };
   }
 
-  revalidatePath('/dashboard/matching');
-  revalidatePath('/dashboard');
+  revalidateDashboardData();
 
   return { success: true, message: 'Matching lancé ! Analyse en cours…', data };
 }
@@ -146,7 +145,6 @@ export async function deleteJobMatchingAction(formData: FormData): Promise<void>
 
   const { error } = await deleteJobMatching(matchingId);
   if (!error) {
-    revalidatePath('/dashboard/matching');
-    revalidatePath('/dashboard');
+    revalidateDashboardData();
   }
 }

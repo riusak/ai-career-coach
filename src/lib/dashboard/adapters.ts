@@ -199,13 +199,16 @@ export function buildMilestones(
   // Migration 012 — the explicit career goal anchors the « summit » node of
   // the roadmap timeline (flag icon). Without a set goal, the template keeps
   // its legacy fallback (the last milestone is treated as the goal).
+  // Chart 3 / migration 014 — the enriched objective baseline (description +
+  // target technologies/skills) rides along on the goal milestone so the
+  // roadmap modal and Analytics can surface the career-fit dataset.
   const goalRole = profile?.target_role?.trim();
   if (goalRole) {
     milestones.push({
       id: 'career-goal',
       role: goalRole,
       company: '',
-      description: null,
+      description: profile?.target_description?.trim() || null,
       startDate: null,
       endDate: null,
       isCurrent: false,
@@ -215,6 +218,8 @@ export function buildMilestones(
       year: profile?.target_year ? String(profile.target_year) : '',
       yearRange: profile?.target_year ? `Objectif ${profile.target_year}` : 'Objectif',
       companyLogo: 'custom',
+      targetTechnologies: toStringArray(profile?.target_technologies),
+      targetSkills: toStringArray(profile?.target_skills),
       isGoal: true,
     });
   }

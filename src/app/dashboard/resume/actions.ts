@@ -1,7 +1,10 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import {
+  revalidateDashboardData,
+  revalidateDashboardDataAnd,
+} from '@/lib/dashboard/revalidate';
 import {
   createResumeAnalysis,
   deleteResume,
@@ -60,9 +63,7 @@ export async function uploadResumeAction(
     };
   }
 
-  revalidatePath('/dashboard/resume');
-  revalidatePath('/dashboard/cvs');
-  revalidatePath('/dashboard');
+  revalidateDashboardData();
 
   // Redirect to the dedicated preview view (framework-handled exception).
   redirect(`/dashboard/resume/${response.data.id}`);
@@ -97,9 +98,7 @@ export async function flashUploadResumeAction(
     };
   }
 
-  revalidatePath('/dashboard/resume');
-  revalidatePath('/dashboard/cvs');
-  revalidatePath('/dashboard');
+  revalidateDashboardData();
 
   return {
     resumeId: response.data.id,
@@ -121,9 +120,7 @@ export async function setPrimaryResumeAction(formData: FormData): Promise<void> 
 
   const { error } = await setPrimaryResume(resumeId);
   if (!error) {
-    revalidatePath('/dashboard/resume');
-    revalidatePath('/dashboard/cvs');
-    revalidatePath('/dashboard');
+    revalidateDashboardData();
   }
 }
 
@@ -136,9 +133,7 @@ export async function unsetPrimaryResumeAction(formData: FormData): Promise<void
 
   const { error } = await unsetPrimaryResume(resumeId);
   if (!error) {
-    revalidatePath('/dashboard/resume');
-    revalidatePath('/dashboard/cvs');
-    revalidatePath('/dashboard');
+    revalidateDashboardData();
   }
 }
 
@@ -156,9 +151,8 @@ export async function updateResumeLabelAction(formData: FormData): Promise<void>
 
   const { error } = await updateResumeLabel(resumeId, labelEntry);
   if (!error) {
-    revalidatePath('/dashboard/resume');
-    revalidatePath(`/dashboard/resume/${resumeId}`);
-    revalidatePath('/dashboard');
+    // The label also shows on the dedicated detail route — refresh it too.
+    revalidateDashboardDataAnd([`/dashboard/resume/${resumeId}`]);
   }
 }
 
@@ -174,9 +168,7 @@ export async function deleteResumeAction(formData: FormData): Promise<void> {
 
   const { error } = await deleteResume(resumeId);
   if (!error) {
-    revalidatePath('/dashboard/resume');
-    revalidatePath('/dashboard/cvs');
-    revalidatePath('/dashboard');
+    revalidateDashboardData();
   }
 }
 
@@ -204,9 +196,9 @@ export async function analyzeResumeAction(
     };
   }
 
-  revalidatePath(`/dashboard/resume/${resumeId}`);
-  revalidatePath('/dashboard/cvs');
-  revalidatePath('/dashboard');
+  // The detail page polls the fresh analysis row; the shared invalidation
+  // also refreshes the catalogue + dashboard scores in the background.
+  revalidateDashboardDataAnd([`/dashboard/resume/${resumeId}`]);
 
   return { success: true, message: 'Analysis queued! Results will appear on this page.' };
 }

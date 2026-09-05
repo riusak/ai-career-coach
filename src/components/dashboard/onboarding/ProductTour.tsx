@@ -10,7 +10,6 @@ import {
   Compass,
   FileText,
   LayoutDashboard,
-  Sparkles,
   TrendingUp,
   User,
   X,
@@ -262,7 +261,7 @@ export default function ProductTour({ isActive, onComplete, onSkip }: ProductTou
 
         <div className="space-y-3 p-5">
           <h4 className="flex items-center gap-2 text-sm font-bold leading-snug text-slate-900">
-            <Sparkles className="h-3.5 w-3.5 text-brand-500" />
+            <currentStep.icon className="h-3.5 w-3.5 text-brand-500" />
             {t(stepTitleKey)}
           </h4>
           <p className="text-xs leading-relaxed text-slate-600">{t(stepDescKey)}</p>

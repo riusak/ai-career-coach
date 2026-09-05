@@ -9,10 +9,10 @@ import {
   CheckCircle2,
   ChevronRight,
   Flag,
-  Layers,
   Plus,
 } from 'lucide-react';
 import type { MilestoneData } from '@/types/dashboard';
+import CompanyLogo from '@/components/dashboard/CompanyLogo';
 
 interface CareerRoadmapProps {
   isEmpty: boolean;
@@ -210,8 +210,8 @@ export default function CareerRoadmap({
   };
 
   const curvePath = generateCurvePath(nodes);
-const renderMilestoneBadge = (logoType?: string, isGoal?: boolean) => {
-    if (isGoal) {
+const renderMilestoneBadge = (milestone: MilestoneData) => {
+    if (milestone.isGoal) {
       return (
         <div className="relative w-16 h-16 sm:w-18 sm:h-18 flex items-center justify-center select-none">
           <div
@@ -227,63 +227,10 @@ const renderMilestoneBadge = (logoType?: string, isGoal?: boolean) => {
       );
     }
 
-    switch (logoType) {
-      case 'up':
-        return (
-          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-white flex items-center justify-center shadow-[0_8px_20px_rgba(255,140,0,0.2)] ring-[7px] ring-amber-100/80 border border-amber-200/60">
-            <span className="text-[#14A800] font-black text-xl font-sans tracking-tighter select-none">
-              up
-            </span>
-          </div>
-        );
-
-      case 'cube':
-        return (
-          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-white flex items-center justify-center shadow-[0_8px_20px_rgba(255,140,0,0.2)] ring-[7px] ring-amber-100/80 border border-amber-200/60">
-            <svg className="w-8 h-8 sm:w-9 sm:h-9" viewBox="0 0 48 48" fill="none">
-              <polygon
-                points="24,5 41,14.5 41,33.5 24,43 7,33.5 7,14.5"
-                fill="#0B1B36"
-              />
-              <polygon points="24,14 33,19 24,24 15,19" fill="#00D2FF" />
-              <polygon points="15,19 24,24 24,34 15,29" fill="#FFB800" />
-              <polygon points="24,24 33,19 33,29 24,34" fill="#0284C7" />
-            </svg>
-          </div>
-        );
-
-      case 'gva':
-        return (
-          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-white flex items-center justify-center shadow-[0_8px_20px_rgba(255,140,0,0.2)] ring-[7px] ring-amber-100/80 border border-amber-200/60">
-            <div className="flex items-center tracking-tighter select-none font-black text-[#0B2545] text-base sm:text-lg">
-              <span>GV</span>
-              <span className="relative">
-                A
-                <span className="absolute -top-1 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#FF7A00]" />
-              </span>
-            </div>
-          </div>
-        );
-
-      case 'moov':
-        return (
-          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#FF7A00] flex flex-col items-center justify-center shadow-[0_8px_20px_rgba(255,107,0,0.3)] p-1 ring-[7px] ring-orange-100/80">
-            <span className="text-white font-black text-[9px] sm:text-[10px] tracking-tight uppercase leading-none">
-              MOOV
-            </span>
-            <span className="text-white/95 font-bold text-[6px] sm:text-[7px] tracking-widest uppercase leading-none mt-0.5">
-              AFRICA
-            </span>
-          </div>
-        );
-
-      default:
-        return (
-          <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-full bg-white flex items-center justify-center shadow-md ring-6 ring-amber-100/70 border border-amber-200/60">
-            <Layers className="w-5 h-5 text-[#FF7A00]" />
-          </div>
-        );
-    }
+    // Chart 3 — dynamic company logo (Clearbit Logo API on the fly, initials
+    // fallback when the domain is unknown or the image fails to load). No
+    // image binary is ever persisted in Supabase storage.
+    return <CompanyLogo company={milestone.company} size="md" shape="circle" />;
   };
 return (
     <div
@@ -481,7 +428,7 @@ return (
                     onMouseLeave={handleBadgeMouseLeave}
                     className="cursor-pointer transition-transform duration-200 transform hover:scale-110 active:scale-95"
                   >
-                    {renderMilestoneBadge(m.companyLogo, isGoal)}
+                    {renderMilestoneBadge(m)}
                   </div>
 
                   <div

@@ -5,20 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import {
   ArrowLeft,
+  Award,
   Briefcase,
   ChevronRight,
-  Code,
+  Cpu,
   Layers,
   Plus,
   Rocket,
-  Sparkles,
-  Star,
-  TrendingUp,
-  Trophy,
-  User,
   Users,
 } from 'lucide-react';
 import MilestoneModal from '@/components/dashboard/MilestoneModal';
+import CompanyLogo from '@/components/dashboard/CompanyLogo';
 import type { MilestoneData } from '@/types/dashboard';
 
 interface FullRoadmapViewProps {
@@ -96,64 +93,6 @@ export default function FullRoadmapView({
   const currentCount = milestones.filter((m) => m.isCurrent).length;
   const successRate = milestones.length > 0 ? Math.round((currentCount / milestones.length) * 100) : 0;
   const uniqueTechs = new Set(milestones.flatMap((m) => m.technologies)).size;
-// Map of card icons according to stage
-  const getStageIcon = (index: number, isGoal?: boolean) => {
-    if (isGoal) {
-      return (
-        <div className="w-8 h-8 rounded-full bg-[#1E293B] text-white flex items-center justify-center shadow-md">
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M5 21V4M5 4h11l-2.5 4L16 12H5"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="white"
-              fillOpacity="0.2"
-            />
-          </svg>
-        </div>
-      );
-    }
-    switch (index) {
-      case 0:
-        return (
-          <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center shadow-xs">
-            <User className="w-4 h-4" />
-          </div>
-        );
-      case 1:
-        return (
-          <div className="w-8 h-8 rounded-full bg-[#1E293B] text-white flex items-center justify-center shadow-xs">
-            <Code className="w-4 h-4 text-white" />
-          </div>
-        );
-      case 2:
-        return (
-          <div className="w-8 h-8 rounded-full bg-[#FF9500] text-white flex items-center justify-center shadow-xs">
-            <Users className="w-4 h-4 text-white" />
-          </div>
-        );
-      case 3:
-        return (
-          <div className="w-8 h-8 rounded-full bg-[#1E293B] text-white flex items-center justify-center shadow-xs">
-            <TrendingUp className="w-4 h-4 text-white" />
-          </div>
-        );
-      case 4:
-        return (
-          <div className="w-8 h-8 rounded-full bg-[#FF9500] text-white flex items-center justify-center shadow-xs">
-            <Briefcase className="w-4 h-4 text-white" />
-          </div>
-        );
-      default:
-        return (
-          <div className="w-8 h-8 rounded-full bg-[#FF9500] text-white flex items-center justify-center shadow-xs">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-        );
-    }
-  };
 
   return (
     <div id="immersive-career-roadmap" className="flex-1 flex flex-col gap-6 sm:gap-7 pb-16 animate-in fade-in duration-300">
@@ -411,9 +350,25 @@ export default function FullRoadmapView({
                   className="absolute z-10 w-[158px] sm:w-[168px] -translate-x-1/2 cursor-pointer group"
                 >
                   <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 shadow-[0_10px_25px_rgba(40,30,20,0.06)] border border-slate-100 hover:border-amber-400/80 hover:shadow-[0_14px_30px_rgba(255,149,0,0.18)] transition-all duration-200 transform group-hover:-translate-y-1.5 flex flex-col gap-2 relative">
-                    {/* Top Icon Badge */}
+                    {/* Top Icon Badge — dynamic company logo (goal keeps the summit flag) */}
                     <div className="mb-0.5">
-                      {getStageIcon(node.index, isGoal)}
+                      {isGoal ? (
+                        <div className="w-8 h-8 rounded-full bg-[#1E293B] text-white flex items-center justify-center shadow-md">
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                            <path
+                              d="M5 21V4M5 4h11l-2.5 4L16 12H5"
+                              stroke="white"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              fill="white"
+                              fillOpacity="0.2"
+                            />
+                          </svg>
+                        </div>
+                      ) : (
+                        <CompanyLogo company={m.company} size="sm" shape="rounded" />
+                      )}
                     </div>
 
                     {/* Period Subtitle */}
@@ -469,7 +424,7 @@ export default function FullRoadmapView({
           <div className="bg-white/90 backdrop-blur-xs rounded-2xl p-3.5 sm:p-4 border border-slate-100 shadow-xs flex items-center justify-between group hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#1E293B] text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Trophy className="w-5 h-5 text-white" />
+                <Award className="w-5 h-5 text-white" />
               </div>
               <div>
                 <span className="text-lg sm:text-xl font-black text-slate-900 leading-none block">
@@ -523,7 +478,7 @@ export default function FullRoadmapView({
           <div className="col-span-2 sm:col-span-1 bg-white/90 backdrop-blur-xs rounded-2xl p-3.5 sm:p-4 border border-slate-100 shadow-xs flex items-center justify-between group hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#FF9500] text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Star className="w-5 h-5 text-white" />
+                <Cpu className="w-5 h-5 text-white" />
               </div>
               <div>
                 <span className="text-lg sm:text-xl font-black text-slate-900 leading-none block">
@@ -588,14 +543,21 @@ export default function FullRoadmapView({
                       )}
                     </div>
 
-                    <h4 className="font-bold text-slate-900 text-sm group-hover:text-[#FF7A00] transition-colors">
-                      {m.role}
-                    </h4>
-                    {m.company && (
-                      <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                        {m.company}
-                      </p>
-                    )}
+                    <div className="flex items-start gap-2.5">
+                      {!m.isGoal && (
+                        <CompanyLogo company={m.company} size="sm" shape="rounded" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-slate-900 text-sm group-hover:text-[#FF7A00] transition-colors">
+                          {m.role}
+                        </h4>
+                        {m.company && (
+                          <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                            {m.company}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
                     {m.description && (
                       <p className="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">

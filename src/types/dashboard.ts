@@ -99,6 +99,13 @@ export interface MilestoneData {
   yearRange: string;
   /** Company badge variant of the template (up/cube/gva/moov/custom). */
   companyLogo: 'up' | 'cube' | 'gva' | 'moov' | 'custom';
+  /**
+   * Chart 3 — aspirational target stack carried from the enriched career goal
+   * (migration 014). Populated on the « goal » milestone only; they are the
+   * baseline dataset for the future career-fit evaluations in Analytics.
+   */
+  targetTechnologies?: string[];
+  targetSkills?: string[];
   /** True for the aspirational « target goal » summit node. */
   isGoal?: boolean;
 }

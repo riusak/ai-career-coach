@@ -6,16 +6,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
+  BadgeCheck,
   Briefcase,
   CheckCircle2,
   Download,
   ExternalLink,
+  FileSearch,
   FileText,
   Layers,
   Loader2,
   ShieldCheck,
-  Sparkles,
-  Star,
   Trash2,
   TrendingUp,
   Video,
@@ -373,7 +373,7 @@ export default function CVPreviewModal({
                 </h3>
                 {cv.isPrimary ? (
                   <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
-                    <Star className="h-3 w-3 fill-emerald-600 text-emerald-600" />
+                    <BadgeCheck className="h-3 w-3 fill-emerald-600 text-emerald-600" />
                     {t('primaryBadge')}
                   </span>
                 ) : (
@@ -383,7 +383,7 @@ export default function CVPreviewModal({
                       type="submit"
                       className="flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-bold text-slate-600 shadow-2xs transition-colors hover:border-amber-300 hover:text-brand-500"
                     >
-                      <Star className="h-3 w-3 text-slate-400" />
+                      <BadgeCheck className="h-3 w-3 text-slate-400" />
                       {t('previewSetPrimary')}
                     </button>
                   </form>
@@ -476,7 +476,10 @@ export default function CVPreviewModal({
                     className="h-[68vh] w-full bg-white"
                   />
                 ) : previewUrlState === 'error' ? (
-                  <div className="flex flex-col items-center gap-2 p-10 text-center">
+                  /* Chart 4 — fixed height identical to the iframe above so
+                     swapping between loading / ready / error never shifts the
+                     modal layout (CLS = 0 on the document viewer). */
+                  <div className="flex h-[68vh] flex-col items-center justify-center gap-2 p-10 text-center">
                     <AlertCircle className="h-7 w-7 text-slate-300" />
                     <p className="max-w-md text-sm text-slate-500">{t('previewPdfError')}</p>
                     {cv.rawText && (
@@ -486,7 +489,8 @@ export default function CVPreviewModal({
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-3 p-14 text-center">
+                  /* Chart 4 — reserved height: no jump when the PDF arrives. */
+                  <div className="flex h-[68vh] flex-col items-center justify-center gap-3 p-14 text-center">
                     <Loader2 className="h-6 w-6 animate-spin text-brand-400" />
                     <p className="text-sm text-slate-500">{t('previewPdfLoading')}</p>
                   </div>
@@ -568,7 +572,7 @@ export default function CVPreviewModal({
                 </div>
               ) : view.score === null || !view.subscores ? (
                 <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-                  <Sparkles className="h-8 w-8 text-brand-300" />
+                  <FileSearch className="h-8 w-8 text-brand-300" />
                   <p className="max-w-md text-sm leading-relaxed text-slate-500">
                     {t('previewAnalysisNone')}
                   </p>
@@ -589,7 +593,7 @@ export default function CVPreviewModal({
                     {isQueueing ? (
                       <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
                     ) : (
-                      <Sparkles className="h-4 w-4 text-amber-400" />
+                      <FileSearch className="h-4 w-4 text-amber-400" />
                     )}
                     {isQueueing ? t('previewAnalysisQueueing') : t('previewRunAnalysis')}
                   </button>
@@ -625,7 +629,7 @@ export default function CVPreviewModal({
                       href={`/dashboard/resume/${cv.id}`}
                       className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all hover:bg-slate-800 active:scale-[0.98]"
                     >
-                      <Sparkles className="h-4 w-4 text-amber-400" />
+                      <FileText className="h-4 w-4 text-amber-400" />
                       {t('previewOpenReport')}
                     </Link>
                   </div>

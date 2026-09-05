@@ -398,6 +398,48 @@ export default function ProfileForm({
                 className={inputClasses}
               />
             </Field>
+
+            {/* Chart 3 / migration 014 — enriched career-objective baseline.
+                These fields are the core dataset for the future career-fit
+                evaluations in Analytics (gap analysis: profile vs cible). */}
+            <div className="sm:col-span-3">
+              <Field id="target_description" label={t('targetDescription')}>
+                <textarea
+                  id="target_description"
+                  name="target_description"
+                  rows={3}
+                  maxLength={600}
+                  defaultValue={initialProfile?.target_description ?? ''}
+                  placeholder={t('targetDescriptionPlaceholder')}
+                  disabled={profilePending}
+                  className={inputClasses}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 sm:col-span-3">
+              <Field id="target_technologies" label={t('targetTechnologies')}>
+                <input
+                  id="target_technologies"
+                  name="target_technologies"
+                  type="text"
+                  defaultValue={initialProfile?.target_technologies?.join(', ') ?? ''}
+                  placeholder={t('targetListPlaceholder')}
+                  disabled={profilePending}
+                  className={inputClasses}
+                />
+              </Field>
+              <Field id="target_skills" label={t('targetSkills')}>
+                <input
+                  id="target_skills"
+                  name="target_skills"
+                  type="text"
+                  defaultValue={initialProfile?.target_skills?.join(', ') ?? ''}
+                  placeholder={t('targetListPlaceholder')}
+                  disabled={profilePending}
+                  className={inputClasses}
+                />
+              </Field>
+            </div>
           </div>
           <p className="text-xs text-navy-500">{t('careerGoalHint')}</p>
           <SubmitRow label={tCommon('save')} pending={profilePending} />

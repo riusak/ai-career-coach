@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Sparkles, Video, X } from 'lucide-react';
+import { Info, Video, X } from 'lucide-react';
 import type { CvSummaryData } from '@/types/dashboard';
 
 interface MockInterviewQuickModalProps {
@@ -119,7 +119,7 @@ export default function MockInterviewQuickModal({
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-3.5">
           <p className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-            <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+            <Info className="h-3.5 w-3.5 text-brand-500" />
             {t('mockQuickHint')}
           </p>
           <div className="flex shrink-0 items-center gap-2">

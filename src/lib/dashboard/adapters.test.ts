@@ -51,6 +51,10 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
     preferred_locale: null,
     target_role: null,
     target_year: null,
+    target_description: null,
+    target_technologies: null,
+    target_skills: null,
+    onboarding_completed_at: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -327,6 +331,30 @@ describe('buildMilestones', () => {
 
     // Null profile → same as before (legacy fallback behaviour intact).
     expect(buildMilestones([makeExperience({ id: 'a' })], null)).toHaveLength(1);
+  });
+
+  it('carries the enriched career-objective baseline (migration 014) on the goal', () => {
+    const goalProfile = makeProfile({
+      target_role: 'Staff Engineer',
+      target_year: 2027,
+      target_description: 'Own the core payments platform.',
+      target_technologies: ['TypeScript', 'AWS', 'Kafka'],
+      target_skills: ['System design', 'Leadership'],
+    });
+
+    const milestones = buildMilestones([makeExperience({ id: 'a' })], goalProfile);
+    const goal = milestones[milestones.length - 1];
+    expect(goal.isGoal).toBe(true);
+    expect(goal.description).toBe('Own the core payments platform.');
+    expect(goal.targetTechnologies).toEqual(['TypeScript', 'AWS', 'Kafka']);
+    expect(goal.targetSkills).toEqual(['System design', 'Leadership']);
+
+    // A bare goal (no enrichment yet) keeps empty target stacks.
+    const bare = buildMilestones([makeExperience({ id: 'a' })], makeProfile({ target_role: 'Lead' }));
+    const bareGoal = bare[bare.length - 1];
+    expect(bareGoal.description).toBeNull();
+    expect(bareGoal.targetTechnologies).toEqual([]);
+    expect(bareGoal.targetSkills).toEqual([]);
   });
 });
 

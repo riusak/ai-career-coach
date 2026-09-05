@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { Briefcase, FileText, FolderKanban, GraduationCap, Sparkles, TrendingUp } from 'lucide-react';
+import { Briefcase, FileText, FolderKanban, GraduationCap, Info, TrendingUp } from 'lucide-react';
 import type { ProfileMetrics } from '@/types/dashboard';
 
 interface ProfileOverviewProps {
@@ -142,7 +142,7 @@ export default function ProfileOverview({ score, isEmpty, metrics }: ProfileOver
           className="p-2.5 sm:p-3 rounded-2xl bg-[#FAF8F5] border border-[#F2EDE4]/80 flex items-center gap-2.5 sm:gap-3 cursor-pointer hover:bg-[#F5F1EB] transition-colors group"
         >
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FCEEE1] text-[#FF7A00] flex items-center justify-center shrink-0">
-            <Sparkles className="w-3.5 h-3.5 fill-[#FF7A00]/20 text-[#FF7A00]" />
+            <Info className="w-3.5 h-3.5 text-[#FF7A00]" />
           </div>
 
           <p className="text-[11px] sm:text-xs text-slate-700 font-medium leading-snug min-w-0 flex-1">

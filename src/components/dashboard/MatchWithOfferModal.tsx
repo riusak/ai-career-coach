@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { Search } from 'lucide-react';
+
 /**
  * Job-matching interest-capture modal, moved from app/dashboard/resume/
  * during Phase 2 so the resume catalogue page (MatchOfferButton) and the
@@ -14,24 +16,6 @@ interface MatchOfferModalProps {
   open: boolean;
   onClose: () => void;
   resumeName: string;
-}
-
-function SparklesIcon({ className = 'h-4 w-4' }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={className}
-    >
-      <path d="M12 3l1.9 5.4a2 2 0 0 0 1.3 1.3L20.5 12l-5.3 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.4a2 2 0 0 0-1.3-1.3L3.5 12l5.3-1.9a2 2 0 0 0 1.3-1.3z" />
-    </svg>
-  );
 }
 
 function SuccessIcon({ className = 'h-5 w-5' }: { className?: string }) {
@@ -162,7 +146,7 @@ export function MatchOfferModal({ open, onClose, resumeName }: MatchOfferModalPr
                 onClick={() => setSubmitted(true)}
                 className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-orange px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-orange-500/25 transition-colors hover:bg-orange-600"
               >
-                <SparklesIcon />
+                <Search className="h-4 w-4" />
                 {t('matchOfferSubmit')}
               </button>
             </div>
@@ -192,7 +176,7 @@ export default function MatchOfferButton({ resumeName, canMatch }: MatchOfferBut
         title={canMatch ? undefined : t('matchNeedsParsing')}
         className="inline-flex items-center gap-1.5 rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-800 shadow-sm transition-colors hover:border-orange-400 hover:bg-orange-100 disabled:cursor-not-allowed disabled:border-navy-200 disabled:bg-navy-50 disabled:text-navy-400"
       >
-        <SparklesIcon />
+        <Search className="h-4 w-4" />
         {t('matchOfferCta')}
       </button>
 

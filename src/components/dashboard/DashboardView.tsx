@@ -21,13 +21,23 @@ import MockInterviewQuickModal from '@/components/dashboard/MockInterviewQuickMo
 import FirstLoginWelcomeModal from '@/components/dashboard/onboarding/FirstLoginWelcomeModal';
 import HowItWorksModal from '@/components/dashboard/onboarding/HowItWorksModal';
 import ProductTour from '@/components/dashboard/onboarding/ProductTour';
+import OnboardingAssistant from '@/components/dashboard/onboarding/OnboardingAssistant';
+import ImportProfileModal from '@/components/dashboard/onboarding/ImportProfileModal';
 
 interface DashboardViewProps {
   data: DashboardViewData;
   /** Full name of the authenticated user (used by the welcome modal). */
   userName: string;
-  /** True on the first connection, before the onboarding cookie is set. */
+  /** True on the first connection, before the onboarding flag is persisted. */
   showOnboarding: boolean;
+  /** Persistent minimal helper widget — shown until onboarding is completed. */
+  showOnboardingAssistant: boolean;
+  /** True when the user already uploaded at least one CV. */
+  hasCv: boolean;
+  /** True when at least one CV has a completed ATS analysis. */
+  hasAnalysis: boolean;
+  /** True when the profile is non-empty (identity + career sections). */
+  profileComplete: boolean;
 }
 
 /**
@@ -38,7 +48,15 @@ interface DashboardViewProps {
  * server component; this layer only owns UI state plus the quick-action
  * flows (flash upload, ATS diagnostic, matching & mock quick modals).
  */
-export default function DashboardView({ data, userName, showOnboarding }: DashboardViewProps) {
+export default function DashboardView({
+  data,
+  userName,
+  showOnboarding,
+  showOnboardingAssistant,
+  hasCv,
+  hasAnalysis,
+  profileComplete,
+}: DashboardViewProps) {
   const locale = useLocale();
   const router = useRouter();
   const [previewCvId, setPreviewCvId] = useState<string | null>(null);
@@ -55,6 +73,8 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
   const [onboardingOpen, setOnboardingOpen] = useState(showOnboarding);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [tourActive, setTourActive] = useState(false);
+  const [assistantHidden, setAssistantHidden] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const primaryCv = data.cvs.find((cv) => cv.isPrimary) ?? data.cvs[0] ?? null;
   const previewCv =
@@ -159,6 +179,24 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
 
   return (
     <>
+      {/* Persistent onboarding helper — sits above the quick actions until the
+          user durably completes the onboarding (DB flag). */}
+      {showOnboardingAssistant && !assistantHidden && (
+        <OnboardingAssistant
+          hasCv={hasCv}
+          profileComplete={profileComplete}
+          hasAnalysis={hasAnalysis}
+          onImport={() => setImportOpen(true)}
+          onComplete={() => {
+            setAssistantHidden(true);
+            void completeOnboardingAction();
+            router.refresh();
+          }}
+        />
+      )}
+
+      <ImportProfileModal open={importOpen} onClose={() => setImportOpen(false)} />
+
       {/* Row 1 — Quick Actions */}
       <QuickActions
         isFlashUploading={isFlashUploading}
@@ -260,6 +298,10 @@ export default function DashboardView({ data, userName, showOnboarding }: Dashbo
         onClose={closeOnboarding}
         onStartTour={startTour}
         onShowHowItWorks={() => setHowItWorksOpen(true)}
+        onImportProfile={() => {
+          setOnboardingOpen(false);
+          setImportOpen(true);
+        }}
       />
 
       <HowItWorksModal

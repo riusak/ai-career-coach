@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Briefcase, CheckCircle2, Loader2, Sparkles, X } from 'lucide-react';
+import { Briefcase, CheckCircle2, Loader2, Target, X } from 'lucide-react';
 import type { CvSummaryData } from '@/types/dashboard';
 import type { MatchingQueueState } from './actions';
 import { queueJobMatchingAction } from './actions';
@@ -238,7 +238,7 @@ export default function JobMatchModal({
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4" />
+                    <Target className="h-4 w-4" />
                     {t('matchingQueueCta')}
                   </>
                 )}

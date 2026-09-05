@@ -7,9 +7,9 @@ import {
   Award,
   Briefcase,
   CheckCircle2,
+  FileSearch,
   FileText,
   GraduationCap,
-  Sparkles,
   Upload,
 } from 'lucide-react';
 import type { DashboardActivity, DashboardActivityType } from '@/types/dashboard';
@@ -21,7 +21,7 @@ interface RecentActivityProps {
 
 const TYPE_STYLES: Record<DashboardActivityType, { Icon: typeof Upload; bg: string }> = {
   cv: { Icon: Upload, bg: 'bg-blue-50 text-blue-600' },
-  analysis: { Icon: Sparkles, bg: 'bg-emerald-50 text-emerald-600' },
+  analysis: { Icon: FileSearch, bg: 'bg-emerald-50 text-emerald-600' },
   experience: { Icon: Briefcase, bg: 'bg-brand-50 text-brand-500' },
   education: { Icon: GraduationCap, bg: 'bg-purple-50 text-purple-600' },
   certification: { Icon: Award, bg: 'bg-amber-50 text-amber-600' },

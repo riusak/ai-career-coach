@@ -23,6 +23,22 @@ export interface Profile {
    */
   target_role: string | null;
   target_year: number | null;
+  /**
+   * Enriched career-objective baseline (migration 014): free-form description
+   * plus the target technologies / skills expected for the goal. These fields
+   * are the core baseline dataset for the future career-fit evaluations in
+   * Analytics (gap analysis: current profile vs objective).
+   */
+  target_description: string | null;
+  target_technologies: string[] | null;
+  target_skills: string[] | null;
+  /**
+   * One-time onboarding persistence (migration 013): set when the user
+   * completes or explicitly dismisses the first-connection wizard. NULL means
+   * the wizard may still be shown; a non-null value permanently disables the
+   * full-screen flow (the dashboard helper widget remains available).
+   */
+  onboarding_completed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +57,9 @@ export type ProfileUpdate = Partial<
     | 'preferred_locale'
     | 'target_role'
     | 'target_year'
+    | 'target_description'
+    | 'target_technologies'
+    | 'target_skills'
   >
 >;
 

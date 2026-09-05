@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
+import { useState } from 'react';
 import {
   ArrowLeft,
   Bell,
   Crown,
+  FileUp,
   Globe,
   Palette,
   ShieldCheck,
@@ -16,6 +18,7 @@ import type { DashboardUser } from '@/types/dashboard';
 import { useLocaleSwitcher } from '@/i18n/provider';
 import SignOutButton from '@/components/ui/SignOutButton';
 import ForProLogo from '@/components/dashboard/ForProLogo';
+import ImportProfileModal from '@/components/dashboard/onboarding/ImportProfileModal';
 
 interface SettingsViewProps {
   user: DashboardUser;
@@ -31,6 +34,7 @@ export default function SettingsView({ user }: SettingsViewProps) {
   const router = useRouter();
   const { setLocale } = useLocaleSwitcher();
   const isFrench = locale !== 'en';
+  const [importOpen, setImportOpen] = useState(false);
 
   return (
     <div className="flex-1 flex flex-col gap-6 sm:gap-7 pb-16">
@@ -99,6 +103,34 @@ export default function SettingsView({ user }: SettingsViewProps) {
             >
               {isFrench ? 'Modifier' : 'Edit'}
             </Link>
+          </div>
+        </div>
+
+        {/* Smart profile import card */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 lg:col-span-2">
+          <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <FileUp className="w-4 h-4 text-[#FF7A00]" />
+            {isFrench ? 'Import intelligent de profil' : 'Smart profile import'}
+          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <p className="max-w-md text-xs text-slate-500 leading-relaxed">
+              {isFrench
+                ? 'Téléversez votre export LinkedIn (PDF) ou un CV standard : l’IA extrait votre parcours, vos compétences et vos formations pour pré-remplir votre profil et votre roadmap en quelques secondes.'
+                : 'Upload your LinkedIn export (PDF) or a standard resume: AI extracts your career path, skills and education to pre-fill your profile and roadmap within seconds.'}
+            </p>
+            <div className="shrink-0 flex flex-col items-stretch gap-1.5">
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#132238] text-white text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+              >
+                <FileUp className="h-3.5 w-3.5 text-[#FF7A00]" />
+                {isFrench ? "Importer mon profil" : 'Import my profile'}
+              </button>
+              <span className="text-center text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                {isFrench ? 'PDF / DOCX · 5 Mo max' : 'PDF / DOCX · 5 MB max'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -211,6 +243,8 @@ export default function SettingsView({ user }: SettingsViewProps) {
       <div className="flex items-center justify-center pt-2 opacity-60">
         <ForProLogo variant="contracted" theme="light" size="sm" showText={false} />
       </div>
+
+      <ImportProfileModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }

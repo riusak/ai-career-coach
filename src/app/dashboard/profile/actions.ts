@@ -1,7 +1,7 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { updateCurrentUserProfile } from '@/lib/supabase/profiles';
+import { revalidateDashboardData } from '@/lib/dashboard/revalidate';
 import {
   createCertification,
   createEducation,
@@ -44,6 +44,12 @@ export async function updateProfileAction(
   if (formData.has('website_url')) updates.website_url = strOrNull(formData.get('website_url'));
   if (formData.has('target_role')) updates.target_role = strOrNull(formData.get('target_role'));
   if (formData.has('target_year')) updates.target_year = parseTargetYear(formData.get('target_year'));
+  // Chart 3 / migration 014 — enriched career-objective baseline. The arrays
+  // reuse the comma/semicolon/newline parser; an empty field submits NULL so
+  // the user can clear a previously saved target stack.
+  if (formData.has('target_description')) updates.target_description = strOrNull(formData.get('target_description'));
+  if (formData.has('target_technologies')) updates.target_technologies = parseStringArray(formData.get('target_technologies'));
+  if (formData.has('target_skills')) updates.target_skills = parseStringArray(formData.get('target_skills'));
 
   const localeRaw = formData.get('preferred_locale');
   if (formData.has('preferred_locale') && typeof localeRaw === 'string' && ['fr', 'en', 'de'].includes(localeRaw)) {
@@ -57,8 +63,9 @@ export async function updateProfileAction(
   }
 
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
-  revalidatePath('/dashboard');
+  // Chart 4 — one centralized invalidation for EVERY dashboard segment, so
+  // the roadmap, analytics, CV grid and settings never serve stale payloads.
+  revalidateDashboardData();
 
   return { success: true, message: 'profile.saveSuccess', data: response.data };
 }
@@ -154,7 +161,7 @@ export async function createEducationAction(
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -167,7 +174,7 @@ export async function deleteEducationAction(
   const result = await deleteEducation(id);
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -195,8 +202,7 @@ export async function createExperienceAction(
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
-  revalidatePath('/dashboard');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -209,8 +215,7 @@ export async function deleteExperienceAction(
   const result = await deleteExperience(id);
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
-  revalidatePath('/dashboard');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -235,7 +240,7 @@ export async function createSkillAction(
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -248,7 +253,7 @@ export async function deleteSkillAction(
   const result = await deleteSkill(id);
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -270,7 +275,7 @@ export async function createCertificationAction(
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -283,7 +288,7 @@ export async function deleteCertificationAction(
   const result = await deleteCertification(id);
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -305,7 +310,7 @@ export async function updateEducationAction(
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
+  revalidateDashboardData();
   return { error: null };
 }
 
@@ -340,7 +345,6 @@ export async function updateExperienceAction(
   });
   if (result.error) return { error: result.error };
   await recomputeRoadmap();
-  revalidatePath('/dashboard/profile');
-  revalidatePath('/dashboard');
+  revalidateDashboardData();
   return { error: null };
 }

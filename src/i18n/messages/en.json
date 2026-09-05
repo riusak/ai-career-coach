@@ -543,7 +543,12 @@
     "targetRolePlaceholder": "e.g. Lead Architect",
     "targetYear": "Target year",
     "targetYearPlaceholder": "e.g. 2030",
-    "careerGoalHint": "This goal anchors the summit of your career roadmap (golden flag, e.g. “Lead Architect · Goal 2030”).",
+    "targetDescription": "Goal description",
+    "targetDescriptionPlaceholder": "Describe the target role, its scope of responsibility and the expected impact.",
+    "targetTechnologies": "Target technologies",
+    "targetSkills": "Target skills",
+    "targetListPlaceholder": "Comma-separated (e.g. TypeScript, AWS, Kafka)",
+    "careerGoalHint": "This goal anchors the summit of your career roadmap (golden flag) and will be the reference for career-fit evaluations in Analytics.",
     "sectionContact": "Contact details",
     "sectionEducation": "Education",
     "sectionExperience": "Professional experience",
@@ -803,6 +808,7 @@
     "welcomeClose": "Close",
     "welcomeExplore": "Explore on my own",
     "welcomeStartTour": "Start Workspace Tour",
+    "welcomeImportProfile": "Import my resume / LinkedIn PDF",
     "welcomeHowLink": "See how it works",
     "howKicker": "ForPro AI Methodology",
     "howTitle": "How does ForPro AI work?",
@@ -839,6 +845,32 @@
     "tourStep6Badge": "Step 6/7",
     "tourStep7Title": "Recent activity",
     "tourStep7Desc": "Your latest moves: uploaded CVs, completed analyses, added experiences and skills.",
-    "tourStep7Badge": "Step 7/7"
+    "tourStep7Badge": "Step 7/7",
+    "assistantTitle": "Startup assistant",
+    "assistantDesc": "Four quick steps to get the most out of ForPro AI. Pick them up again any time.",
+    "assistantDismiss": "Hide this panel",
+    "assistantProgress": "Onboarding progress",
+    "assistantImportCta": "Import my profile (CV / LinkedIn)",
+    "assistantStep": {
+      "cv": "Import or upload my resume",
+      "profile": "Complete my profile",
+      "analysis": "Run an ATS diagnostic",
+      "matching": "Explore offer matching"
+    },
+    "assistantComplete": "All clear — hide permanently",
+    "importTitle": "Smart profile import",
+    "importHint": "Upload a LinkedIn export (PDF) or a standard resume. AI extracts your career path, skills and education to pre-fill your profile and roadmap.",
+    "importCta": "Import my profile",
+    "importPending": "Importing…",
+    "importSuccessTitle": "Profile imported!",
+    "importSuccessDesc": "Your resume was added to your library and your profile was pre-filled. Review and adjust if needed.",
+    "importReviewProfile": "Review my profile",
+    "importDone": "Done",
+    "importCount": {
+      "experiences": "Experiences",
+      "skills": "Skills",
+      "educations": "Education",
+      "certifications": "Certifications"
+    }
   }
 }
