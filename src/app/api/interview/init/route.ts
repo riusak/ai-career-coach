@@ -54,9 +54,11 @@ export async function POST(request: Request) {
     // 2. Create session row with panel
     const createResult = await createInterviewSession(input, [], dynamicPanel);
     if (createResult.error || !createResult.data) {
+      console.error('[api/interview/init] createInterviewSession error:', createResult.error);
+      const isAuth = createResult.error?.toLowerCase().includes('authentifi');
       return NextResponse.json(
         { error: createResult.error ?? 'Échec de création de la session.' },
-        { status: 500 }
+        { status: isAuth ? 401 : 500 }
       );
     }
 

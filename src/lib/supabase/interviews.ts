@@ -18,6 +18,17 @@ const INTERVIEW_SELECT =
   'language, interview_type, status, score, current_step, total_steps, ' +
   'panel, transcript, star_evaluation, created_at, updated_at';
 
+const INTERVIEW_SELECT_NO_PANEL =
+  'id, resume_id, user_id, job_matching_id, job_title, company, job_description, ' +
+  'language, interview_type, status, score, current_step, total_steps, ' +
+  'transcript, star_evaluation, created_at, updated_at';
+
+function isMissingPanelError(error: { message?: string; code?: string } | null): boolean {
+  if (!error) return false;
+  const msg = error.message?.toLowerCase() ?? '';
+  return msg.includes('panel') || error.code === '42703' || msg.includes('column');
+}
+
 interface DbInterviewRow {
   id: string;
   resume_id: string;
@@ -39,7 +50,11 @@ interface DbInterviewRow {
   updated_at: string;
 }
 
-function mapDbRowToSession(row: DbInterviewRow): InterviewSession {
+function mapDbRowToSession(row: DbInterviewRow, fallbackPanel?: InterviewerSpeaker[] | null): InterviewSession {
+  const parsedPanel = Array.isArray(row.panel)
+    ? (row.panel as InterviewerSpeaker[])
+    : (fallbackPanel ?? null);
+
   return {
     id: row.id,
     resumeId: row.resume_id,
@@ -58,7 +73,7 @@ function mapDbRowToSession(row: DbInterviewRow): InterviewSession {
     score: row.score,
     currentStep: row.current_step,
     totalSteps: row.total_steps,
-    panel: Array.isArray(row.panel) ? (row.panel as InterviewerSpeaker[]) : null,
+    panel: parsedPanel,
     transcript: Array.isArray(row.transcript) ? (row.transcript as InterviewTurn[]) : [],
     starEvaluation: (row.star_evaluation as StarEvaluation) ?? null,
     createdAt: row.created_at,
@@ -68,6 +83,7 @@ function mapDbRowToSession(row: DbInterviewRow): InterviewSession {
 
 /**
  * Creates and initializes an in-progress interview simulation session.
+ * Gracefully degrades if the remote Postgres schema lacks the optional 'panel' column.
  */
 export async function createInterviewSession(
   input: InitInterviewInput,
@@ -85,31 +101,47 @@ export async function createInterviewSession(
       return { data: null, error: authError?.message ?? 'Non authentifié.' };
     }
 
-    const { data, error } = await supabase
+    const payloadWithPanel = {
+      resume_id: input.resumeId,
+      user_id: user.id,
+      job_matching_id: input.jobMatchingId ?? null,
+      job_title: input.jobTitle.trim().slice(0, 200),
+      company: input.company ? input.company.trim().slice(0, 200) : null,
+      job_description: input.jobDescription ? input.jobDescription.trim() : null,
+      language: input.language ?? 'fr',
+      interview_type: input.interviewType ?? 'general',
+      status: 'in_progress',
+      current_step: 1,
+      total_steps: 5,
+      panel: panel ?? null,
+      transcript: initialTurns,
+    };
+
+    let result = await supabase
       .from('interview_simulations')
-      .insert({
-        resume_id: input.resumeId,
-        user_id: user.id,
-        job_matching_id: input.jobMatchingId ?? null,
-        job_title: input.jobTitle.trim().slice(0, 200),
-        company: input.company ? input.company.trim().slice(0, 200) : null,
-        job_description: input.jobDescription ? input.jobDescription.trim() : null,
-        language: input.language ?? 'fr',
-        interview_type: input.interviewType ?? 'general',
-        status: 'in_progress',
-        current_step: 1,
-        total_steps: 5,
-        panel: panel ?? null,
-        transcript: initialTurns,
-      })
+      .insert(payloadWithPanel)
       .select(INTERVIEW_SELECT)
       .single();
 
-    if (error) {
-      return { data: null, error: error.message };
+    // If 'panel' column is missing in remote DB, fallback to insert without it
+    if (result.error && isMissingPanelError(result.error)) {
+      const payloadWithoutPanel = { ...payloadWithPanel };
+      delete (payloadWithoutPanel as { panel?: unknown }).panel;
+      result = await supabase
+        .from('interview_simulations')
+        .insert(payloadWithoutPanel)
+        .select(INTERVIEW_SELECT_NO_PANEL)
+        .single();
     }
 
-    return { data: mapDbRowToSession(data as unknown as DbInterviewRow), error: null };
+    if (result.error) {
+      return { data: null, error: result.error.message };
+    }
+
+    return {
+      data: mapDbRowToSession(result.data as unknown as DbInterviewRow, panel),
+      error: null,
+    };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Erreur lors de la création de la session.';
@@ -162,7 +194,7 @@ export async function appendInterviewTurns(
       updates.current_step = currentStep;
     }
 
-    const { data, error } = await supabase
+    let result = await supabase
       .from('interview_simulations')
       .update(updates)
       .eq('id', sessionId)
@@ -170,11 +202,21 @@ export async function appendInterviewTurns(
       .select(INTERVIEW_SELECT)
       .single();
 
-    if (error) {
-      return { data: null, error: error.message };
+    if (result.error && isMissingPanelError(result.error)) {
+      result = await supabase
+        .from('interview_simulations')
+        .update(updates)
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .select(INTERVIEW_SELECT_NO_PANEL)
+        .single();
     }
 
-    return { data: mapDbRowToSession(data as unknown as DbInterviewRow), error: null };
+    if (result.error) {
+      return { data: null, error: result.error.message };
+    }
+
+    return { data: mapDbRowToSession(result.data as unknown as DbInterviewRow), error: null };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Erreur lors de la mise à jour de la session.';
@@ -203,24 +245,36 @@ export async function completeInterviewSession(
 
     const clampedScore = Math.max(0, Math.min(100, Math.round(score)));
 
-    const { data, error } = await supabase
+    const updates = {
+      score: clampedScore,
+      star_evaluation: starEvaluation,
+      status: 'completed',
+      updated_at: new Date().toISOString(),
+    };
+
+    let result = await supabase
       .from('interview_simulations')
-      .update({
-        score: clampedScore,
-        star_evaluation: starEvaluation,
-        status: 'completed',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', sessionId)
       .eq('user_id', user.id)
       .select(INTERVIEW_SELECT)
       .single();
 
-    if (error) {
-      return { data: null, error: error.message };
+    if (result.error && isMissingPanelError(result.error)) {
+      result = await supabase
+        .from('interview_simulations')
+        .update(updates)
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .select(INTERVIEW_SELECT_NO_PANEL)
+        .single();
     }
 
-    return { data: mapDbRowToSession(data as unknown as DbInterviewRow), error: null };
+    if (result.error) {
+      return { data: null, error: result.error.message };
+    }
+
+    return { data: mapDbRowToSession(result.data as unknown as DbInterviewRow), error: null };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Erreur lors de la clôture de la session.';
@@ -245,18 +299,27 @@ export async function getInterviewSessionById(
       return { data: null, error: authError?.message ?? 'Non authentifié.' };
     }
 
-    const { data, error } = await supabase
+    let result = await supabase
       .from('interview_simulations')
       .select(INTERVIEW_SELECT)
       .eq('id', sessionId)
       .eq('user_id', user.id)
       .single();
 
-    if (error) {
-      return { data: null, error: error.message };
+    if (result.error && isMissingPanelError(result.error)) {
+      result = await supabase
+        .from('interview_simulations')
+        .select(INTERVIEW_SELECT_NO_PANEL)
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .single();
     }
 
-    return { data: mapDbRowToSession(data as unknown as DbInterviewRow), error: null };
+    if (result.error) {
+      return { data: null, error: result.error.message };
+    }
+
+    return { data: mapDbRowToSession(result.data as unknown as DbInterviewRow), error: null };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Erreur lors de la récupération de la session.';
@@ -354,36 +417,48 @@ export async function abandonInterviewSession(
       userMessage ||
       'Entretien interrompu par le candidat. Vous pouvez vous réentraîner à tout moment pour compléter les 5 étapes et décrocher votre bilan STAR complet !';
 
-    const { data, error } = await supabase
+    const updates = {
+      status: 'abandoned',
+      star_evaluation: {
+        recruiterVerdict: verdict,
+        overallScore: 0,
+        situationScore: 0,
+        taskScore: 0,
+        actionScore: 0,
+        resultScore: 0,
+        strengthsSummary: ['Prise d’initiative pour s’entraîner à l’oral'],
+        weaknessesSummary: ['Session suspendue avant les étapes de clôture'],
+        keyAdvice: [
+          'Prévoyez 5 à 10 minutes d’affilée pour franchir les 5 questions clés du recruteur.',
+        ],
+        questionsFeedback: [],
+      },
+      updated_at: new Date().toISOString(),
+    };
+
+    let result = await supabase
       .from('interview_simulations')
-      .update({
-        status: 'abandoned',
-        star_evaluation: {
-          recruiterVerdict: verdict,
-          overallScore: 0,
-          situationScore: 0,
-          taskScore: 0,
-          actionScore: 0,
-          resultScore: 0,
-          strengthsSummary: ['Prise d’initiative pour s’entraîner à l’oral'],
-          weaknessesSummary: ['Session suspendue avant les étapes de clôture'],
-          keyAdvice: [
-            'Prévoyez 5 à 10 minutes d’affilée pour franchir les 5 questions clés du recruteur.',
-          ],
-          questionsFeedback: [],
-        },
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', sessionId)
       .eq('user_id', user.id)
       .select(INTERVIEW_SELECT)
       .single();
 
-    if (error) {
-      return { data: null, error: error.message };
+    if (result.error && isMissingPanelError(result.error)) {
+      result = await supabase
+        .from('interview_simulations')
+        .update(updates)
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .select(INTERVIEW_SELECT_NO_PANEL)
+        .single();
     }
 
-    return { data: mapDbRowToSession(data as unknown as DbInterviewRow), error: null };
+    if (result.error) {
+      return { data: null, error: result.error.message };
+    }
+
+    return { data: mapDbRowToSession(result.data as unknown as DbInterviewRow), error: null };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Erreur lors de l’interruption de la session.';
