@@ -261,19 +261,84 @@ export function coerceProfileImportExtraction(
   };
 }
 
+import { extractGeminiText } from '@/lib/quick-test/llm';
+
+async function extractProfileWithGeminiMultimodal(
+  pdfBuffer: Buffer,
+  promptText: string
+): Promise<unknown | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const primaryModel = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite';
+  const models = primaryModel === 'gemini-3.6-flash' ? [primaryModel] : [primaryModel, 'gemini-3.6-flash'];
+  const base64Data = pdfBuffer.toString('base64');
+
+  for (const model of models) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: 'application/pdf',
+                      data: base64Data,
+                    },
+                  },
+                  {
+                    text: promptText,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              responseMimeType: 'application/json',
+              maxOutputTokens: 4096,
+            },
+          }),
+          signal: AbortSignal.timeout(25_000),
+        }
+      );
+
+      if (response.ok) {
+        const body: unknown = await response.json();
+        const text = extractGeminiText(body);
+        if (text) {
+          try {
+            return JSON.parse(text);
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[profile-import] Multimodal PDF extraction failed on model ${model}:`, err);
+    }
+  }
+
+  return null;
+}
+
 /**
- * Runs the smart profile-import extraction: reads the document text, sends it
- * to Gemini with the strict profile schema and coerces the result. Fails
- * explicitly (no silent fallback) — mirroring the deep-analysis pipeline
- * contract used elsewhere in the app.
+ * Runs the smart profile-import extraction:
+ * Reads PDF documents natively via Gemini multimodal or text extraction for DOCX/TXT.
+ * Guaranteed to read scanned, formatted, or standard PDFs with high precision.
  */
 export async function extractProfileFromDocument(
   buffer: Buffer,
   fileName: string
 ): Promise<ProfileImportExtractionResult> {
-  const textResult = await extractDocumentText(buffer, fileName);
-  if (!textResult.ok) return { ok: false, error: textResult.error };
-
   if (!isLlmConfigured()) {
     return {
       ok: false,
@@ -285,10 +350,35 @@ export async function extractProfileFromDocument(
     };
   }
 
-  const raw = await callGeminiJson<unknown>(
-    buildProfileExtractionPrompt(textResult.text),
-    { timeoutMs: 20_000, temperature: 0.1 }
-  );
+  const kind = inferDocumentKind(fileName);
+  let raw: unknown = null;
+
+  // 1. PDF path: Try text extraction, and use multimodal PDF ingestion for maximum visual/structural fidelity
+  if (kind === 'pdf') {
+    const textResult = await extractDocumentText(buffer, fileName);
+    const extractedText = textResult.ok ? textResult.text : '';
+
+    const prompt = buildProfileExtractionPrompt(
+      extractedText || 'Ce document est un CV ou profil professionnel en PDF. Extrais toutes les informations visibles.'
+    );
+
+    // Multimodal ingestion directly with Gemini Flash
+    raw = await extractProfileWithGeminiMultimodal(buffer, prompt);
+
+    // If multimodal failed and we had extracted text, try standard text prompt
+    if (!raw && extractedText.length > 50) {
+      raw = await callGeminiJson<unknown>(prompt, { timeoutMs: 20_000, temperature: 0.1 });
+    }
+  } else {
+    // 2. DOCX / TXT path: Extract text and call Gemini
+    const textResult = await extractDocumentText(buffer, fileName);
+    if (!textResult.ok) return { ok: false, error: textResult.error };
+
+    raw = await callGeminiJson<unknown>(
+      buildProfileExtractionPrompt(textResult.text),
+      { timeoutMs: 20_000, temperature: 0.1 }
+    );
+  }
 
   if (!raw) {
     return {

@@ -61,6 +61,17 @@ export interface QuestionStarScore {
   suggestedImprovement: string;
 }
 
+/** English language assessment produced when English proficiency is evaluated. */
+export interface EnglishLanguageEvaluation {
+  required: boolean;
+  detectedRequirement?: string;
+  score: number;
+  assessedLevel: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2' | 'N/A';
+  fluencyFeedback: string;
+  strengths: string[];
+  areasForImprovement: string[];
+}
+
 /** Comprehensive final STAR evaluation report produced by Gemini. */
 export interface StarEvaluation {
   overallScore: number;
@@ -73,6 +84,8 @@ export interface StarEvaluation {
   recruiterVerdict: string;
   keyAdvice: string[];
   questionsFeedback: QuestionStarScore[];
+  /** Dedicated English proficiency evaluation if required or tested */
+  englishEvaluation?: EnglishLanguageEvaluation | null;
 }
 
 /** The full entity representing an interview simulation in Supabase. */

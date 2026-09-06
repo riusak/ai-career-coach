@@ -209,6 +209,52 @@ export function panelToMap(panel: InterviewerSpeaker[]): Record<string, Intervie
 }
 
 /**
+ * Detects whether English language proficiency is required for this position based on title and description.
+ */
+export function detectEnglishRequirement(
+  jobTitle: string,
+  jobDescription?: string | null
+): { required: boolean; reason: string } {
+  const text = `${jobTitle} ${jobDescription || ''}`.toLowerCase();
+
+  const englishPatterns = [
+    /\banglais\b/i,
+    /\benglish\b/i,
+    /\bb2\b/i,
+    /\bc1\b/i,
+    /\bc2\b/i,
+    /\btoeic\b/i,
+    /\btoefl\b/i,
+    /\bfluent\b/i,
+    /\bbilingue\b/i,
+    /\bbilingual\b/i,
+    /\binternational\b/i,
+    /\bworldwide\b/i,
+    /\bglobal team\b/i,
+    /\bcross-border\b/i,
+    /\benglish proficiency\b/i,
+    /\banglais courant\b/i,
+    /\banglais exigé\b/i,
+    /\banglais requis\b/i,
+    /\banglais professionnel\b/i,
+  ];
+
+  for (const pattern of englishPatterns) {
+    if (pattern.test(text)) {
+      return {
+        required: true,
+        reason: "Compétence en anglais professionnel requise pour ce poste.",
+      };
+    }
+  }
+
+  return {
+    required: false,
+    reason: "Anglais non requis explicitement dans l'offre.",
+  };
+}
+
+/**
  * Generates the system instructions for Gemini to embody a dynamic panel of recruiters
  * in an interactive video interview. Uses context.panel if available, else falls back
  * to the legacy Alisor/Marc panel.
@@ -218,8 +264,17 @@ export function buildRecruiterSystemPrompt(context: InterviewContext): string {
   const roleTarget = context.jobTitle;
   const companyName = context.company || (isFrench ? 'notre entreprise' : 'our company');
   const profileGuidance = getRoleSpecificGuidance(context.jobTitle, context.interviewType, isFrench);
+  const englishCheck = detectEnglishRequirement(context.jobTitle, context.jobDescription);
 
   const panel = context.panel;
+
+  const englishInstructionFr = englishCheck.required
+    ? `\n\nÉVALUATION OBLIGATOIRE DU NIVEAU D'ANGLAIS :
+Le poste exige un bon niveau d'anglais (${englishCheck.reason}). À l'Étape 3 ou 4, l'expert métier DOIT explicitement basculer en anglais pour poser une question technique ou de collaboration internationale (ex: *"Since this position involves working with English-speaking teammates/clients, let's switch to English for a moment: could you explain in English how you handle [problème technique/projet] ?"*). Le jury évaluera la fluidité, le vocabulaire et l'aisance d'expression en anglais.`
+    : '';
+
+  const englishInstructionEn = `\n\nLANGUAGE EVALUATION:
+Assess candidate's clarity, professional vocabulary, and communication impact in English.`;
 
   // Build dynamic panel description
   if (panel && panel.length >= 2) {
@@ -251,7 +306,7 @@ DYNAMIQUE DE VISIOCONFÉRENCE EN DIRECT :
 - Tu indiques ton émotion dominante : "neutral", "curious", "smiling", "skeptical", "impressed", "thoughtful".
 
 CADRAGE MÉTIER DU POSTE :
-${profileGuidance}
+${profileGuidance}${englishInstructionFr}
 
 CYCLE DES 5 ÉTAPES OBLIGATOIRES :
 1. Étape 1 (${hrLead.name}) - Le Pitch d'introduction : Accueil en visio, présentation du jury et invitation à se présenter en 2 minutes.
@@ -279,7 +334,7 @@ DYNAMIC INTERVIEW FLOW:
 - React authentically before challenging. Dominant emotion: "neutral", "curious", "smiling", "skeptical", "impressed", "thoughtful".
 
 JOB GUIDANCE:
-${profileGuidance}
+${profileGuidance}${englishInstructionEn}
 
 5 MANDATORY STAGES:
 1. Stage 1 (${hrLead.name}) - Intro Pitch: Welcome & 2-minute elevator pitch.
@@ -466,12 +521,15 @@ MÉTHODE D'ÉVALUATION S.T.A.R. :
 - Action (0-100) : A-t-il détaillé ses actions personnelles ("Je" et non pas "On"), ses compétences et sa méthode ?
 - Result / Résultat (0-100) : Les résultats sont-ils quantifiés, mesurables et porteurs d'apprentissage ?
 
+ÉVALUATION DU NIVEAU D'ANGLAIS :
+- Si une question ou un échange a eu lieu en anglais (ou si le poste exige l'anglais) : évalue avec précision le niveau du candidat (A1, A2, B1, B2, C1, C2), son aisance, sa fluidité et son vocabulaire professionnel.
+
 TRANSCRIPTION COMPLÈTE DE L'ENTRETIEN :
 ${turnsText}
 
 CONSIGNES DE NOTATION :
 - Sois juste, rigoureux et constructif. Pas de complaisance : si le candidat est resté en surface, note sévèrement mais donne-lui la formulation idéale qu'il aurait dû donner.
-- Fournis un score global (0-100), les 4 scores STAR, une synthèse du verdict, 3 points forts majeurs, 3 axes d'amélioration prioritaires, 3 conseils d'impact, et le détail question par question.`;
+- Fournis un score global (0-100), les 4 scores STAR, une synthèse du verdict, 3 points forts majeurs, 3 axes d'amélioration prioritaires, 3 conseils d'impact, l'évaluation de l'anglais et le détail question par question.`;
   }
 
   return `You are a Senior HR Evaluation Panel and executive career coach.
@@ -482,6 +540,7 @@ STAR METHOD CRITERIA:
 - Task (0-100): Well-defined responsibility and objective.
 - Action (0-100): Detailed personal ownership ("I" vs "We"), strategic decisions.
 - Result (0-100): Quantified outcomes, measurable metrics and learnings.
+- English Language Evaluation: Assess clarity, level (A1-C2), and technical vocabulary.
 
 TRANSCRIPT:
 ${turnsText}
@@ -513,6 +572,19 @@ export const STAR_EVALUATION_SCHEMA = {
       type: 'ARRAY',
       items: { type: 'STRING' },
       description: 'Actionable tips for the real interview day.',
+    },
+    english_evaluation: {
+      type: 'OBJECT',
+      properties: {
+        required: { type: 'BOOLEAN' },
+        detected_requirement: { type: 'STRING' },
+        score: { type: 'INTEGER', description: 'English proficiency score (0-100)' },
+        assessed_level: { type: 'STRING', enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'N/A'] },
+        fluency_feedback: { type: 'STRING' },
+        strengths: { type: 'ARRAY', items: { type: 'STRING' } },
+        areas_for_improvement: { type: 'ARRAY', items: { type: 'STRING' } },
+      },
+      required: ['required', 'score', 'assessed_level', 'fluency_feedback', 'strengths', 'areas_for_improvement'],
     },
     questions_feedback: {
       type: 'ARRAY',

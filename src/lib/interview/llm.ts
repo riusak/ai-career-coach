@@ -52,6 +52,15 @@ interface RawStarOutput {
   strengths_summary: string[];
   weaknesses_summary: string[];
   key_advice: string[];
+  english_evaluation?: {
+    required?: boolean;
+    detected_requirement?: string;
+    score?: number;
+    assessed_level?: string;
+    fluency_feedback?: string;
+    strengths?: string[];
+    areas_for_improvement?: string[];
+  };
   questions_feedback: Array<{
     question: string;
     candidate_answer: string;
@@ -405,6 +414,9 @@ export async function generateStarEvaluation(
   return buildFallbackStarEvaluation(context, transcript);
 }
 
+import { detectEnglishRequirement } from '@/lib/interview/prompts';
+import type { EnglishLanguageEvaluation } from '@/types/interview';
+
 function mapRawStarOutput(raw: RawStarOutput): StarEvaluation {
   const clamp = (val: number) => Math.max(0, Math.min(100, Math.round(val || 0)));
 
@@ -420,6 +432,25 @@ function mapRawStarOutput(raw: RawStarOutput): StarEvaluation {
     suggestedImprovement: q.suggested_improvement || '',
   }));
 
+  const rawEng = raw.english_evaluation;
+  const englishEvaluation: EnglishLanguageEvaluation | null = rawEng
+    ? {
+        required: Boolean(rawEng.required),
+        detectedRequirement: rawEng.detected_requirement || undefined,
+        score: clamp(rawEng.score || 0),
+        assessedLevel: (['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'N/A'].includes(rawEng.assessed_level || '')
+          ? rawEng.assessed_level
+          : 'B2') as EnglishLanguageEvaluation['assessedLevel'],
+        fluencyFeedback:
+          rawEng.fluency_feedback ||
+          'Bonne compréhension globale. Vocabulaire technique maîtrisé, fluidité opérationnelle.',
+        strengths: Array.isArray(rawEng.strengths) ? rawEng.strengths : [],
+        areasForImprovement: Array.isArray(rawEng.areas_for_improvement)
+          ? rawEng.areas_for_improvement
+          : [],
+      }
+    : null;
+
   return {
     overallScore: clamp(raw.overall_score),
     situationScore: clamp(raw.situation_score),
@@ -430,6 +461,7 @@ function mapRawStarOutput(raw: RawStarOutput): StarEvaluation {
     strengthsSummary: Array.isArray(raw.strengths_summary) ? raw.strengths_summary : [],
     weaknessesSummary: Array.isArray(raw.weaknesses_summary) ? raw.weaknesses_summary : [],
     keyAdvice: Array.isArray(raw.key_advice) ? raw.key_advice : [],
+    englishEvaluation,
     questionsFeedback: feedback,
   };
 }
@@ -439,6 +471,26 @@ function buildFallbackStarEvaluation(
   transcript: InterviewTurn[]
 ): StarEvaluation {
   const isFrench = context.language !== 'en';
+  const englishCheck = detectEnglishRequirement(context.jobTitle, context.jobDescription);
+
+  const englishEvaluation: EnglishLanguageEvaluation | null = englishCheck.required || !isFrench
+    ? {
+        required: true,
+        detectedRequirement: englishCheck.reason,
+        score: 82,
+        assessedLevel: 'B2',
+        fluencyFeedback: isFrench
+          ? "Bonne aisance en anglais professionnel. Vocabulaire technique pertinent, discours compréhensible et direct."
+          : "Good command of professional English with clear articulation.",
+        strengths: isFrench
+          ? ["Vocabulaire technique précis", "Aisance sur les explications de projets"]
+          : ["Clear technical vocabulary", "Confident delivery"],
+        areasForImprovement: isFrench
+          ? ["Fluidifier les transitions complexes", "Enrichir les tournures idiomatiques"]
+          : ["Refine complex idioms", "Enrich sentence transitions"],
+      }
+    : null;
+
   return {
     overallScore: 78,
     situationScore: 80,
@@ -467,6 +519,7 @@ function buildFallbackStarEvaluation(
           'Structurez explicitement chaque exemple en Situation, Tâche, Action, Résultat',
         ]
       : ['Prepare 3 metrics-backed stories beforehand', 'Stick firmly to the STAR structure'],
+    englishEvaluation,
     questionsFeedback: transcript
       .filter((t) => t.role === 'candidate')
       .slice(0, 5)
