@@ -53,21 +53,47 @@ export async function POST(request: Request) {
     }
 
     // Dynamic import to keep edge-tts isolated to node runtime
-    const { Communicate } = await import('edge-tts-universal');
-    const communicate = new Communicate(cleanedText, { voice });
+    let buffer: Buffer;
+    try {
+      const { Communicate } = await import('edge-tts-universal');
+      const communicate = new Communicate(cleanedText, { voice });
 
-    const chunks: Buffer[] = [];
-    for await (const chunk of communicate.stream()) {
-      if (chunk.type === 'audio' && chunk.data) {
-        chunks.push(chunk.data);
+      const chunks: Buffer[] = [];
+
+      // Race with a 15s timeout so we don't hang the serverless function
+      const streamPromise = (async () => {
+        for await (const chunk of communicate.stream()) {
+          if (chunk.type === 'audio' && chunk.data) {
+            chunks.push(chunk.data);
+          }
+        }
+      })();
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('TTS stream timeout (15s)')), 15_000)
+      );
+
+      await Promise.race([streamPromise, timeoutPromise]);
+
+      if (chunks.length === 0) {
+        console.warn('[api/interview/tts] No audio chunks received from edge-tts');
+        return NextResponse.json(
+          { error: 'Synthèse vocale indisponible. Utilisation du fallback navigateur.' },
+          { status: 503 }
+        );
       }
-    }
 
-    if (chunks.length === 0) {
-      return NextResponse.json({ error: 'Aucun flux audio reçu.' }, { status: 502 });
+      buffer = Buffer.concat(chunks);
+    } catch (ttsErr) {
+      console.warn(
+        '[api/interview/tts] Edge-TTS generation failed, client should fall back to browser TTS:',
+        ttsErr instanceof Error ? ttsErr.message : ttsErr
+      );
+      return NextResponse.json(
+        { error: 'Synthèse vocale temporairement indisponible.' },
+        { status: 503 }
+      );
     }
-
-    const buffer = Buffer.concat(chunks);
 
     // Save to memory cache
     if (audioCache.size >= MAX_CACHE_ITEMS) {
@@ -85,10 +111,11 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
-    console.error('[api/interview/tts] Generation error:', err);
+    console.error('[api/interview/tts] Unexpected error:', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Erreur interne de synthèse vocale.' },
       { status: 500 }
     );
   }
 }
+

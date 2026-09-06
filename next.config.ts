@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
           // iframe points at Supabase, whose own headers govern that frame).
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
           // Ignored over plain HTTP (local dev), enforced on HTTPS deployments.
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
         ],
