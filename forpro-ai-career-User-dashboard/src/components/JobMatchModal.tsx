@@ -31,7 +31,7 @@ export const JobMatchModal: React.FC<JobMatchModalProps> = ({ isOpen, onClose, l
 
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs font-bold mb-3">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>{isFrench ? "Bientôt disponible" : "Coming Soon"}</span>
+          <span>{isFrench ? "Disponible maintenant" : "Now available"}</span>
         </div>
 
         <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-600 mx-auto flex items-center justify-center mb-3">

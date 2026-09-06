@@ -732,7 +732,7 @@ export default function CVPreviewModal({
                       <h5 className="flex items-center gap-1.5 text-sm font-bold text-slate-400">
                         <span>{t('previewServiceMatchTitle')}</span>
                         <span className="rounded-full bg-navy-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-navy-500">
-                          {t('comingSoonBadge')}
+                          {t('pendingParse')}
                         </span>
                       </h5>
                       <p className="mt-1 text-xs leading-relaxed text-slate-400">
@@ -741,24 +741,22 @@ export default function CVPreviewModal({
                     </div>
                   )}
 
-                  {/* Service 2: Mock Interview (teaser) */}
-                  <div
-                    className="cursor-not-allowed rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4"
-                    title={t('quickComingSoon')}
+                  {/* Service 2: Mock Interview — live, launched from this CV */}
+                  <Link
+                    href={`/dashboard/mock?cv=${cv.id}`}
+                    className="group cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 text-left transition-all hover:border-brand-500 hover:shadow-md"
                   >
-                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-300">
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
                       <Video className="h-5 w-5" />
                     </div>
-                    <h5 className="flex items-center gap-1.5 text-sm font-bold text-slate-400">
+                    <h5 className="flex items-center gap-1.5 text-sm font-bold text-slate-900 transition-colors group-hover:text-brand-500">
                       <span>{t('previewServiceInterviewTitle')}</span>
-                      <span className="rounded-full bg-navy-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-navy-500">
-                        {t('comingSoonBadge')}
-                      </span>
+                      <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                     </h5>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500">
                       {t('previewServiceInterviewDesc')}
                     </p>
-                  </div>
+                  </Link>
                 </div>
               </div>
 

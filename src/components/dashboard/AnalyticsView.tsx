@@ -6,11 +6,12 @@ import {
   Activity,
   ArrowLeft,
   BarChart2,
-  Clock,
   FileText,
   Flame,
+  Mic,
   Target,
   TrendingUp,
+  Video,
 } from 'lucide-react';
 import type { DashboardViewData } from '@/types/dashboard';
 import PageGuideToggle from '@/components/dashboard/onboarding/PageGuideToggle';
@@ -271,23 +272,92 @@ export default function AnalyticsView({ data }: AnalyticsViewProps) {
         )}
       </div>
 
-      {/* Empty state for upcoming analytics */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
-          <BarChart2 className="w-7 h-7 text-blue-500" />
+      {/* Simulation practice stats */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 sm:p-7">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-purple-50">
+            <Video className="w-5.5 h-5.5 text-purple-600" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-slate-900">
+              {isFrench ? 'Simulations d’entretien' : 'Mock interviews'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {isFrench
+                ? 'Votre entraînement à l’oral (méthode STAR) et vos scores en un coup d’œil.'
+                : 'Your STAR-method interview practice and scores at a glance.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/mock')}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#FF7A00] px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-[#E66E00] cursor-pointer"
+          >
+            <Mic className="w-3.5 h-3.5" />
+            {isFrench ? 'Lancer une simulation' : 'Start a mock interview'}
+          </button>
         </div>
-        <h3 className="text-base font-bold text-slate-900">
-          {isFrench ? 'Graphiques détaillés bientôt disponibles' : 'Detailed charts coming soon'}
-        </h3>
-        <p className="max-w-md text-sm text-slate-500 leading-relaxed">
-          {isFrench
-            ? 'Historique des simulations et évolution des scores ATS apparaîtront dès vos prochaines analyses.'
-            : 'Simulation history and ATS score evolution will appear with your next analyses.'}
-        </p>
-        <div className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">
-          <Clock className="w-3.5 h-3.5 text-[#FF7A00]" />
-          {isFrench ? 'Bientôt disponible' : 'Coming soon'}
-        </div>
+
+        {data.simulations.total > 0 ? (
+          <>
+            <div className="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {[
+                {
+                  label: isFrench ? 'Simulations lancées' : 'Sessions started',
+                  value: String(data.simulations.total),
+                },
+                {
+                  label: isFrench ? 'Terminées' : 'Completed',
+                  value: String(data.simulations.completed),
+                },
+                {
+                  label: isFrench ? 'En cours' : 'In progress',
+                  value: String(data.simulations.inProgress),
+                },
+                {
+                  label: isFrench ? 'Score moyen' : 'Average score',
+                  value: data.simulations.averageScore !== null ? `${data.simulations.averageScore}%` : '—',
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs"
+                >
+                  <span className="block text-xl font-black text-slate-900 leading-none tabular-nums">
+                    {stat.value}
+                  </span>
+                  <span className="block text-[11px] font-semibold text-slate-500 mt-1">
+                    {stat.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-xs text-slate-500">
+              {data.simulations.bestScore !== null && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  {isFrench
+                    ? `Meilleur score : ${data.simulations.bestScore}%`
+                    : `Best score: ${data.simulations.bestScore}%`}
+                </span>
+              )}
+            </p>
+          </>
+        ) : (
+          <div className="mt-5 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-10 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center">
+              <BarChart2 className="w-6 h-6 text-purple-400" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-900">
+              {isFrench ? 'Aucune simulation pour le moment' : 'No mock interview yet'}
+            </h4>
+            <p className="max-w-md text-xs text-slate-500 leading-relaxed">
+              {isFrench
+                ? 'Lancez votre première simulation d’entretien : votre coach IA joue le recruteur, débriefe chaque réponse et vous remet un bilan STAR complet.'
+                : 'Start your first mock interview: your AI coach plays the recruiter, debriefs each answer and hands you a full STAR report.'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

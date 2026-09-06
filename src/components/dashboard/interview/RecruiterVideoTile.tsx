@@ -20,7 +20,7 @@ export default function RecruiterVideoTile({
   onReplayAudio,
   className = '',
 }: RecruiterVideoTileProps) {
-  const isAlisor = speaker.id === 'alisor';
+  const isLead = speaker.id === 'alisor' || speaker.role === 'lead_recruiter';
 
   return (
     <div
@@ -30,7 +30,7 @@ export default function RecruiterVideoTile({
           : 'border-slate-800/80 bg-slate-950'
       } ${className}`}
       style={{
-        background: isAlisor
+        background: isLead
           ? 'radial-gradient(circle at 50% 20%, #1e293b 0%, #0f172a 60%, #020617 100%)'
           : 'radial-gradient(circle at 50% 20%, #1e1e38 0%, #0d1117 60%, #030712 100%)',
       }}
@@ -39,7 +39,7 @@ export default function RecruiterVideoTile({
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div
           className={`absolute -top-10 left-1/4 w-40 h-40 rounded-full blur-3xl opacity-20 ${
-            isAlisor ? 'bg-teal-500' : 'bg-blue-600'
+            isLead ? 'bg-teal-500' : 'bg-blue-600'
           }`}
         />
         <div className="absolute bottom-0 right-0 w-32 h-32 rounded-full blur-2xl opacity-15 bg-amber-500" />
@@ -89,6 +89,7 @@ export default function RecruiterVideoTile({
       <div className="relative z-10 flex-1 flex items-center justify-center py-1 sm:py-2">
         <AnimatedRecruiterAvatar
           speakerId={speaker.id}
+          avatarSeed={speaker.avatarSeed !== undefined ? String(speaker.avatarSeed) : speaker.id}
           emotion={emotion}
           isSpeaking={isSpeaking}
           size="md"

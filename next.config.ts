@@ -3,6 +3,23 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' 'unsafe-eval';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com data:;
+  img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://ui-avatars.com https://img.logo.dev https://logo.clearbit.com;
+  media-src 'self' blob: data:;
+  connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+  frame-src 'self' https://*.supabase.co;
+  frame-ancestors 'self';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+`
+  .replace(/\s{2,}/g, ' ')
+  .trim();
+
 const nextConfig: NextConfig = {
   // Development access from the LAN (e.g. http://192.168.0.23:3000 from a
   // phone/second machine): Next.js blocks cross-origin requests to dev-only
@@ -24,23 +41,25 @@ const nextConfig: NextConfig = {
       {
         source: '/:path*',
         headers: [
-          // Prevents MIME sniffing — complements the server-side magic-byte
-          // upload validation (an uploaded file served from Storage is out of
-          // scope here, but app responses are covered).
+          // Content Security Policy: prevents XSS, injection and unauthorized origins
+          { key: 'Content-Security-Policy', value: cspHeader },
+          // Prevents MIME sniffing — complements server-side magic-byte validation
           { key: 'X-Content-Type-Options', value: 'nosniff' },
-          // The app itself is never legitimately framed (the resume preview
-          // iframe points at Supabase, whose own headers govern that frame).
+          // The app itself is never framed by third-party origins
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // Cross-origin privacy
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // Limit browser features accessible to the app
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=()' },
-          // Ignored over plain HTTP (local dev), enforced on HTTPS deployments.
+          // Enforces HTTPS transport with 2-year max-age
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+          // Legacy XSS filter protection
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          // Enable DNS prefetching control
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
         ],
       },
     ];
-    // NOTE: a strict Content-Security-Policy (nonces for Next inline scripts,
-    // allow-lists for the Supabase/Gemini origins) is a deliberate follow-up —
-    // enabling it blindly breaks hydration.
   },
 };
 

@@ -1,12 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { ArrowRight, Bell, Compass, Crown, Globe } from 'lucide-react';
+import { ArrowRight, Bell, Compass, Crown, Globe, MessageSquare } from 'lucide-react';
 import type { DashboardUser } from '@/types/dashboard';
 import { useLocaleSwitcher } from '@/i18n/provider';
 import { startDashboardTour } from '@/lib/dashboard/tour-events';
+import FeedbackModal from '@/components/dashboard/FeedbackModal';
 
 interface DashboardHeaderProps {
   user: DashboardUser;
@@ -28,6 +30,7 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
   const isFrench = locale !== 'en';
   const firstName = user.name ? user.name.split(' ')[0] : 'ForPro';
   const score = user.isEmptyState ? 0 : user.profileStrength || 0;
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   const handleStartTour = () => startDashboardTour(pathname, (href) => router.push(href));
 
@@ -85,18 +88,26 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
               <span>{isFrench ? 'Visite guidée' : 'Guided tour'}</span>
             </button>
 
-            {/* Upgrade Button — payments not integrated yet: intentionally inert. */}
+            {/* Support & Feedback modal trigger */}
             <button
-              id="header-upgrade-btn"
+              id="support-feedback-btn"
               type="button"
-              disabled
-              aria-disabled="true"
-              title={isFrench ? 'Le paiement arrive bientôt' : 'Payments coming soon'}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0B1528] text-white font-bold text-xs sm:text-sm shadow-xs cursor-not-allowed opacity-80"
+              onClick={() => setFeedbackOpen(true)}
+              title={isFrench ? 'Contacter le support / Envoyer un retour' : 'Contact support / Send feedback'}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 cursor-pointer"
+            >
+              <MessageSquare className="h-3.5 w-3.5 text-[#FF7A00]" />
+              <span>{isFrench ? 'Support / Avis' : 'Feedback'}</span>
+            </button>
+
+            {/* Upgrade Button — redirects to pricing */}
+            <Link
+              href="/dashboard/pricing"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0B1528] text-white font-bold text-xs sm:text-sm shadow-xs cursor-pointer"
             >
               <Crown className="w-4 h-4 text-[#FF7A00] fill-[#FF7A00]" />
               <span>{isFrench ? 'Passer Pro' : 'Upgrade'}</span>
-            </button>
+            </Link>
 
             {/* Notifications Bell */}
             <button
@@ -254,21 +265,19 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
               </div>
             </Link>
 
-            {/* Upgrade Button (mobile) — payments not integrated yet: inert. */}
-            <button
-              id="mobile-header-upgrade-btn"
-              type="button"
-              disabled
-              aria-disabled="true"
-              title={isFrench ? 'Le paiement arrive bientôt' : 'Payments coming soon'}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B1528] text-white font-bold text-xs shadow-xs shrink-0 cursor-not-allowed opacity-80"
+            {/* Upgrade Button (mobile) — redirects to pricing */}
+            <Link
+              href="/dashboard/pricing"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B1528] text-white font-bold text-xs shadow-xs shrink-0 cursor-pointer"
             >
               <Crown className="w-3.5 h-3.5 text-[#FF7A00] fill-[#FF7A00]" />
               <span>{isFrench ? 'Passer Pro' : 'Upgrade'}</span>
-            </button>
+            </Link>
           </div>
         </div>
       </div>
+
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </header>
   );
 }

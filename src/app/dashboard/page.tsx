@@ -18,10 +18,10 @@ export default async function DashboardPage() {
   const onboardingSeenCookie = cookieStore.get(ONBOARDING_COOKIE)?.value === '1';
 
   // Full-screen onboarding wizard: triggered STRICTLY ONCE for brand-new
-  // users — only when the dashboard is empty AND the user has never completed
-  // or dismissed the wizard (neither the DB flag nor the cookie is set).
+  // users — when the user has never completed or dismissed the wizard
+  // (neither the DB flag nor the cookie is set).
   const showOnboarding =
-    data.isEmptyState && !onboardingCompletedDurably && !onboardingSeenCookie;
+    !onboardingCompletedDurably && !onboardingSeenCookie;
 
   // Persistent minimal helper widget — the non-intrusive replacement for the
   // full-screen flow. Shown until the user durably completes the onboarding.

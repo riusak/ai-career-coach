@@ -24,13 +24,16 @@ export type InterviewStatus = 'in_progress' | 'completed' | 'abandoned';
 
 export type InterviewLanguage = 'fr' | 'en';
 
-export type InterviewerId = 'alisor' | 'marc';
+export type InterviewerId = string;
 
 export interface InterviewerSpeaker {
   id: InterviewerId;
   name: string;
   title: string;
   gender: 'female' | 'male';
+  role?: string;
+  /** Deterministic seed for avatar rendering (0-99) */
+  avatarSeed?: number;
 }
 
 /** A single conversational turn exchanged between recruiter and candidate. */
@@ -88,6 +91,8 @@ export interface InterviewSession {
   currentStep: number;
   totalSteps: number;
   transcript: InterviewTurn[];
+  /** Dynamically generated jury panel for this session */
+  panel: InterviewerSpeaker[] | null;
   starEvaluation: StarEvaluation | null;
   createdAt: string;
   updatedAt: string;

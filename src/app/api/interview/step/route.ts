@@ -4,6 +4,7 @@ import {
   appendInterviewTurns,
   getInterviewSessionById,
 } from '@/lib/supabase/interviews';
+import { checkRateLimit, getClientIp, sanitizeText } from '@/lib/security/rate-limit';
 import type { InterviewTurn } from '@/types/interview';
 
 export const runtime = 'nodejs';
@@ -17,6 +18,16 @@ interface StepRequestBody {
 
 export async function POST(request: Request) {
   try {
+    // 0. DoS and Quota abuse protection: 30 steps/min per IP
+    const ip = getClientIp(new Headers(request.headers));
+    const rateCheck = checkRateLimit(`interview_step:${ip}`, 30, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Trop de requêtes d’entretien. Veuillez patienter un instant.' },
+        { status: 429 }
+      );
+    }
+
     const body: unknown = await request.json();
     if (typeof body !== 'object' || body === null) {
       return NextResponse.json({ error: 'Payload invalide.' }, { status: 400 });
@@ -31,12 +42,20 @@ export async function POST(request: Request) {
       );
     }
 
+    if (candidateAnswer.length > 5000) {
+      return NextResponse.json(
+        { error: 'Votre réponse est trop volumineuse (maximum 5000 caractères).' },
+        { status: 413 }
+      );
+    }
+
     // 1. Fetch current session
     const sessionResult = await getInterviewSessionById(sessionId);
     if (sessionResult.error || !sessionResult.data) {
+      const isAuth = sessionResult.error?.toLowerCase().includes('authentifié');
       return NextResponse.json(
         { error: sessionResult.error ?? 'Session introuvable.' },
-        { status: 404 }
+        { status: isAuth ? 401 : 404 }
       );
     }
 
@@ -46,7 +65,7 @@ export async function POST(request: Request) {
     const candidateTurn: InterviewTurn = {
       id: crypto.randomUUID(),
       role: 'candidate',
-      content: candidateAnswer.trim(),
+      content: sanitizeText(candidateAnswer, 5000),
       isFollowup: Boolean(isCandidateFollowup),
       stage: session.currentStep,
       timestamp: new Date().toISOString(),
@@ -62,6 +81,7 @@ export async function POST(request: Request) {
         jobDescription: session.jobDescription,
         language: session.language,
         interviewType: session.interviewType,
+        panel: session.panel ?? undefined,
       },
       updatedTranscript,
       session.currentStep,

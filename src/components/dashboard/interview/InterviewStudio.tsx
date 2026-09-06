@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Award,
@@ -58,6 +58,13 @@ export default function InterviewStudio({
   const isFrench = session.language !== 'en';
   const panel = isFrench ? RECRUITER_PANEL : RECRUITER_PANEL_EN;
 
+  const panelMembers: InterviewerSpeaker[] = useMemo(() => {
+    if (session.panel && session.panel.length > 0) {
+      return session.panel;
+    }
+    return [panel.alisor, panel.marc];
+  }, [session.panel, panel]);
+
   // Current recruiter prompt & emotion & active speaker
   const [latestRecruiterTurn, setLatestRecruiterTurn] = useState<InterviewTurn>(initialTurn);
   const [currentEmotion, setCurrentEmotion] = useState<InterviewEmotion>(
@@ -66,7 +73,8 @@ export default function InterviewStudio({
 
   const activeSpeaker: InterviewerSpeaker =
     latestRecruiterTurn.speaker ||
-    (currentStep >= 3 && currentStep <= 4 ? panel.marc : panel.alisor);
+    panelMembers[0] ||
+    panel.alisor;
 
   // Input modes: 'voice' | 'text'
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
@@ -112,14 +120,14 @@ export default function InterviewStudio({
 
   const playTurn = useCallback(
     (turn: InterviewTurn) => {
-      const speakerId = turn.speaker?.id || (currentStep >= 3 && currentStep <= 4 ? 'marc' : 'alisor');
+      const speakerId = turn.speaker?.id || panelMembers[0]?.id || 'alisor';
       playAudio({
         text: turn.content,
         speakerId,
         language: session.language,
       });
     },
-    [currentStep, playAudio, session.language]
+    [panelMembers, playAudio, session.language]
   );
 
   // Play initial recruiter greeting on mount if autoPlay enabled
@@ -208,11 +216,7 @@ export default function InterviewStudio({
         recruiterTurn: InterviewTurn;
       };
 
-      if (stepData.isCompleted) {
-        await triggerStarEvaluation();
-        return;
-      }
-
+      // Always display and play the recruiter's turn (including closing speech)
       const nextRecruiterTurn = stepData.recruiterTurn;
       setLatestRecruiterTurn(nextRecruiterTurn);
       setCurrentEmotion(stepData.emotion);
@@ -221,6 +225,17 @@ export default function InterviewStudio({
 
       if (autoPlayAudio && nextRecruiterTurn.content) {
         playTurn(nextRecruiterTurn);
+      }
+
+      // If interview is completed, trigger STAR evaluation after the closing speech plays
+      if (stepData.isCompleted) {
+        // Estimate audio duration: ~100ms per word + 2s buffer for natural pause
+        const wordCount = (nextRecruiterTurn.content || '').split(/\s+/).length;
+        const estimatedAudioMs = Math.max(4000, wordCount * 100 + 2000);
+        setTimeout(() => {
+          triggerStarEvaluation();
+        }, estimatedAudioMs);
+        return;
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erreur de communication avec le jury.';
@@ -261,7 +276,9 @@ export default function InterviewStudio({
               <span>•</span>
               <span className="flex items-center gap-1">
                 <Users className="w-3 h-3 text-slate-400" />
-                {isFrench ? 'Jury de 2 recruteurs' : '2-Recruiter Panel'}
+                {isFrench
+                  ? `Jury de ${panelMembers.length} recruteur${panelMembers.length > 1 ? 's' : ''}`
+                  : `${panelMembers.length}-Recruiter Panel`}
               </span>
             </div>
           </div>
@@ -350,23 +367,32 @@ export default function InterviewStudio({
 
       {/* Main Video Call Arena */}
       <div className="flex-1 p-4 sm:p-6 flex flex-col gap-5 overflow-y-auto">
-        {/* The 2-Recruiter Visio Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tile 1: Mme Alisor (RH) */}
-          <RecruiterVideoTile
-            speaker={panel.alisor}
-            emotion={activeSpeaker.id === 'alisor' ? currentEmotion : 'smiling'}
-            isSpeaking={isSpeaking && (activeSpeakerId === 'alisor' || activeSpeaker.id === 'alisor')}
-            onReplayAudio={() => playTurn(latestRecruiterTurn)}
-          />
-
-          {/* Tile 2: Marc Laurent (Directeur Technique) */}
-          <RecruiterVideoTile
-            speaker={panel.marc}
-            emotion={activeSpeaker.id === 'marc' ? currentEmotion : 'thoughtful'}
-            isSpeaking={isSpeaking && (activeSpeakerId === 'marc' || activeSpeaker.id === 'marc')}
-            onReplayAudio={() => playTurn(latestRecruiterTurn)}
-          />
+        {/* Dynamic Recruiter Visio Grid */}
+        <div
+          className={`grid gap-4 ${
+            panelMembers.length === 1
+              ? 'grid-cols-1 max-w-xl mx-auto w-full'
+              : panelMembers.length === 2
+              ? 'grid-cols-1 md:grid-cols-2'
+              : panelMembers.length === 3
+              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+              : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+          }`}
+        >
+          {panelMembers.map((member) => {
+            const isThisSpeaker =
+              activeSpeakerId?.toLowerCase() === member.id.toLowerCase() ||
+              activeSpeaker.id.toLowerCase() === member.id.toLowerCase();
+            return (
+              <RecruiterVideoTile
+                key={member.id}
+                speaker={member}
+                emotion={isThisSpeaker ? currentEmotion : 'smiling'}
+                isSpeaking={isSpeaking && isThisSpeaker}
+                onReplayAudio={() => playTurn(latestRecruiterTurn)}
+              />
+            );
+          })}
         </div>
 
         {/* Live Subtitle & Current Recruiter Dialogue Bar */}

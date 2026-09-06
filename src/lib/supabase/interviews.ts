@@ -4,6 +4,7 @@ import type {
   InterviewSession,
   InterviewSessionSummary,
   InterviewTurn,
+  InterviewerSpeaker,
   StarEvaluation,
 } from '@/types/interview';
 
@@ -15,7 +16,7 @@ export interface InterviewResponse<T> {
 const INTERVIEW_SELECT =
   'id, resume_id, user_id, job_matching_id, job_title, company, job_description, ' +
   'language, interview_type, status, score, current_step, total_steps, ' +
-  'transcript, star_evaluation, created_at, updated_at';
+  'panel, transcript, star_evaluation, created_at, updated_at';
 
 interface DbInterviewRow {
   id: string;
@@ -31,6 +32,7 @@ interface DbInterviewRow {
   score: number | null;
   current_step: number;
   total_steps: number;
+  panel?: unknown;
   transcript: unknown;
   star_evaluation: unknown;
   created_at: string;
@@ -56,6 +58,7 @@ function mapDbRowToSession(row: DbInterviewRow): InterviewSession {
     score: row.score,
     currentStep: row.current_step,
     totalSteps: row.total_steps,
+    panel: Array.isArray(row.panel) ? (row.panel as InterviewerSpeaker[]) : null,
     transcript: Array.isArray(row.transcript) ? (row.transcript as InterviewTurn[]) : [],
     starEvaluation: (row.star_evaluation as StarEvaluation) ?? null,
     createdAt: row.created_at,
@@ -68,7 +71,8 @@ function mapDbRowToSession(row: DbInterviewRow): InterviewSession {
  */
 export async function createInterviewSession(
   input: InitInterviewInput,
-  initialTurns: InterviewTurn[] = []
+  initialTurns: InterviewTurn[] = [],
+  panel?: InterviewerSpeaker[] | null
 ): Promise<InterviewResponse<InterviewSession>> {
   try {
     const supabase = await createClient();
@@ -95,6 +99,7 @@ export async function createInterviewSession(
         status: 'in_progress',
         current_step: 1,
         total_steps: 5,
+        panel: panel ?? null,
         transcript: initialTurns,
       })
       .select(INTERVIEW_SELECT)
@@ -382,6 +387,42 @@ export async function abandonInterviewSession(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Erreur lors de l’interruption de la session.';
+    return { data: null, error: message };
+  }
+}
+
+/**
+ * Permanently deletes an interview session owned by the authenticated user.
+ * RLS policy ensures only the owner can delete their own sessions.
+ */
+export async function deleteInterviewSession(
+  sessionId: string
+): Promise<InterviewResponse<{ deleted: boolean }>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError?.message ?? 'Non authentifié.' };
+    }
+
+    const { error } = await supabase
+      .from('interview_simulations')
+      .delete()
+      .eq('id', sessionId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    return { data: { deleted: true }, error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Erreur lors de la suppression de la session.';
     return { data: null, error: message };
   }
 }

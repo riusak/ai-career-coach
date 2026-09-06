@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { MessageSquare } from 'lucide-react';
 import BarChart from '@/components/admin/BarChart';
 import StatCard from '@/components/admin/StatCard';
 import ErrorState from '@/components/ui/ErrorState';
 import EmptyState from '@/components/ui/EmptyState';
 import { getAdminStats } from '@/lib/admin/stats';
+import { getFeedbackSummaryStats } from '@/lib/feedback/actions';
 import { formatDateTime, formatPercent, truncateMiddle } from '@/lib/admin/utils';
 import { QUICK_TEST_EVENT_TYPES, type QuickTestEventType } from '@/types/admin';
 
@@ -45,7 +47,11 @@ function FunnelItem({
 }
 
 export default async function AdminOverviewPage() {
-  const [stats, t] = await Promise.all([getAdminStats(), getTranslations('admin')]);
+  const [stats, feedbackStats, t] = await Promise.all([
+    getAdminStats(),
+    getFeedbackSummaryStats(),
+    getTranslations('admin'),
+  ]);
 
   const eventLabel = (eventType: QuickTestEventType): string =>
     t(`eventTypes.${eventType}`);
@@ -79,13 +85,43 @@ export default async function AdminOverviewPage() {
             {t('subtitle')}
           </p>
         </div>
-        <Link
-          href="/admin/users"
-          className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
-        >
-          {t('overview.manageUsers')}
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/feedback"
+            className="flex items-center gap-2 rounded-md border border-navy-200 bg-white px-3.5 py-2 text-sm font-semibold text-navy-800 shadow-sm hover:bg-navy-50"
+          >
+            <MessageSquare className="h-4 w-4 text-orange" />
+            <span>Retours ({feedbackStats.newCount} nouv.)</span>
+          </Link>
+          <Link
+            href="/admin/users"
+            className="rounded-md bg-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600"
+          >
+            {t('overview.manageUsers')}
+          </Link>
+        </div>
       </div>
+
+      {/* Feedback banner if there are new items */}
+      {feedbackStats.newCount > 0 && (
+        <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="flex h-3 w-3 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+            </span>
+            <p className="text-sm font-medium text-amber-900">
+              <strong>{feedbackStats.newCount} nouveau(x) retour(s) utilisateur(s)</strong> en attente de traitement.
+            </p>
+          </div>
+          <Link
+            href="/admin/feedback?status=new"
+            className="rounded-lg bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition-colors shadow-2xs"
+          >
+            Voir les retours
+          </Link>
+        </div>
+      )}
 
       {/* 1. KPI row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

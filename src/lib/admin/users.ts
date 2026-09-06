@@ -4,6 +4,7 @@ import { RESUME_BUCKET } from '@/lib/supabase/resumes';
 import { writeAuditLog } from '@/lib/admin/audit';
 import { getCurrentAdmin } from '@/lib/admin/guard';
 import { toUserRole, clampPage } from '@/lib/admin/utils';
+import { sanitizeLikePattern } from '@/lib/security/rate-limit';
 import type {
   AdminResumeSummary,
   AdminLatestAnalysis,
@@ -102,7 +103,8 @@ export async function listAdminUsers(options: {
       count: 'exact',
     });
     if (query && query.trim().length > 0) {
-      request = request.ilike('full_name', `%${query.trim()}%`);
+      const sanitized = sanitizeLikePattern(query);
+      request = request.ilike('full_name', `%${sanitized}%`);
     }
     if (role) {
       request = request.eq('role', role);

@@ -1,28 +1,30 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
-  X,
-  ArrowRight,
-  ArrowLeft,
-  CheckCircle2,
-  Compass,
-  LayoutDashboard,
-  FileText,
-  Users,
-  Video,
-  TrendingUp,
   Activity,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  FileText,
+  LayoutDashboard,
   Settings,
   Sparkles,
-  Eye
+  Target,
+  TrendingUp,
+  Users,
+  Video,
+  X,
 } from 'lucide-react';
 
 interface TourStep {
   id: string;
   targetId: string;
-  title: string;
-  description: string;
-  placement: 'right' | 'center';
-  badge: string;
+  titleFr: string;
+  titleEn: string;
+  descFr: string;
+  descEn: string;
+  badgeFr: string;
+  badgeEn: string;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 interface ProductTourProps {
@@ -32,18 +34,173 @@ interface ProductTourProps {
   lang?: 'en' | 'fr';
 }
 
-const stepMenuMeta: Record<
-  string,
-  { labelFr: string; labelEn: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  'nav-dashboard': { labelFr: 'Tableau de bord', labelEn: 'Dashboard', icon: LayoutDashboard },
-  'nav-cvs': { labelFr: 'Mes CVs', labelEn: 'My CVs', icon: FileText },
-  'nav-matching': { labelFr: 'Job Matching', labelEn: 'Job Matching', icon: Users },
-  'nav-mock': { labelFr: 'Simulations d’entretiens', labelEn: 'Mock Interviews', icon: Video },
-  'nav-timeline': { labelFr: 'Roadmap de carrière', labelEn: 'Career Roadmap', icon: TrendingUp },
-  'nav-analytics': { labelFr: 'Analytics', labelEn: 'Analytics', icon: Activity },
-  'nav-settings': { labelFr: 'Paramètres', labelEn: 'Settings', icon: Settings },
-};
+interface TargetRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  right: number;
+  bottom: number;
+}
+
+const STEPS: TourStep[] = [
+  {
+    id: 'nav-dashboard',
+    targetId: 'nav-dashboard',
+    titleFr: 'Tableau de bord',
+    titleEn: 'Dashboard',
+    descFr:
+      'Votre vue synthétique : complétude du profil, actions rapides et activités récentes. C’est votre camp de base.',
+    descEn:
+      'Your central hub: profile completeness, quick shortcuts to test an offer or CV, and recent activity.',
+    badgeFr: 'Menu 1/12',
+    badgeEn: 'Menu 1/12',
+    icon: LayoutDashboard,
+  },
+  {
+    id: 'quick-actions-section',
+    targetId: 'quick-actions-section',
+    titleFr: 'Actions rapides',
+    titleEn: 'Quick Actions',
+    descFr:
+      'Vos 4 raccourcis clés : téléversez un CV, lancez un diagnostic ATS instantané, évaluez une offre ou démarrez une simulation.',
+    descEn:
+      'Your 4 instant shortcuts: upload a CV, run an ATS diagnostic, evaluate a job offer, or start a mock interview.',
+    badgeFr: 'Étape 2/12',
+    badgeEn: 'Step 2/12',
+    icon: Sparkles,
+  },
+  {
+    id: 'career-roadmap-card',
+    targetId: 'career-roadmap-card',
+    titleFr: 'Progression de Carrière',
+    titleEn: 'Career Progression',
+    descFr:
+      'Votre feuille de route ascendante : suivez vos étapes professionnelles, vos compétences et votre projection vers vos objectifs cibles.',
+    descEn:
+      'Your ascending career roadmap: track milestone roles, mastered skills, and your trajectory toward target positions.',
+    badgeFr: 'Étape 3/12',
+    badgeEn: 'Step 3/12',
+    icon: TrendingUp,
+  },
+  {
+    id: 'profile-overview-card',
+    targetId: 'profile-overview-card',
+    titleFr: 'Aperçu du Profil',
+    titleEn: 'Profile Overview',
+    descFr:
+      'Votre score global de force et le diagnostic détaillé de vos 5 indicateurs clés : compétences, expérience, formation, certifications et qualité CV.',
+    descEn:
+      'Your overall strength score and detailed assessment across 5 dimensions: skills, experience, education, certifications, and CV quality.',
+    badgeFr: 'Étape 4/12',
+    badgeEn: 'Step 4/12',
+    icon: Target,
+  },
+  {
+    id: 'cv-section-card',
+    targetId: 'cv-section-card',
+    titleFr: 'Vos CVs & Scores ATS',
+    titleEn: 'Your CVs & ATS Scores',
+    descFr:
+      'Vos documents actifs avec leurs scores ATS calculés en direct par l’IA. Cliquez sur un CV pour ouvrir son diagnostic complet.',
+    descEn:
+      'Your active resumes with live algorithmic ATS compliance scores calculated by AI. Click any CV to inspect the full diagnostic.',
+    badgeFr: 'Étape 5/12',
+    badgeEn: 'Step 5/12',
+    icon: FileText,
+  },
+  {
+    id: 'recent-activity-card',
+    targetId: 'recent-activity-card',
+    titleFr: 'Activité récente',
+    titleEn: 'Recent Activity',
+    descFr:
+      'Votre fil d’actualité en direct : historique des simulations vocales réalisées, analyses ATS achevées et compétences ajoutées.',
+    descEn:
+      'Your real-time audit feed: completed voice simulations, finished ATS reviews, and newly added skills.',
+    badgeFr: 'Étape 6/12',
+    badgeEn: 'Step 6/12',
+    icon: Activity,
+  },
+  {
+    id: 'nav-cvs',
+    targetId: 'nav-cvs',
+    titleFr: 'Mes CVs (Module complet)',
+    titleEn: 'My CVs (Full Library)',
+    descFr:
+      'Votre coffre-fort documentaire dédié : gérez vos différentes versions de CV, auditez vos mots-clés et téléchargez des variantes ciblées.',
+    descEn:
+      'Your dedicated CV vault: organize multiple versions, audit missing keywords, and download targeted tailored documents.',
+    badgeFr: 'Menu 7/12',
+    badgeEn: 'Menu 7/12',
+    icon: FileText,
+  },
+  {
+    id: 'nav-matching',
+    targetId: 'nav-matching',
+    titleFr: "Job Matching",
+    titleEn: 'Job Matching',
+    descFr:
+      'Évaluez votre pertinence face aux offres : téléversez une offre d’emploi pour mesurer votre compatibilité technique et repérer les mots-clés cibles.',
+    descEn:
+      'Benchmark your profile against job specs: upload a job ad to calculate your match score and identify target keywords.',
+    badgeFr: 'Menu 8/12',
+    badgeEn: 'Menu 8/12',
+    icon: Users,
+  },
+  {
+    id: 'nav-mock',
+    targetId: 'nav-mock',
+    titleFr: "Simulations d'entretiens",
+    titleEn: 'Mock Interviews',
+    descFr:
+      'Entraînez-vous à l’oral en conditions réelles face à un coach IA vocal. Répondez aux questions ciblées et recevez un débriefing structuré STAR.',
+    descEn:
+      'Practice aloud under real interview conditions with our voice AI coach. Answer targeted questions and receive STAR feedback.',
+    badgeFr: 'Menu 9/12',
+    badgeEn: 'Menu 9/12',
+    icon: Video,
+  },
+  {
+    id: 'nav-timeline',
+    targetId: 'nav-timeline',
+    titleFr: 'Roadmap Carrière',
+    titleEn: 'Career Roadmap',
+    descFr:
+      'Visualisez votre progression : missions clés, compétences validées et prochaines étapes recommandées par l’IA.',
+    descEn:
+      'Track your career path: past achievements, validated skills, and next recommended milestones toward Lead or Architect.',
+    badgeFr: 'Menu 10/12',
+    badgeEn: 'Menu 10/12',
+    icon: TrendingUp,
+  },
+  {
+    id: 'nav-analytics',
+    targetId: 'nav-analytics',
+    titleFr: 'Analyses et Stats',
+    titleEn: 'Analytics',
+    descFr:
+      'Indicateurs détaillés de vos performances : assiduité, progression de vos notes et cartographie radar de vos compétences.',
+    descEn:
+      'Detailed performance metrics: practice frequency, score progress, and radar map of your technical & soft skills.',
+    badgeFr: 'Menu 11/12',
+    badgeEn: 'Menu 11/12',
+    icon: Activity,
+  },
+  {
+    id: 'nav-settings',
+    targetId: 'nav-settings',
+    titleFr: 'Paramètres',
+    titleEn: 'Settings',
+    descFr:
+      'Gérez vos préférences, notifications, sécurité et options de personnalisation de l’IA.',
+    descEn:
+      'Configure your profile, manage notifications, security settings, and AI coach personalization.',
+    badgeFr: 'Menu 12/12',
+    badgeEn: 'Menu 12/12',
+    icon: Settings,
+  },
+];
 
 export const ProductTour: React.FC<ProductTourProps> = ({
   isActive,
@@ -52,319 +209,352 @@ export const ProductTour: React.FC<ProductTourProps> = ({
   lang = 'fr',
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverHeight, setPopoverHeight] = useState(260);
 
   const isFrench = lang === 'fr';
+  const currentStep = STEPS[currentStepIndex] ?? STEPS[0];
+  const isFirst = currentStepIndex === 0;
+  const isLast = currentStepIndex === STEPS.length - 1;
+  const totalSteps = STEPS.length;
+  const progress = ((currentStepIndex + 1) / totalSteps) * 100;
 
-  const handleFinish = () => {
-    setCurrentStepIndex(0);
-    onComplete();
-  };
-
-  const handleCancel = () => {
-    setCurrentStepIndex(0);
-    onSkip();
-  };
-
-  const steps: TourStep[] = [
-    {
-      id: 'nav-dashboard',
-      targetId: 'nav-dashboard',
-      title: isFrench ? '1. Tableau de bord' : '1. Dashboard',
-      description: isFrench
-        ? 'Votre vue synthétique : visualisez la complétude de votre profil, vos raccourcis rapides pour tester une offre ou un CV, et vos activités récentes.'
-        : 'Your central hub: track profile completeness, use quick shortcuts to test an offer or CV, and monitor recent activities.',
-      placement: 'right',
-      badge: 'Menu 1/7',
-    },
-    {
-      id: 'nav-cvs',
-      targetId: 'nav-cvs',
-      title: isFrench ? '2. Mes CVs' : '2. My CVs',
-      description: isFrench
-        ? 'Votre coffre-fort documentaire : stockez vos versions de CV, consultez votre note ATS algorithmique en temps réel, auditez vos mots-clés et téléchargez vos documents.'
-        : 'Your CV vault: store multiple CV versions, review live algorithmic ATS compliance, audit missing keywords, and download tailored versions.',
-      placement: 'right',
-      badge: 'Menu 2/7',
-    },
-    {
-      id: 'nav-matching',
-      targetId: 'nav-matching',
-      title: isFrench ? '3. Job Matching' : '3. Job Matching',
-      description: isFrench
-        ? 'Évaluez votre pertinence face aux offres : téléversez n’importe quelle offre d’emploi (PDF, Word ou lien web) pour mesurer votre compatibilité technique et repérer les mots-clés cibles.'
-        : 'Benchmark your profile against job specs: upload any job ad (PDF, Word, or web link) to calculate your match score and identify target keywords.',
-      placement: 'right',
-      badge: 'Menu 3/7',
-    },
-    {
-      id: 'nav-mock',
-      targetId: 'nav-mock',
-      title: isFrench ? '4. Simulations d’entretiens' : '4. Mock Interviews',
-      description: isFrench
-        ? 'Entraînez-vous à l’oral en conditions réelles face à un coach IA vocal. Répondez aux questions ciblées et recevez un débriefing structuré selon la méthode STAR.'
-        : 'Practice aloud under real interview conditions with our voice AI recruiter. Answer targeted questions and receive in-depth STAR feedback.',
-      placement: 'right',
-      badge: 'Menu 4/7',
-    },
-    {
-      id: 'nav-timeline',
-      targetId: 'nav-timeline',
-      title: isFrench ? '5. Roadmap de carrière' : '5. Career Roadmap',
-      description: isFrench
-        ? 'Retracez la chronologie complète de votre parcours : valorisez vos missions clés, vos technologies maîtrisées et fixez vos objectifs vers les paliers Lead ou Architect.'
-        : 'Map your complete career journey: highlight past achievements, mastered tech stacks, and plan milestones toward Lead or Architect positions.',
-      placement: 'right',
-      badge: 'Menu 5/7',
-    },
-    {
-      id: 'nav-analytics',
-      targetId: 'nav-analytics',
-      title: isFrench ? '6. Analytics' : '6. Analytics',
-      description: isFrench
-        ? 'Suivez vos indicateurs d’entraînement : assiduité de vos simulations, progression de vos notes d’entretien et cartographie radar de vos compétences techniques et managériales.'
-        : 'Monitor key metrics: practice frequency, interview score evolution, and a radar map evaluating technical and leadership strengths.',
-      placement: 'right',
-      badge: 'Menu 6/7',
-    },
-    {
-      id: 'nav-settings',
-      targetId: 'nav-settings',
-      title: isFrench ? '7. Paramètres' : '7. Settings',
-      description: isFrench
-        ? 'Personnalisez votre expérience : mise à jour du profil, bascule de langue (Français / Anglais), réglage du niveau d’exigence du coach IA et alertes d’opportunités.'
-        : 'Configure your profile: update personal info, toggle working language (French / English), adjust AI coach rigor, and manage alerts.',
-      placement: 'right',
-      badge: 'Menu 7/7',
-    },
-    {
-      id: 'tour-complete',
-      targetId: 'main-sidebar',
-      title: isFrench ? 'Votre espace de travail est prêt !' : 'Your Workspace is Ready!',
-      description: isFrench
-        ? 'Vous connaissez maintenant le rôle de chaque menu. Vous pouvez dès à présent ajouter votre première expérience ou importer votre premier CV pour personnaliser votre profil.'
-        : 'You now know the role of each menu in your workspace. You can now add your first experience or upload your first CV to start customizing your profile.',
-      placement: 'center',
-      badge: isFrench ? 'Prêt à démarrer' : 'Ready to Start',
-    },
-  ];
-
-  const currentStep = steps[currentStepIndex];
-
-  // Update target bounding box
+  // Measure target element position
   useEffect(() => {
     if (!isActive) return;
 
-    const updateRect = () => {
+    const measure = () => {
       const el = document.getElementById(currentStep.targetId);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        setTargetRect(rect);
-      } else {
+      if (!el) {
         setTargetRect(null);
+        return;
       }
+      const r = el.getBoundingClientRect();
+      setTargetRect({
+        top: r.top,
+        left: r.left,
+        width: r.width,
+        height: r.height,
+        right: r.right,
+        bottom: r.bottom,
+      });
     };
 
-    updateRect();
-    const timeout = setTimeout(updateRect, 60);
-    window.addEventListener('resize', updateRect);
-    window.addEventListener('scroll', updateRect, true);
+    const el = document.getElementById(currentStep.targetId);
+    if (el) {
+      if (!currentStep.targetId.startsWith('nav-')) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    const raf = requestAnimationFrame(measure);
+    const t1 = setTimeout(measure, 150);
+    const t2 = setTimeout(measure, 350);
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
 
     return () => {
-      clearTimeout(timeout);
-      window.removeEventListener('resize', updateRect);
-      window.removeEventListener('scroll', updateRect, true);
+      cancelAnimationFrame(raf);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
     };
-  }, [isActive, currentStepIndex, currentStep]);
+  }, [isActive, currentStep.targetId]);
+
+  // Measure popover height dynamically
+  useEffect(() => {
+    const node = popoverRef.current;
+    if (!node) return;
+    const obs = new ResizeObserver(([entry]) => {
+      if (entry) setPopoverHeight(entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height);
+    });
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [isActive]);
+
+  const goToStep = useCallback((next: number) => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentStepIndex(next);
+      setIsTransitioning(false);
+    }, 150);
+  }, []);
+
+  const handleFinish = useCallback(() => {
+    setCurrentStepIndex(0);
+    onComplete();
+  }, [onComplete]);
+
+  const handleCancel = useCallback(() => {
+    setCurrentStepIndex(0);
+    onSkip();
+  }, [onSkip]);
+
+  const handleNext = useCallback(() => {
+    if (isLast) handleFinish();
+    else goToStep(currentStepIndex + 1);
+  }, [isLast, handleFinish, goToStep, currentStepIndex]);
+
+  const handlePrev = useCallback(() => {
+    if (!isFirst) goToStep(currentStepIndex - 1);
+  }, [isFirst, goToStep, currentStepIndex]);
 
   // Keyboard navigation
   useEffect(() => {
     if (!isActive) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         handleCancel();
       } else if (e.key === 'ArrowRight') {
-        if (currentStepIndex < steps.length - 1) {
-          setCurrentStepIndex((prev) => prev + 1);
-        } else {
-          handleFinish();
-        }
+        e.preventDefault();
+        handleNext();
       } else if (e.key === 'ArrowLeft') {
-        if (currentStepIndex > 0) {
-          setCurrentStepIndex((prev) => prev - 1);
-        }
+        e.preventDefault();
+        handlePrev();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isActive, currentStepIndex, steps.length]);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isActive, handleCancel, handleNext, handlePrev]);
 
   if (!isActive) return null;
 
-  // Calculate tooltip style
-  const getTooltipStyle = (): React.CSSProperties => {
-    const isMobile = window.innerWidth < 768;
-    if (isMobile || currentStep.placement === 'center' || !targetRect) {
-      return {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: 'calc(100vw - 32px)',
-        maxWidth: '440px',
-        zIndex: 60,
-      };
+  const computePopoverStyle = (): CSSProperties => {
+    const POPOVER_WIDTH = 380;
+    const GAP = 16;
+
+    const centered: CSSProperties = {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: `${POPOVER_WIDTH}px`,
+      maxWidth: 'calc(100vw - 32px)',
+      zIndex: 10002,
+    };
+
+    if (!targetRect || (typeof window !== 'undefined' && window.innerWidth < 768)) {
+      return centered;
     }
 
-    const margin = 20;
-    const tooltipWidth = 380;
-    const tooltipHeight = 220;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const ph = popoverHeight;
 
-    let top = targetRect.top + targetRect.height / 2 - 90;
-    let left = targetRect.right + margin;
+    let top = targetRect.top + targetRect.height / 2 - ph / 2;
+    let left = targetRect.right + GAP;
 
-    // Viewport bounding clamp
-    top = Math.max(16, Math.min(window.innerHeight - tooltipHeight - 20, top));
-    left = Math.max(16, Math.min(window.innerWidth - tooltipWidth - 20, left));
+    if (left + POPOVER_WIDTH > vw - GAP) {
+      left = targetRect.left;
+      top = targetRect.bottom + GAP;
+    }
+
+    top = Math.max(GAP, Math.min(vh - ph - GAP, top));
+    left = Math.max(GAP, Math.min(vw - POPOVER_WIDTH - GAP, left));
 
     return {
       position: 'fixed',
       top: `${top}px`,
       left: `${left}px`,
-      width: `${tooltipWidth}px`,
-      zIndex: 60,
+      width: `${POPOVER_WIDTH}px`,
+      maxWidth: 'calc(100vw - 32px)',
+      zIndex: 10002,
     };
   };
 
-  const isFinalStep = currentStepIndex === steps.length - 1;
-  const currentMeta = stepMenuMeta[currentStep.targetId];
-  const StepIcon = currentMeta ? currentMeta.icon : Compass;
-  const menuDisplayName = currentMeta
-    ? isFrench
-      ? currentMeta.labelFr
-      : currentMeta.labelEn
-    : currentStep.title;
+  const StepIcon = currentStep.icon;
 
   return (
-    <div id="product-tour-overlay" className="fixed inset-0 z-50 pointer-events-auto">
-      {/* Blurred & Dimmed Backdrop - Blurs the entire workspace */}
-      <div
-        className="fixed inset-0 bg-slate-950/75 backdrop-blur-md transition-all duration-300"
-        onClick={handleCancel}
+    <>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+        @keyframes forpro-glow-pulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(255,122,0,0.25), 0 0 18px rgba(255,122,0,0.55), 0 0 40px rgba(255,122,0,0.30), 0 0 70px rgba(255,122,0,0.12); }
+          50%       { box-shadow: 0 0 0 5px rgba(255,122,0,0.35), 0 0 28px rgba(255,122,0,0.70), 0 0 55px rgba(255,122,0,0.40), 0 0 90px rgba(255,122,0,0.18); }
+        }
+        @keyframes forpro-beacon {
+          0%   { transform: scale(1);   opacity: 1; }
+          100% { transform: scale(2.6); opacity: 0; }
+        }
+        @keyframes forpro-popover-in {
+          from { opacity: 0; transform: translateY(8px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)   scale(1);   }
+        }
+      `,
+        }}
       />
 
-      {/* HIGHLIGHTED ACTIVE MENU ITEM: Displayed brightly above the blur with full clarity */}
-      {targetRect && currentStep.placement !== 'center' && (
+      {/* Transparent click-catcher — NO dark/blurred backdrop whatsoever. */}
+      <div
+        className="fixed inset-0 z-[10000]"
+        onClick={handleCancel}
+        aria-hidden="true"
+      />
+
+      {/* Animated orange glow spotlight around the targeted element */}
+      {targetRect && (
         <div
-          id="spotlight-active-menu-item"
-          className="fixed transition-all duration-200 rounded-xl ring-4 ring-[#FF7A00]/40 border-2 border-[#FF7A00] bg-[#0E1A2E] text-white shadow-[0_0_35px_rgba(255,122,0,0.6)] z-58 flex items-center justify-between px-3.5 py-2.5 pointer-events-none select-none"
+          id="tour-spotlight"
+          className="pointer-events-none fixed z-[10001] transition-all duration-300 ease-out"
           style={{
-            top: `${targetRect.top}px`,
-            left: `${targetRect.left}px`,
-            width: `${targetRect.width}px`,
-            height: `${targetRect.height}px`,
+            top: `${targetRect.top - 5}px`,
+            left: `${targetRect.left - 5}px`,
+            width: `${targetRect.width + 10}px`,
+            height: `${targetRect.height + 10}px`,
           }}
         >
-          {/* Menu icon and clearly visible menu name */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-6 h-6 rounded-lg bg-[#FF7A00]/20 border border-[#FF7A00]/40 flex items-center justify-center text-[#FF7A00] shrink-0">
-              <StepIcon className="w-3.5 h-3.5" />
-            </div>
-            <span className="font-bold text-white text-xs sm:text-sm tracking-wide truncate">
-              {menuDisplayName}
-            </span>
-          </div>
-
-          {/* Active spotlight beacon */}
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF7A00] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#FF7A00]" />
-            </span>
-          </div>
+          {/* Glowing border ring */}
+          <div
+            className="h-full w-full rounded-xl"
+            style={{
+              border: '2px solid #FF7A00',
+              animation: 'forpro-glow-pulse 2.4s ease-in-out infinite',
+            }}
+          />
+          {/* Pulsing beacon dot — top-right corner */}
+          <span
+            className="absolute -right-1 -top-1 block h-3 w-3 rounded-full bg-[#FF7A00]"
+            style={{ animation: 'forpro-beacon 1.8s ease-out infinite' }}
+          />
+          <span className="absolute -right-1 -top-1 block h-3 w-3 rounded-full bg-[#FF7A00]" />
         </div>
       )}
 
-      {/* Interactive Tooltip Card */}
+      {/* Popover card */}
       <div
-        ref={tooltipRef}
-        style={getTooltipStyle()}
-        className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col"
+        ref={popoverRef}
+        style={{
+          ...computePopoverStyle(),
+          animation: 'forpro-popover-in 0.25s ease-out',
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className={`overflow-hidden rounded-2xl border border-slate-700/50 bg-gradient-to-br from-[#0B1528] via-[#101E35] to-[#162640] shadow-2xl shadow-black/40 transition-all duration-200 ${
+          isTransitioning ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
+        }`}
       >
         {/* Header */}
-        <div className="p-4 bg-linear-to-r from-[#0B1528] to-[#142238] text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-[#FF7A00]/20 border border-[#FF7A00]/40 flex items-center justify-center">
-              <Compass className="w-3.5 h-3.5 text-[#FF7A00]" />
+        <div className="relative px-5 pt-4 pb-3">
+          <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF7A00] to-transparent" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FF7A00]/15 ring-1 ring-[#FF7A00]/30">
+                <Sparkles className="h-4 w-4 text-[#FF7A00]" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-[#FF7A00]">
+                  {isFrench ? 'Visite guidée' : 'Guided Tour'}
+                </p>
+                <p className="font-mono text-[10px] text-slate-500">
+                  {currentStepIndex + 1} / {totalSteps}
+                </p>
+              </div>
             </div>
-            <span className="text-xs font-bold text-[#FFA040]">{currentStep.badge}</span>
+            <button
+              type="button"
+              onClick={handleCancel}
+              title={isFrench ? 'Passer' : 'Skip'}
+              className="cursor-pointer rounded-lg p-1.5 text-slate-500 transition-all hover:bg-white/10 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-slate-400">
-              {currentStepIndex + 1}/{steps.length}
-            </span>
-            <button
-              onClick={handleCancel}
-              className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-              title={isFrench ? 'Quitter la visite' : 'Skip Tour'}
-            >
-              <X className="w-4 h-4" />
-            </button>
+          {/* Animated progress bar */}
+          <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/5">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#FF7A00] to-[#FFB347] transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold text-slate-900 leading-snug">{currentStep.title}</h4>
+        {/* Step content */}
+        <div className="px-5 py-4">
+          <div className="mb-2 flex items-center gap-2.5">
+            <StepIcon className="h-4 w-4 shrink-0 text-[#FF7A00]" />
+            <h4 className="text-sm font-bold text-white">
+              {isFrench ? currentStep.titleFr : currentStep.titleEn}
+            </h4>
           </div>
-          <p className="text-xs text-slate-600 leading-relaxed">{currentStep.description}</p>
+          <p className="text-xs leading-relaxed text-slate-400">
+            {isFrench ? currentStep.descFr : currentStep.descEn}
+          </p>
+        </div>
+
+        {/* Step dots */}
+        <div className="flex items-center justify-center gap-1.5 pb-3">
+          {STEPS.map((step, i) => (
+            <button
+              key={`dot-${step.targetId}`}
+              type="button"
+              onClick={() => goToStep(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                i === currentStepIndex
+                  ? 'w-6 bg-[#FF7A00]'
+                  : i < currentStepIndex
+                    ? 'w-1.5 bg-[#FF7A00]/40'
+                    : 'w-1.5 bg-white/15 hover:bg-white/30'
+              }`}
+              aria-label={`Step ${i + 1}`}
+            />
+          ))}
         </div>
 
         {/* Footer Navigation */}
-        <div className="p-3.5 px-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <div className="flex items-center justify-between border-t border-white/5 bg-white/[0.02] px-5 py-3">
           <button
+            type="button"
             onClick={handleCancel}
-            className="text-xs font-medium text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+            className="cursor-pointer text-[11px] font-medium text-slate-500 transition-colors hover:text-white"
           >
             {isFrench ? 'Passer' : 'Skip'}
           </button>
 
           <div className="flex items-center gap-2">
-            {currentStepIndex > 0 && (
+            {!isFirst && (
               <button
-                onClick={() => setCurrentStepIndex((prev) => prev - 1)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                type="button"
+                onClick={handlePrev}
+                className="flex cursor-pointer items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition-all hover:border-white/20 hover:bg-white/5"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>{isFrench ? 'Précédent' : 'Back'}</span>
+                <ArrowLeft className="h-3 w-3" />
+                {isFrench ? 'Précédent' : 'Back'}
               </button>
             )}
-
-            {isFinalStep ? (
-              <button
-                onClick={handleFinish}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#FF7A00] hover:bg-[#E66E00] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{isFrench ? 'C’est parti !' : 'Get Started'}</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setCurrentStepIndex((prev) => prev + 1)}
-                className="flex items-center gap-1 px-4 py-1.5 rounded-lg bg-[#0B1528] hover:bg-[#FF7A00] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-              >
-                <span>{isFrench ? 'Suivant' : 'Next'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleNext}
+              className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-4 py-1.5 text-[11px] font-bold text-white shadow-lg transition-all active:scale-95 ${
+                isLast
+                  ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-emerald-500/25 hover:from-emerald-400 hover:to-emerald-500'
+                  : 'bg-gradient-to-r from-[#FF7A00] to-[#FF9500] shadow-orange-500/25 hover:from-[#FF8C00] hover:to-[#FFA500]'
+              }`}
+            >
+              {isLast ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>{isFrench ? "C'est parti !" : 'Get Started'}</span>
+                </>
+              ) : (
+                <>
+                  <span>{isFrench ? 'Suivant' : 'Next'}</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };

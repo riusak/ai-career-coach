@@ -23,15 +23,14 @@ import LocaleSwitcher from '@/components/ui/LocaleSwitcher';
 type ServiceIcon = 'scan' | 'target' | 'mic' | 'library';
 
 /**
- * Services overview model. « live » cards are fully clickable and routed to
- * their dedicated dashboard page; « coming-soon » cards keep the lock badge.
- * `unlockKey` renders the service-specific access copy at the card footer.
+ * Services overview model. Every service is now live and fully clickable,
+ * routed to its dedicated dashboard page. `unlockKey` renders the
+ * service-specific access copy at the card footer.
  */
 const SERVICES: ReadonlyArray<{
   titleKey: string;
   descriptionKey: string;
-  status: 'live' | 'coming-soon';
-  href: string | null;
+  href: string;
   unlockKey: string | null;
   icon: ServiceIcon;
   featured?: boolean;
@@ -39,7 +38,6 @@ const SERVICES: ReadonlyArray<{
   {
     titleKey: 'servicesCards.analyzeTitle',
     descriptionKey: 'servicesCards.analyzeDesc',
-    status: 'live',
     href: '/dashboard/resume',
     unlockKey: null,
     icon: 'scan',
@@ -48,7 +46,6 @@ const SERVICES: ReadonlyArray<{
   {
     titleKey: 'servicesCards.matchingTitle',
     descriptionKey: 'servicesCards.matchingDesc',
-    status: 'live',
     href: '/dashboard/matching',
     unlockKey: 'serviceFreeUnlock',
     icon: 'target',
@@ -56,15 +53,13 @@ const SERVICES: ReadonlyArray<{
   {
     titleKey: 'servicesCards.interviewTitle',
     descriptionKey: 'servicesCards.interviewDesc',
-    status: 'coming-soon',
-    href: null,
-    unlockKey: 'servicePaidUnlock',
+    href: '/dashboard/mock',
+    unlockKey: 'serviceFreeUnlock',
     icon: 'mic',
   },
   {
     titleKey: 'servicesCards.libraryTitle',
     descriptionKey: 'servicesCards.libraryDesc',
-    status: 'live',
     href: '/dashboard/cvs',
     unlockKey: 'serviceFreeUnlock',
     icon: 'library',
@@ -255,25 +250,7 @@ export default function Landing({ isAuthenticated }: LandingProps) {
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-navy-900 text-white shadow-md transition-colors duration-300 group-hover:bg-orange group-hover:shadow-lg group-hover:shadow-orange-500/25">
                         {SERVICE_ICONS[service.icon]}
                       </div>
-                      {service.status === 'coming-soon' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-navy-50 px-2.5 py-0.5 text-[11px] font-semibold text-navy-500">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                            className="h-3 w-3"
-                          >
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                          </svg>
-                          {t('comingSoon')}
-                        </span>
-                      ) : service.featured ? (
+                      {service.featured ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold text-orange-800">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -333,16 +310,12 @@ export default function Landing({ isAuthenticated }: LandingProps) {
                       service.featured || index === 3 ? 'sm:col-span-2 lg:col-span-2' : ''
                     }`}
                   >
-                    {service.href ? (
-                      <Link
-                        href={service.href}
-                        className="block h-full rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
-                      >
-                        {card}
-                      </Link>
-                    ) : (
-                      card
-                    )}
+                    <Link
+                      href={service.href}
+                      className="block h-full rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
+                    >
+                      {card}
+                    </Link>
                   </Reveal>
                 );
               })}
@@ -404,7 +377,7 @@ export default function Landing({ isAuthenticated }: LandingProps) {
               <div className="rounded-2xl border border-slate-200 bg-slate-900 p-8 text-white shadow-md ring-1 ring-orange-500/40">
                 <div className="flex items-baseline justify-between">
                   <h3 className="text-lg font-bold">{t('planPremiumName')}</h3>
-                  <span className="rounded-full bg-orange-500/20 px-2.5 py-0.5 text-xs font-semibold text-orange-300">
+                  <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">
                     {t('planPremiumSoon')}
                   </span>
                 </div>

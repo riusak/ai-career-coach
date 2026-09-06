@@ -12,6 +12,7 @@ import {
   listExperiences,
   listSkills,
 } from '@/lib/supabase/profile-extensions';
+import { getUserInterviewSessions } from '@/lib/supabase/interviews';
 import { buildDashboardViewData } from '@/lib/dashboard/adapters';
 import type { DashboardViewData } from '@/types/dashboard';
 import type { Profile } from '@/types/profile';
@@ -39,6 +40,7 @@ export const getDashboardViewData = cache(async (): Promise<DashboardLoadResult>
     educationsResult,
     certificationsResult,
     fileSizes,
+    interviewSessionsResult,
   ] = await Promise.all([
     getCurrentUserProfile(),
     getUserResumes(),
@@ -49,6 +51,7 @@ export const getDashboardViewData = cache(async (): Promise<DashboardLoadResult>
     listEducations(),
     listCertifications(),
     getResumeFileSizes(),
+    getUserInterviewSessions(100),
   ]);
 
   const { data: profile } = profileResult;
@@ -59,6 +62,7 @@ export const getDashboardViewData = cache(async (): Promise<DashboardLoadResult>
   const skills = skillsResult.data ?? [];
   const educations = educationsResult.data ?? [];
   const certifications = certificationsResult.data ?? [];
+  const interviewSessions = interviewSessionsResult.data ?? [];
 
   const data = buildDashboardViewData({
     profile,
@@ -70,6 +74,7 @@ export const getDashboardViewData = cache(async (): Promise<DashboardLoadResult>
     analysesByResume,
     roadmap,
     sizesByPath: fileSizes,
+    interviewSessions,
   });
 
   return { data, profile, certificationsCount: certifications.length };

@@ -33,7 +33,7 @@ function getGeminiModels(): string[] {
 }
 
 interface RawStepOutput {
-  speaker_id?: 'alisor' | 'marc';
+  speaker_id?: string;
   reaction: string;
   emotion: string;
   next_question: string;
@@ -79,7 +79,7 @@ function coerceEmotion(raw?: string): InterviewEmotion {
 
 /**
  * Generates the greeting turn and question 1 (Pitch) when the session begins.
- * Mme Alisor (HR) opens the interview.
+ * The lead recruiter (HR / Lead) opens the interview and introduces the panel.
  */
 export async function generateInitialGreeting(
   context: InterviewContext
@@ -87,19 +87,28 @@ export async function generateInitialGreeting(
   const isFrench = context.language !== 'en';
   const role = context.jobTitle;
   const company = context.company || (isFrench ? 'notre entreprise' : 'our team');
-  const panel = isFrench ? RECRUITER_PANEL : RECRUITER_PANEL_EN;
-  const speaker: InterviewerSpeaker = panel.alisor;
+  const legacyPanel = isFrench ? RECRUITER_PANEL : RECRUITER_PANEL_EN;
+  
+  const leadSpeaker: InterviewerSpeaker =
+    context.panel && context.panel.length > 0
+      ? context.panel[0]
+      : legacyPanel.alisor;
+
+  const otherMembers =
+    context.panel && context.panel.length > 1
+      ? context.panel.slice(1).map((m) => `${m.name} (${m.title})`).join(', ')
+      : (isFrench ? 'Marc Laurent (Directeur Technique)' : 'Mark Laurent (Technical Director)');
 
   const systemInstruction = buildRecruiterSystemPrompt(context);
   const prompt = isFrench
-    ? `Tu es Mme Alisor. Démarre la visioconférence d'entretien pour le poste de "${role}" chez ${company}.
-Accueille chaleureusement le candidat en visioconférence, présente brièvement le jury (toi-même et Marc Laurent le Directeur Technique), et pose la TOUTE PREMIÈRE QUESTION obligatoire : son Pitch personnel (se présenter en 2 minutes, son parcours et ce qui l'amène aujourd'hui).`
-    : `You are Mrs. Alisor. Start the video job interview for "${role}" at ${company}.
-Warmly welcome the candidate, briefly introduce the panel (yourself and Mark Laurent, Technical Director), and ask the MANDATORY FIRST QUESTION: their 2-minute elevator pitch.`;
+    ? `Tu es ${leadSpeaker.name}, ${leadSpeaker.title}. Démarre la visioconférence d'entretien pour le poste de "${role}" chez ${company}.
+Accueille chaleureusement le candidat en visioconférence, présente brièvement les membres du jury présents (${otherMembers}), et pose la TOUTE PREMIÈRE QUESTION obligatoire : son Pitch personnel (se présenter en 2 minutes, son parcours et ce qui l'amène aujourd'hui).`
+    : `You are ${leadSpeaker.name}, ${leadSpeaker.title}. Start the video job interview for "${role}" at ${company}.
+Warmly welcome the candidate, briefly introduce the panel members with you (${otherMembers}), and ask the MANDATORY FIRST QUESTION: their 2-minute elevator pitch.`;
 
   const fallbackText = isFrench
-    ? `Bonjour et bienvenue dans cet échange en visioconférence ! Je suis Mme Alisor, Responsable Recrutement, et je suis accompagnée de Marc Laurent, notre Directeur Technique. Nous sommes ravis d'échanger avec vous pour le poste de ${role}. Pour démarrer : pouvez-vous vous présenter en deux minutes et nous partager votre trajectoire ?`
-    : `Hello and welcome to our video interview! I am Mrs. Alisor, Head of Talent Acquisition, and I am joined by Mark Laurent, our Technical Director. We are excited to connect with you regarding the ${role} position. To kick things off: could you pitch yourself in 2 minutes and walk us through your trajectory?`;
+    ? `Bonjour et bienvenue dans cet échange en visioconférence ! Je suis ${leadSpeaker.name}, ${leadSpeaker.title}, et je suis avec ${otherMembers}. Nous sommes ravis d'échanger avec vous pour le poste de ${role}. Pour démarrer : pouvez-vous vous présenter en deux minutes et nous partager votre parcours ?`
+    : `Hello and welcome to our video interview! I am ${leadSpeaker.name}, ${leadSpeaker.title}, joined by ${otherMembers}. We are excited to connect with you regarding the ${role} position. To kick things off: could you pitch yourself in 2 minutes and walk us through your trajectory?`;
 
   const models = getGeminiModels();
   const apiKey = process.env.GEMINI_API_KEY;
@@ -108,7 +117,7 @@ Warmly welcome the candidate, briefly introduce the panel (yourself and Mark Lau
     return {
       text: fallbackText,
       emotion: 'smiling',
-      speaker,
+      speaker: leadSpeaker,
     };
   }
 
@@ -146,7 +155,7 @@ Warmly welcome the candidate, briefly introduce the panel (yourself and Mark Lau
             return {
               text: cleaned.text,
               emotion: coerceEmotion(cleaned.emotion),
-              speaker,
+              speaker: leadSpeaker,
             };
           }
         }
@@ -159,7 +168,7 @@ Warmly welcome the candidate, briefly introduce the panel (yourself and Mark Lau
   return {
     text: fallbackText,
     emotion: 'smiling',
-    speaker,
+    speaker: leadSpeaker,
   };
 }
 
@@ -174,7 +183,17 @@ export async function generateNextInterviewTurn(
   isCandidateFollowup: boolean
 ): Promise<StepInterviewResponse> {
   const isFrench = context.language !== 'en';
-  const panel = isFrench ? RECRUITER_PANEL : RECRUITER_PANEL_EN;
+  const legacyPanel = isFrench ? RECRUITER_PANEL : RECRUITER_PANEL_EN;
+  const panelList = (context.panel && context.panel.length > 0)
+    ? context.panel
+    : [legacyPanel.alisor, legacyPanel.marc];
+
+  const leadSpeaker = panelList[0];
+  const techOrExpertSpeaker = panelList[1] || leadSpeaker;
+
+  const defaultSpeaker =
+    currentStep === 3 || currentStep === 4 ? techOrExpertSpeaker : leadSpeaker;
+
   const systemInstruction = buildRecruiterSystemPrompt(context);
 
   const turnsText = transcript
@@ -184,27 +203,30 @@ export async function generateNextInterviewTurn(
     })
     .join('\n\n');
 
+  const panelInstructions = panelList
+    .map(
+      (m) =>
+        `- ${m.name} (${m.title}, ID: "${m.id}"${'role' in m && m.role ? `, rôle: ${m.role}` : ''})`
+    )
+    .join('\n');
+
   const stepGuidance = isFrench
     ? `Nous sommes à l'étape ${currentStep}/5.
 Dernière réplique du candidat à évaluer attentivement.
-RÉPARTITION DU JURY :
-- Étape 2 : Mme Alisor ou Marc selon l'angle (motivation vs adéquation).
-- Étape 3 : Marc Laurent prend la parole (challenge technique / métier concret).
-- Étape 4 : Marc Laurent ou Mme Alisor (gestion de crise STAR ou désaccord).
-- Étape 5 : Mme Alisor revient pour la synthèse et le closing.
-${isCandidateFollowup ? 'Le candidat venait déjà de répondre à une relance : ne relance pas une 2ème fois consécutive, enchaîne sur la question suivante pour avancer.' : 'Si la réponse est trop floue, déclenche une relance (is_followup: true). Sinon enchaîne (is_followup: false).'}`
+MEMBRES DU JURY DISPONIBLES :
+${panelInstructions}
+RÉPARTITION SUGGÉRÉE :
+- Étape 2 : Recruteur RH ou Manager selon l'angle.
+- Étape 3 : Expert métier ou technique (${techOrExpertSpeaker.name}).
+- Étape 4 : Mise en situation / comportemental STAR (relance ou question approfondie).
+- Étape 5 (Closing) : ${leadSpeaker.name} conclut l'entretien avec les remerciements et prochaines étapes.
+${isCandidateFollowup ? 'Le candidat venait déjà de répondre à une relance : ne relance pas une 2ème fois consécutive, enchaîne sur la question suivante pour avancer.' : 'Si la réponse est trop floue ou manque de concret STAR, déclenche une relance (is_followup: true). Sinon enchaîne (is_followup: false).'}`
     : `Current stage is ${currentStep}/5.
-PANEL DISTRIBUTION:
-- Stage 2: Mrs. Alisor or Mark (Motivation & target).
-- Stage 3: Mark Laurent leads (hands-on hard skills & tech deep-dive).
-- Stage 4: Mark Laurent or Mrs. Alisor (behavioral STAR setback).
-- Stage 5: Mrs. Alisor leads closing and summary.
-${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: do not trigger a second consecutive followup, proceed to the next stage.' : 'If response is vague, trigger is_followup: true. Otherwise advance.'}`;
+JURY MEMBERS AVAILABLE:
+${panelInstructions}
+${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: do not trigger a second consecutive followup, proceed to the next stage.' : 'If response is vague or lacking STAR details, trigger is_followup: true. Otherwise advance.'}`;
 
   const prompt = `${systemInstruction}\n\nHISTORIQUE DES ÉCHANGES JUSQU'ICI :\n${turnsText}\n\nCONSIGNE D'ENCHAÎNEMENT :\n${stepGuidance}`;
-
-  const defaultSpeakerId: 'alisor' | 'marc' =
-    currentStep === 3 || currentStep === 4 ? 'marc' : 'alisor';
 
   const models = getGeminiModels();
   const apiKey = process.env.GEMINI_API_KEY;
@@ -223,7 +245,7 @@ ${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: d
       currentStep: Math.min(5, currentStep + 1),
       totalSteps: 5,
       isCompleted: currentStep >= 5,
-      speaker: panel[defaultSpeakerId],
+      speaker: defaultSpeaker,
     };
   }
 
@@ -236,9 +258,14 @@ ${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: d
           'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemInstruction}\n\nINSTRUCTION:\n${prompt}` }],
+            },
+          ],
           generationConfig: {
-            temperature: 0.75, // Natural human variety
+            temperature: 0.75,
             responseMimeType: 'application/json',
             responseSchema: STEP_RESPONSE_SCHEMA,
             maxOutputTokens: 1024,
@@ -260,7 +287,6 @@ ${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: d
       try {
         parsed = JSON.parse(generatedText) as RawStepOutput;
       } catch {
-        // Fallback to extractCleanSpeech
         const clean = extractCleanSpeech(generatedText);
         parsed = {
           speaker_id: clean.speakerId,
@@ -271,20 +297,26 @@ ${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: d
         };
       }
 
-      const speakerId: 'alisor' | 'marc' =
-        parsed.speaker_id === 'marc' || parsed.speaker_id === 'alisor'
-          ? parsed.speaker_id
-          : defaultSpeakerId;
-
       const isFollowup = Boolean(parsed.is_followup) && !isCandidateFollowup;
       const nextStep = isFollowup ? currentStep : Math.min(5, currentStep + 1);
       const isCompleted = currentStep >= 5 && !isFollowup;
 
-      // Ensure reaction and next_question are strictly sanitized
+      // Find speaker object from panel
+      let selectedSpeaker: InterviewerSpeaker = defaultSpeaker;
+      if (isCompleted || currentStep >= 5) {
+        // Closing turn is led by lead recruiter
+        selectedSpeaker = leadSpeaker;
+      } else if (parsed.speaker_id) {
+        const found = panelList.find(
+          (p) => p.id.toLowerCase() === parsed?.speaker_id?.toLowerCase()
+        );
+        if (found) {
+          selectedSpeaker = found;
+        }
+      }
+
       const cleanReaction = extractCleanSpeech(parsed.reaction || '').text || (isFrench ? "Mmh, d'accord..." : 'I see...');
-      const cleanNextQ = isCompleted
-        ? null
-        : extractCleanSpeech(parsed.next_question || '').text || (isFrench ? 'Passons à la suite.' : 'Moving on.');
+      const cleanNextQ = extractCleanSpeech(parsed.next_question || '').text || null;
 
       return {
         turnId: crypto.randomUUID(),
@@ -295,14 +327,13 @@ ${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: d
         currentStep: nextStep,
         totalSteps: 5,
         isCompleted,
-        speaker: panel[speakerId],
+        speaker: selectedSpeaker,
       };
     } catch (err) {
       console.warn(`[interview-llm] Step generation failed on model ${model}:`, err);
     }
   }
 
-  // Graceful fallback
   return {
     turnId: crypto.randomUUID(),
     reaction: isFrench
@@ -316,7 +347,7 @@ ${isCandidateFollowup ? 'Candidate was already clarifying a previous followup: d
     currentStep: Math.min(5, currentStep + 1),
     totalSteps: 5,
     isCompleted: currentStep >= 5,
-    speaker: panel[defaultSpeakerId],
+    speaker: defaultSpeaker,
   };
 }
 

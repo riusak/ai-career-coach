@@ -7,6 +7,7 @@ import type {
   DashboardViewData,
   MilestoneData,
   ProfileMetrics,
+  SimulationStatsData,
 } from '@/types/dashboard';
 import type {
   Profile,
@@ -18,6 +19,7 @@ import type {
 } from '@/types/profile';
 import type { Resume, ResumeAnalysis } from '@/types/resume';
 import type { ScoreBreakdownItem } from '@/types/quick-test';
+import type { InterviewSessionSummary } from '@/types/interview';
 import { parseDeepAnalysisOutput } from '@/lib/analysis/deep-output';
 
 /**
@@ -309,6 +311,31 @@ export function buildCvDetails(
   });
 }
 
+/** Aggregates mock-interview practice stats from the raw session rows. */
+export function buildSimulationStats(
+  sessions: InterviewSessionSummary[]
+): SimulationStatsData {
+  if (sessions.length === 0) {
+    return { total: 0, completed: 0, inProgress: 0, averageScore: null, bestScore: null };
+  }
+
+  const completed = sessions.filter((session) => session.status === 'completed');
+  const scored = completed.filter((session) => session.score !== null).map(
+    (session) => clampScore(session.score as number)
+  );
+
+  return {
+    total: sessions.length,
+    completed: completed.length,
+    inProgress: sessions.length - completed.length,
+    averageScore:
+      scored.length > 0
+        ? Math.round(scored.reduce((acc, score) => acc + score, 0) / scored.length)
+        : null,
+    bestScore: scored.length > 0 ? Math.max(...scored) : null,
+  };
+}
+
 /** Derives the recent-activity feed from existing row timestamps (no table). */
 export function buildActivities(input: {
   resumes: Resume[];
@@ -317,8 +344,18 @@ export function buildActivities(input: {
   skills: ProfileSkill[];
   educations: ProfileEducation[];
   certifications: ProfileCertification[];
+  /** Completed interview sessions (surfaced so practice shows in the feed). */
+  interviewSessions?: InterviewSessionSummary[];
 }): DashboardActivity[] {
-  const { resumes, analysesByResume, experiences, skills, educations, certifications } = input;
+  const {
+    resumes,
+    analysesByResume,
+    experiences,
+    skills,
+    educations,
+    certifications,
+    interviewSessions = [],
+  } = input;
   const activities: DashboardActivity[] = [];
 
   for (const resume of resumes) {
@@ -386,6 +423,18 @@ export function buildActivities(input: {
     });
   }
 
+  for (const session of interviewSessions) {
+    if (session.status !== 'completed') continue;
+    activities.push({
+      id: `interview-${session.id}`,
+      type: 'interview',
+      at: session.createdAt,
+      titleKey: 'activityInterviewCompleted',
+      detail: session.jobTitle,
+      score: session.score ?? undefined,
+    });
+  }
+
   return activities
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, ACTIVITY_LIMIT);
@@ -438,6 +487,8 @@ export function buildDashboardViewData(input: {
   roadmap: ProfileRoadmap | null;
   /** Optional storage path → bytes map for the CV file-size chips. */
   sizesByPath?: Record<string, number> | null;
+  /** Optional interview-session rows (analytics stats + activity feed). */
+  interviewSessions?: InterviewSessionSummary[];
 }): DashboardViewData {
   const {
     profile,
@@ -449,6 +500,7 @@ export function buildDashboardViewData(input: {
     analysesByResume,
     roadmap,
     sizesByPath,
+    interviewSessions = [],
   } = input;
 
   const completedAnalyses = Object.values(analysesByResume ?? {}).filter(
@@ -493,8 +545,10 @@ export function buildDashboardViewData(input: {
       skills,
       educations,
       certifications,
+      interviewSessions,
     }),
     primaryCvId: resumes.find((resume) => resume.is_primary)?.id ?? resumes[0]?.id ?? null,
+    simulations: buildSimulationStats(interviewSessions),
   };
 }
 

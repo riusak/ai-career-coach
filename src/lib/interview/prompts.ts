@@ -1,4 +1,4 @@
-import type { InterviewLanguage, InterviewType, InterviewTurn } from '@/types/interview';
+import type { InterviewLanguage, InterviewType, InterviewTurn, InterviewerSpeaker } from '@/types/interview';
 
 export interface InterviewContext {
   jobTitle: string;
@@ -7,8 +7,11 @@ export interface InterviewContext {
   resumeText?: string | null;
   language: InterviewLanguage;
   interviewType: InterviewType;
+  /** Dynamic panel generated for this session */
+  panel?: InterviewerSpeaker[];
 }
 
+/** @deprecated Use generateDynamicPanel() for new sessions */
 export const RECRUITER_PANEL = {
   alisor: {
     id: 'alisor' as const,
@@ -24,6 +27,7 @@ export const RECRUITER_PANEL = {
   },
 } as const;
 
+/** @deprecated Use generateDynamicPanel() for new sessions */
 export const RECRUITER_PANEL_EN = {
   alisor: {
     id: 'alisor' as const,
@@ -39,17 +43,253 @@ export const RECRUITER_PANEL_EN = {
   },
 } as const;
 
+// ── Dynamic Jury Panel Generator ──────────────────────────────────────────────
+
+interface NameEntry {
+  first: string;
+  last: string;
+  gender: 'female' | 'male';
+}
+
+const NAME_BANK_FR: NameEntry[] = [
+  { first: 'Aminata', last: 'Koné', gender: 'female' },
+  { first: 'Fatou', last: 'Diallo', gender: 'female' },
+  { first: 'Mariam', last: 'Ndiaye', gender: 'female' },
+  { first: 'Sophie', last: 'Durand', gender: 'female' },
+  { first: 'Isabelle', last: 'Moreau', gender: 'female' },
+  { first: 'Aïcha', last: 'Bamba', gender: 'female' },
+  { first: 'Nadia', last: 'Traoré', gender: 'female' },
+  { first: 'Claire', last: 'Lefèvre', gender: 'female' },
+  { first: 'Léa', last: 'Ouédraogo', gender: 'female' },
+  { first: 'Moussa', last: 'Sylla', gender: 'male' },
+  { first: 'Ibrahim', last: 'Touré', gender: 'male' },
+  { first: 'Olivier', last: 'Bertrand', gender: 'male' },
+  { first: 'Koffi', last: 'Asante', gender: 'male' },
+  { first: 'Jean-Pierre', last: 'Martin', gender: 'male' },
+  { first: 'Abdoulaye', last: 'Coulibaly', gender: 'male' },
+  { first: 'Marc', last: 'Dupont', gender: 'male' },
+  { first: 'Sébastien', last: 'Roux', gender: 'male' },
+  { first: 'Yao', last: 'Koffi', gender: 'male' },
+  { first: 'Emmanuel', last: 'Aké', gender: 'male' },
+];
+
+const NAME_BANK_EN: NameEntry[] = [
+  { first: 'Amara', last: 'Johnson', gender: 'female' },
+  { first: 'Priya', last: 'Sharma', gender: 'female' },
+  { first: 'Sarah', last: 'Chen', gender: 'female' },
+  { first: 'Olivia', last: 'Brooks', gender: 'female' },
+  { first: 'Fatima', last: 'Hassan', gender: 'female' },
+  { first: 'Rachel', last: 'Kim', gender: 'female' },
+  { first: 'Ngozi', last: 'Adeyemi', gender: 'female' },
+  { first: 'David', last: 'Okafor', gender: 'male' },
+  { first: 'James', last: 'Mitchell', gender: 'male' },
+  { first: 'Wei', last: 'Zhang', gender: 'male' },
+  { first: 'Marcus', last: 'Thompson', gender: 'male' },
+  { first: 'Raj', last: 'Patel', gender: 'male' },
+  { first: 'Daniel', last: 'Mensah', gender: 'male' },
+  { first: 'Chris', last: 'O\'Brien', gender: 'male' },
+  { first: 'Kwame', last: 'Asare', gender: 'male' },
+];
+
+interface RoleTemplate {
+  titleFr: string;
+  titleEn: string;
+  category: 'hr' | 'tech' | 'business' | 'executive';
+}
+
+const ROLE_TEMPLATES: RoleTemplate[] = [
+  { titleFr: 'Responsable Recrutement', titleEn: 'Head of Talent Acquisition', category: 'hr' },
+  { titleFr: 'Directrice des Ressources Humaines', titleEn: 'VP of People & Culture', category: 'hr' },
+  { titleFr: 'Chargée de Recrutement Senior', titleEn: 'Senior Recruitment Lead', category: 'hr' },
+  { titleFr: 'Directeur Technique', titleEn: 'Technical Director', category: 'tech' },
+  { titleFr: 'Lead Architecte Solutions', titleEn: 'Lead Solutions Architect', category: 'tech' },
+  { titleFr: 'Engineering Manager', titleEn: 'Engineering Manager', category: 'tech' },
+  { titleFr: 'CTO Adjoint', titleEn: 'Deputy CTO', category: 'tech' },
+  { titleFr: 'Directeur Commercial', titleEn: 'Sales Director', category: 'business' },
+  { titleFr: 'Responsable Marketing & Growth', titleEn: 'Head of Growth & Marketing', category: 'business' },
+  { titleFr: 'Directeur des Opérations', titleEn: 'Head of Operations', category: 'business' },
+  { titleFr: 'Directeur Général', titleEn: 'CEO / Managing Director', category: 'executive' },
+  { titleFr: 'Directeur Financier', titleEn: 'Chief Financial Officer', category: 'executive' },
+];
+
+function pickRandom<T>(arr: T[], count: number, exclude: T[] = []): T[] {
+  const available = arr.filter((item) => !exclude.includes(item));
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+function toSpeakerId(first: string, last: string): string {
+  return `${first.toLowerCase().replace(/[^a-z]/g, '')}_${last.toLowerCase().replace(/[^a-z]/g, '')}`;
+}
+
 /**
- * Generates the system instructions for Gemini to embody an elite panel of recruiters
- * (Mme Alisor HR + Marc Laurent Technical Director) in an interactive video interview.
+ * Generates a randomized interview panel of 2-4 members based on the job profile.
+ * Always includes at least 1 HR recruiter + 1 domain expert.
+ */
+export function generateDynamicPanel(
+  jobTitle: string,
+  interviewType: InterviewType,
+  language: InterviewLanguage
+): InterviewerSpeaker[] {
+  const isFrench = language !== 'en';
+  const nameBank = isFrench ? NAME_BANK_FR : NAME_BANK_EN;
+  const lower = jobTitle.toLowerCase();
+
+  // Determine panel size: 2-4 based on job seniority
+  const isExecutive = /director|directeur|vp|head of|ceo|cto|cfo|lead|manager|chef/i.test(lower);
+  const panelSize = isExecutive
+    ? 3 + (Math.random() > 0.5 ? 1 : 0)   // 3-4 for senior roles
+    : 2 + (Math.random() > 0.6 ? 1 : 0);  // 2-3 for standard roles
+
+  // Determine required domain expert category
+  const isTech = interviewType === 'technical' ||
+    /dev|software|ingénieur|tech|architect|fullstack|frontend|backend|data|cloud|devops|cyber/i.test(lower);
+  const isSales = interviewType === 'sales' ||
+    /commercial|sales|business dev|account|vente|marketing|growth/i.test(lower);
+
+  const expertCategory = isTech ? 'tech' : isSales ? 'business' : isExecutive ? 'executive' : 'tech';
+
+  // Pick 1 HR role
+  const hrRoles = ROLE_TEMPLATES.filter((r) => r.category === 'hr');
+  const hrRole = pickRandom(hrRoles, 1)[0];
+
+  // Pick expert roles
+  const expertRoles = ROLE_TEMPLATES.filter((r) => r.category === expertCategory);
+  const additionalRoles = ROLE_TEMPLATES.filter((r) => r.category !== 'hr' && r.category !== expertCategory);
+  const expertPicks = pickRandom(expertRoles, Math.min(panelSize - 1, expertRoles.length));
+
+  // Fill remaining slots with mixed roles if needed
+  const remainingSlots = panelSize - 1 - expertPicks.length;
+  const extraRoles = remainingSlots > 0 ? pickRandom(additionalRoles, remainingSlots) : [];
+
+  const allRoles = [hrRole, ...expertPicks, ...extraRoles];
+
+  // Pick unique names from the bank
+  const pickedNames = pickRandom(nameBank, panelSize);
+
+  // Assemble panel: try to match gender with picked name
+  const panel: InterviewerSpeaker[] = allRoles.map((role, index) => {
+    const nameEntry = pickedNames[index] || pickedNames[0];
+    const id = toSpeakerId(nameEntry.first, nameEntry.last);
+    const prefix = isFrench
+      ? (nameEntry.gender === 'female' ? 'Mme' : 'M.')
+      : (nameEntry.gender === 'female' ? 'Ms.' : 'Mr.');
+    const displayName = `${prefix} ${nameEntry.first} ${nameEntry.last}`;
+    const title = isFrench ? role.titleFr : role.titleEn;
+
+    return {
+      id,
+      name: displayName,
+      title,
+      gender: nameEntry.gender,
+      avatarSeed: Math.floor(Math.random() * 100),
+    };
+  });
+
+  return panel;
+}
+
+/** Returns the HR lead (first panel member) and the first expert */
+export function getPanelLeadAndExpert(
+  panel: InterviewerSpeaker[]
+): { hrLead: InterviewerSpeaker; expert: InterviewerSpeaker } {
+  return {
+    hrLead: panel[0],
+    expert: panel[1] || panel[0],
+  };
+}
+
+/** Builds panel lookup map by speaker ID */
+export function panelToMap(panel: InterviewerSpeaker[]): Record<string, InterviewerSpeaker> {
+  const map: Record<string, InterviewerSpeaker> = {};
+  for (const member of panel) {
+    map[member.id] = member;
+  }
+  return map;
+}
+
+/**
+ * Generates the system instructions for Gemini to embody a dynamic panel of recruiters
+ * in an interactive video interview. Uses context.panel if available, else falls back
+ * to the legacy Alisor/Marc panel.
  */
 export function buildRecruiterSystemPrompt(context: InterviewContext): string {
   const isFrench = context.language !== 'en';
   const roleTarget = context.jobTitle;
   const companyName = context.company || (isFrench ? 'notre entreprise' : 'our company');
-
   const profileGuidance = getRoleSpecificGuidance(context.jobTitle, context.interviewType, isFrench);
 
+  const panel = context.panel;
+
+  // Build dynamic panel description
+  if (panel && panel.length >= 2) {
+    const hrLead = panel[0];
+    const experts = panel.slice(1);
+    const panelSize = panel.length;
+
+    const panelDescriptions = panel.map((member, idx) => {
+      const roleDesc = idx === 0
+        ? (isFrench ? 'Ouvre et clôture l\'entretien (Étapes 1 et 5)' : 'Opens and closes the interview (Stages 1 & 5)')
+        : idx === 1
+        ? (isFrench ? 'Mène le deep-dive technique/métier (Étapes 3-4)' : 'Leads technical deep-dive (Stages 3-4)')
+        : (isFrench ? 'Intervient ponctuellement sur ses domaines d\'expertise' : 'Contributes domain expertise across stages');
+      return `${idx + 1}. ${member.name} (${member.title}):\n   - ${roleDesc}\n   - Identifiant: "speaker_id": "${member.id}"`;
+    }).join('\n\n');
+
+    const speakerIds = panel.map(m => `"${m.id}"`).join(', ');
+
+    if (isFrench) {
+      return `Tu incarnes le JURY D'ENTRETIEN en visioconférence chez ${companyName}, pour le poste clé de : "${roleTarget}".
+
+LE PANEL DE RECRUTEURS (${panelSize} PERSONNALITÉS DISTINCTES & COMPLÉMENTAIRES) :
+${panelDescriptions}
+
+DYNAMIQUE DE VISIOCONFÉRENCE EN DIRECT :
+- Les ${panelSize} intervenants se passent la parole naturellement, avec des transitions humaines.
+- Tu indiques TOUJOURS quel membre parle via "speaker_id" (valeurs possibles : ${speakerIds}).
+- Tu réagis TOUJOURS d'abord aux propos du candidat avec une courte réaction incarnée avant la question.
+- Tu indiques ton émotion dominante : "neutral", "curious", "smiling", "skeptical", "impressed", "thoughtful".
+
+CADRAGE MÉTIER DU POSTE :
+${profileGuidance}
+
+CYCLE DES 5 ÉTAPES OBLIGATOIRES :
+1. Étape 1 (${hrLead.name}) - Le Pitch d'introduction : Accueil en visio, présentation du jury et invitation à se présenter en 2 minutes.
+2. Étape 2 (${hrLead.name} ou ${experts[0].name}) - La Motivation & la cible : Pourquoi ${companyName} et ce poste précis ?
+3. Étape 3 (${experts[0].name}) - Le Deep-dive Métier & Hard Skills : Challenge concret et pointu.
+4. Étape 4 (${experts.length > 1 ? experts[1].name : experts[0].name} ou ${hrLead.name}) - L'épreuve STAR : Gestion de crise, conflit ou échec cuisant résolu.
+5. Étape 5 (${hrLead.name}) - La Conviction & Closing : "Pourquoi vous et pas un autre ?", synthèse finale et conclusion bienveillante.
+
+DÉTECTION DU FLOU ET RELANCE (CHALLENGE IMMÉDIAT) :
+- Si la réponse est floue, théorique, trop courte (< 20 mots) ou utilise le "on" impersonnel :
+  -> Définis "is_followup": true.
+  -> Dans "reaction", marque ton étonnement ou ton exigence bienveillante.
+- Si sa réponse est solide :
+  -> Définis "is_followup": false et enchaîne avec l'étape suivante.`;
+    }
+
+    return `You embody an elite ${panelSize}-interviewer panel conducting a live video job interview at ${companyName} for: "${roleTarget}".
+
+THE INTERVIEWER PANEL:
+${panelDescriptions}
+
+DYNAMIC INTERVIEW FLOW:
+- The ${panelSize} panelists hand over speaking turns naturally with human transitions.
+- Set "speaker_id" on every turn (possible values: ${speakerIds}).
+- React authentically before challenging. Dominant emotion: "neutral", "curious", "smiling", "skeptical", "impressed", "thoughtful".
+
+JOB GUIDANCE:
+${profileGuidance}
+
+5 MANDATORY STAGES:
+1. Stage 1 (${hrLead.name}) - Intro Pitch: Welcome & 2-minute elevator pitch.
+2. Stage 2 (${hrLead.name} or ${experts[0].name}) - Motivation & Target.
+3. Stage 3 (${experts[0].name}) - Hands-on Hard Skills Challenge.
+4. Stage 4 (${experts.length > 1 ? experts[1].name : experts[0].name} or ${hrLead.name}) - STAR Behavioral Setback/Crisis.
+5. Stage 5 (${hrLead.name}) - Closing: "Why you?", debriefing & next steps.`;
+  }
+
+  // ─── Legacy hardcoded panel fallback ───────────────────────────────────────
   if (isFrench) {
     return `Tu incarnes le JURY D'ENTRETIEN en visioconférence chez ${companyName}, pour le poste clé de : "${roleTarget}".
 
@@ -172,8 +412,7 @@ export const STEP_RESPONSE_SCHEMA = {
   properties: {
     speaker_id: {
       type: 'STRING',
-      description: "Panel member speaking: 'alisor' for Mme Alisor (RH) or 'marc' for Marc Laurent (Directeur Technique/Manager Métier).",
-      enum: ['alisor', 'marc'],
+      description: 'The speaker_id of the panel member currently speaking. Must match one of the panel member identifiers.',
     },
     reaction: {
       type: 'STRING',

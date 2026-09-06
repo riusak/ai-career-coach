@@ -6,14 +6,25 @@ import type { InterviewEmotion, InterviewerId } from '@/types/interview';
 
 interface AnimatedRecruiterAvatarProps {
   speakerId: InterviewerId;
+  avatarSeed?: string;
   emotion?: InterviewEmotion;
   isSpeaking: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
 
+// Deterministic hash helper for archetype selection
+function hashSeed(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
+  }
+  return Math.abs(h);
+}
+
 export default function AnimatedRecruiterAvatar({
   speakerId,
+  avatarSeed,
   emotion = 'smiling',
   isSpeaking,
   size = 'lg',
@@ -28,14 +39,14 @@ export default function AnimatedRecruiterAvatar({
       setIsBlinking(true);
       setTimeout(() => {
         setIsBlinking(false);
-      }, 150);
+      }, 140);
 
-      // Next blink in 2.8 to 5.2 seconds
-      const nextDelay = 2800 + Math.random() * 2400;
+      // Next blink in 2.6 to 4.8 seconds
+      const nextDelay = 2600 + Math.random() * 2200;
       timeoutId = setTimeout(triggerBlink, nextDelay);
     };
 
-    timeoutId = setTimeout(triggerBlink, 3000);
+    timeoutId = setTimeout(triggerBlink, 2800);
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -46,206 +57,304 @@ export default function AnimatedRecruiterAvatar({
     xl: 'w-64 h-72',
   }[size];
 
-  const isAlisor = speakerId === 'alisor';
+  // Determine avatar style profile based on seed or speakerId
+  const seedKey = avatarSeed || speakerId || 'alisor';
+  const seedVal = hashSeed(seedKey);
+
+  // Determine gender/archetype
+  // Alisor => Archetype 0 (Female HR executive, warm amber/terracotta palette, elegant blazer)
+  // Marc => Archetype 1 (Male Tech architect, crisp navy suit, minimalist tech glasses)
+  // Others => Dynamic based on seedVal (4 archetypes)
+  const isHardcodedAlisor = speakerId.toLowerCase() === 'alisor' || speakerId.toLowerCase().includes('rh');
+  const isHardcodedMarc = speakerId.toLowerCase() === 'marc' || speakerId.toLowerCase().includes('tech') || speakerId.toLowerCase().includes('directeur');
+
+  let archetype = seedVal % 4;
+  if (isHardcodedAlisor) archetype = 0;
+  else if (isHardcodedMarc) archetype = 1;
+
+  // Palettes per archetype
+  const palettes = [
+    // 0: Elegant Executive Woman (Warm / Coral / Terracotta tones)
+    {
+      skinTop: '#FBE4D5',
+      skinBottom: '#ECC4A8',
+      skinShadow: '#D89E7E',
+      hairTop: '#3D2014',
+      hairBottom: '#22110B',
+      hairHighlight: '#5C3322',
+      iris: '#5C381E',
+      suitTop: '#1E293B',
+      suitBottom: '#0F172A',
+      shirt: '#0D9488',
+      lapel: '#334155',
+      accent: '#F59E0B',
+      hasGlasses: false,
+      hasBeard: false,
+      isFemale: true,
+      earring: true,
+    },
+    // 1: Modern Tech Leader Man (Slate / Sapphire tones)
+    {
+      skinTop: '#F6D5BA',
+      skinBottom: '#E5B695',
+      skinShadow: '#C89370',
+      hairTop: '#1F2937',
+      hairBottom: '#111827',
+      hairHighlight: '#374151',
+      iris: '#1E3A8A',
+      suitTop: '#0F172A',
+      suitBottom: '#020617',
+      shirt: '#2563EB',
+      lapel: '#1E293B',
+      accent: '#38BDF8',
+      hasGlasses: true,
+      hasBeard: true,
+      isFemale: false,
+      earring: false,
+    },
+    // 2: Dynamic Senior Specialist Woman (Rich Deep Chestnut / Emerald tones)
+    {
+      skinTop: '#8D5B4C',
+      skinBottom: '#6F4133',
+      skinShadow: '#573024',
+      hairTop: '#171717',
+      hairBottom: '#0A0A0A',
+      hairHighlight: '#262626',
+      iris: '#3B2F2F',
+      suitTop: '#064E3B',
+      suitBottom: '#022C22',
+      shirt: '#F8FAFC',
+      lapel: '#047857',
+      accent: '#FCD34D',
+      hasGlasses: false,
+      hasBeard: false,
+      isFemale: true,
+      earring: true,
+    },
+    // 3: VP & Senior Manager Man (Golden Brown / Midnight Indigo tones)
+    {
+      skinTop: '#E2B895',
+      skinBottom: '#C5936E',
+      skinShadow: '#A7734E',
+      hairTop: '#27272A',
+      hairBottom: '#18181B',
+      hairHighlight: '#3F3F46',
+      iris: '#292524',
+      suitTop: '#1E1B4B',
+      suitBottom: '#0F0E2A',
+      shirt: '#E0E7FF',
+      lapel: '#312E81',
+      accent: '#818CF8',
+      hasGlasses: false,
+      hasBeard: true,
+      isFemale: false,
+      earring: false,
+    },
+  ];
+
+  const p = palettes[archetype];
+  const uid = `av-${seedKey.replace(/[^a-z0-9]/gi, '_')}`;
 
   return (
     <div
       className={`relative flex items-center justify-center select-none ${sizeClasses} ${className}`}
-      aria-label={`${isAlisor ? 'Mme Alisor' : 'Marc Laurent'} - Avatar`}
+      aria-label={`Avatar recruteur`}
     >
       <motion.svg
         viewBox="0 0 240 280"
-        className="w-full h-full drop-shadow-md"
+        className="w-full h-full drop-shadow-xl"
         animate={{
-          y: isSpeaking ? [0, -3, 1, -2, 0] : [0, -1.5, 0],
+          y: isSpeaking ? [0, -3.5, 1, -2, 0] : [0, -1.8, 0],
           rotate: isSpeaking
             ? emotion === 'curious'
-              ? [1, 2.5, 0.5, 2]
-              : [0, 0.8, -0.6, 0]
+              ? [0.5, 2, 0.5, 1.5]
+              : [0, 0.7, -0.5, 0]
             : emotion === 'thoughtful'
-            ? 1.5
+            ? 1.2
             : 0,
         }}
         transition={{
           y: {
             repeat: Infinity,
-            duration: isSpeaking ? 1.2 : 3.5,
+            duration: isSpeaking ? 1.3 : 3.8,
             ease: 'easeInOut',
           },
           rotate: {
             repeat: isSpeaking ? Infinity : 0,
-            duration: isSpeaking ? 1.6 : 0.5,
+            duration: isSpeaking ? 1.7 : 0.6,
             ease: 'easeInOut',
           },
         }}
       >
         <defs>
-          {/* Subtle skin & hair gradients */}
-          <linearGradient id={`skin-${speakerId}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={isAlisor ? '#FBD9B9' : '#E8B996'} />
-            <stop offset="100%" stopColor={isAlisor ? '#E8B896' : '#CF9B73'} />
+          {/* Subtle skin gradient */}
+          <linearGradient id={`${uid}-skin`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={p.skinTop} />
+            <stop offset="100%" stopColor={p.skinBottom} />
           </linearGradient>
 
-          <linearGradient id={`hair-${speakerId}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={isAlisor ? '#422416' : '#1F2430'} />
-            <stop offset="100%" stopColor={isAlisor ? '#2A1409' : '#0F131A'} />
+          {/* Hair Gradient */}
+          <linearGradient id={`${uid}-hair`} x1="0" y1="0" x2="0.6" y2="1">
+            <stop offset="0%" stopColor={p.hairTop} />
+            <stop offset="100%" stopColor={p.hairBottom} />
           </linearGradient>
 
-          <linearGradient id={`suit-${speakerId}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={isAlisor ? '#1E293B' : '#0F172A'} />
-            <stop offset="100%" stopColor={isAlisor ? '#0F172A' : '#020617'} />
+          {/* Suit Gradient */}
+          <linearGradient id={`${uid}-suit`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={p.suitTop} />
+            <stop offset="100%" stopColor={p.suitBottom} />
           </linearGradient>
 
-          <linearGradient id={`shirt-${speakerId}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={isAlisor ? '#0D9488' : '#2563EB'} />
-            <stop offset="100%" stopColor={isAlisor ? '#14B8A6' : '#3B82F6'} />
-          </linearGradient>
+          {/* Ambient Lighting Glow */}
+          <radialGradient id={`${uid}-glow`} cx="50%" cy="30%" r="60%">
+            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          </radialGradient>
 
-          {/* Shadow filters */}
-          <filter id="subtle-shadow" x="-10%" y="-10%" width="120%" height="120%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.15" />
+          {/* Soft Shadow Filter */}
+          <filter id={`${uid}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodOpacity="0.18" />
           </filter>
         </defs>
 
-        {/* 1. Body & Clothes (Shoulders/Chest) */}
+        {/* 1. Body & Elegant Business Attire */}
         <g>
-          {/* Base Shoulders */}
+          {/* Shoulders & Jacket Silhouette */}
           <path
-            d="M 30 280 C 30 215, 75 195, 120 195 C 165 195, 210 215, 210 280 Z"
-            fill={`url(#suit-${speakerId})`}
+            d="M 24 280 C 24 212, 70 192, 120 192 C 170 192, 216 212, 216 280 Z"
+            fill={`url(#${uid}-suit)`}
+          />
+          {/* Soft lighting overlay across shoulders */}
+          <path
+            d="M 24 280 C 24 212, 70 192, 120 192 C 170 192, 216 212, 216 280 Z"
+            fill={`url(#${uid}-glow)`}
           />
 
-          {/* Inner Shirt Collar */}
-          {isAlisor ? (
-            // Elegant silk collar for Mme Alisor
-            <>
-              <path
-                d="M 90 195 L 120 230 L 150 195 Z"
-                fill={`url(#shirt-${speakerId})`}
-              />
-              <path
-                d="M 85 195 L 120 245 L 98 280 L 80 280 Z"
-                fill="#334155"
-                opacity="0.8"
-              />
-              <path
-                d="M 155 195 L 120 245 L 142 280 L 160 280 Z"
-                fill="#1E293B"
-              />
-            </>
-          ) : (
-            // Modern Tech Shirt & Lapel for Marc Laurent
-            <>
-              <path
-                d="M 95 195 L 120 235 L 145 195 Z"
-                fill="#FFFFFF"
-                opacity="0.95"
-              />
-              <path
-                d="M 116 235 L 124 235 L 124 280 L 116 280 Z"
-                fill={`url(#shirt-${speakerId})`}
-              />
-              <path
-                d="M 80 195 L 115 250 L 105 280 L 70 280 Z"
-                fill="#1E293B"
-              />
-              <path
-                d="M 160 195 L 125 250 L 135 280 L 170 280 Z"
-                fill="#0F172A"
-              />
-            </>
-          )}
-
-          {/* Neck */}
+          {/* Inner Shirt / Top */}
           <path
-            d="M 98 150 L 98 198 C 112 205, 128 205, 142 198 L 142 150 Z"
-            fill={`url(#skin-${speakerId})`}
+            d="M 92 192 L 120 238 L 148 192 Z"
+            fill={p.shirt}
+            opacity="0.96"
           />
-          {/* Neck shadow under chin */}
+
+          {/* Left & Right Suit Lapels */}
           <path
-            d="M 98 152 C 110 162, 130 162, 142 152 L 142 166 C 130 174, 110 174, 98 166 Z"
-            fill="#000000"
-            opacity="0.12"
+            d="M 78 192 L 118 256 L 102 280 L 65 280 Z"
+            fill={p.lapel}
+            opacity="0.9"
+          />
+          <path
+            d="M 162 192 L 122 256 L 138 280 L 175 280 Z"
+            fill={p.lapel}
+            opacity="0.8"
+          />
+
+          {/* Neck Column */}
+          <path
+            d="M 97 146 L 97 196 C 111 204, 129 204, 143 196 L 143 146 Z"
+            fill={`url(#${uid}-skin)`}
+          />
+          {/* Chin Shadow on Neck */}
+          <path
+            d="M 97 148 C 110 160, 130 160, 143 148 L 143 162 C 130 170, 110 170, 97 162 Z"
+            fill={p.skinShadow}
+            opacity="0.45"
           />
         </g>
 
-        {/* 2. Head & Facial Base */}
+        {/* 2. Head, Ears & Refined Facial Structure */}
         <g>
-          {/* Ears */}
+          {/* Ears with soft inner shading */}
           <ellipse
-            cx="68"
-            cy="124"
-            rx="9"
-            ry="14"
-            fill={`url(#skin-${speakerId})`}
+            cx="66"
+            cy="123"
+            rx="8.5"
+            ry="13.5"
+            fill={`url(#${uid}-skin)`}
           />
           <ellipse
-            cx="172"
-            cy="124"
-            rx="9"
-            ry="14"
-            fill={`url(#skin-${speakerId})`}
+            cx="66"
+            cy="123"
+            rx="4.5"
+            ry="7.5"
+            fill={p.skinShadow}
+            opacity="0.3"
           />
-          {/* Mme Alisor Earrings */}
-          {isAlisor && (
+
+          <ellipse
+            cx="174"
+            cy="123"
+            rx="8.5"
+            ry="13.5"
+            fill={`url(#${uid}-skin)`}
+          />
+          <ellipse
+            cx="174"
+            cy="123"
+            rx="4.5"
+            ry="7.5"
+            fill={p.skinShadow}
+            opacity="0.3"
+          />
+
+          {/* Earrings for female archetypes */}
+          {p.earring && (
             <>
-              <circle cx="68" cy="138" r="3.5" fill="#F59E0B" />
-              <circle cx="172" cy="138" r="3.5" fill="#F59E0B" />
+              <circle cx="66" cy="138" r="3.2" fill={p.accent} />
+              <circle cx="66" cy="138" r="1.5" fill="#FFF" opacity="0.6" />
+              <circle cx="174" cy="138" r="3.2" fill={p.accent} />
+              <circle cx="174" cy="138" r="1.5" fill="#FFF" opacity="0.6" />
             </>
           )}
 
-          {/* Head Shape */}
+          {/* Smooth Ergonomic Head Shape */}
           <path
-            d={
-              isAlisor
-                ? 'M 74 110 C 74 65, 166 65, 166 110 C 166 148, 148 168, 120 168 C 92 168, 74 148, 74 110 Z'
-                : 'M 74 105 C 74 62, 166 62, 166 105 C 166 146, 150 170, 120 170 C 90 170, 74 146, 74 105 Z'
-            }
-            fill={`url(#skin-${speakerId})`}
-            filter="url(#subtle-shadow)"
+            d="M 72 106 C 72 58, 168 58, 168 106 C 168 146, 150 168, 120 168 C 90 168, 72 146, 72 106 Z"
+            fill={`url(#${uid}-skin)`}
+            filter={`url(#${uid}-shadow)`}
           />
 
-          {/* Marc Laurent Stubble / Beard */}
-          {!isAlisor && (
+          {/* Subtle natural beard/stubble for male archetypes */}
+          {p.hasBeard && (
             <path
-              d="M 82 128 C 82 162, 100 170, 120 170 C 140 170, 158 162, 158 128 C 158 138, 144 148, 120 148 C 96 148, 82 138, 82 128 Z"
-              fill="#261A12"
-              opacity="0.22"
+              d="M 80 126 C 80 162, 98 169, 120 169 C 142 169, 160 162, 160 126 C 160 138, 146 148, 120 148 C 94 148, 80 138, 80 126 Z"
+              fill={p.hairBottom}
+              opacity="0.18"
             />
           )}
 
-          {/* Cheeks Warm Blush */}
+          {/* Natural Cheek Warmth */}
           <ellipse
-            cx="90"
-            cy="134"
+            cx="88"
+            cy="133"
             rx="9"
-            ry="5"
+            ry="5.5"
             fill="#FB7185"
-            opacity={emotion === 'smiling' ? 0.35 : 0.18}
+            opacity={emotion === 'smiling' ? 0.32 : 0.16}
           />
           <ellipse
-            cx="150"
-            cy="134"
+            cx="152"
+            cy="133"
             rx="9"
-            ry="5"
+            ry="5.5"
             fill="#FB7185"
-            opacity={emotion === 'smiling' ? 0.35 : 0.18}
+            opacity={emotion === 'smiling' ? 0.32 : 0.16}
           />
         </g>
 
-        {/* 3. Eyebrows (Dynamic Emotion Tilts) */}
+        {/* 3. Refined Eyebrows with Emotion Nuances */}
         <g>
           {/* Left Eyebrow */}
           <motion.path
             d={
               emotion === 'curious'
-                ? 'M 88 95 Q 102 91, 114 96' // raised left brow
+                ? 'M 86 94 Q 101 89, 114 94'
                 : emotion === 'skeptical'
-                ? 'M 88 100 Q 102 101, 114 102' // furrowed left brow
-                : 'M 88 98 Q 102 94, 114 98' // natural arc
+                ? 'M 86 99 Q 101 100, 114 101'
+                : 'M 86 97 Q 101 92, 114 96'
             }
-            stroke={isAlisor ? '#3E2314' : '#1A1E29'}
-            strokeWidth={isAlisor ? '2.8' : '3.8'}
+            stroke={p.hairTop}
+            strokeWidth={p.isFemale ? '2.8' : '3.6'}
             strokeLinecap="round"
             fill="none"
           />
@@ -254,47 +363,48 @@ export default function AnimatedRecruiterAvatar({
           <motion.path
             d={
               emotion === 'curious'
-                ? 'M 126 97 Q 138 95, 152 99' // normal right brow
+                ? 'M 126 96 Q 139 94, 154 98'
                 : emotion === 'skeptical'
-                ? 'M 126 95 Q 138 89, 152 94' // raised right brow
-                : 'M 126 98 Q 138 94, 152 98' // natural arc
+                ? 'M 126 94 Q 139 88, 154 93'
+                : 'M 126 96 Q 139 92, 154 97'
             }
-            stroke={isAlisor ? '#3E2314' : '#1A1E29'}
-            strokeWidth={isAlisor ? '2.8' : '3.8'}
+            stroke={p.hairTop}
+            strokeWidth={p.isFemale ? '2.8' : '3.6'}
             strokeLinecap="round"
             fill="none"
           />
         </g>
 
-        {/* 4. Eyes & Blinking Animation */}
+        {/* 4. Natural Expressive Eyes */}
         <g>
           {/* Left Eye */}
           {isBlinking ? (
-            // Closed eye line on blink
             <path
-              d="M 90 114 Q 102 118, 112 114"
-              stroke="#2E1B12"
-              strokeWidth="2.5"
+              d="M 88 113 Q 101 117, 114 113"
+              stroke={p.hairBottom}
+              strokeWidth="2.4"
               strokeLinecap="round"
               fill="none"
             />
           ) : (
-            // Open Eye
             <g>
-              <ellipse cx="101" cy="113" rx="8" ry="6.5" fill="#FFFFFF" />
-              <ellipse
+              <ellipse cx="101" cy="112" rx="8" ry="6.5" fill="#FFFFFF" />
+              {/* Iris */}
+              <circle
                 cx={emotion === 'thoughtful' ? '99.5' : '101'}
-                cy="113"
-                rx="4.2"
-                ry="4.5"
-                fill={isAlisor ? '#633B23' : '#1E293B'}
+                cy="112"
+                r="4.2"
+                fill={p.iris}
               />
-              <circle cx="99.5" cy="111.5" r="1.4" fill="#FFFFFF" />
-              {/* Eyelash for Mme Alisor */}
-              {isAlisor && (
+              <circle cx="101" cy="112" r="2" fill="#0F172A" />
+              {/* Specular Catchlight */}
+              <circle cx="99.5" cy="110.5" r="1.4" fill="#FFFFFF" />
+              <circle cx="102.5" cy="113.5" r="0.7" fill="#FFFFFF" opacity="0.8" />
+              {/* Eyelash accent for female */}
+              {p.isFemale && (
                 <path
-                  d="M 92 110 Q 101 106, 110 110"
-                  stroke="#2E1B12"
+                  d="M 90 109 Q 101 105, 112 109"
+                  stroke={p.hairBottom}
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   fill="none"
@@ -305,31 +415,32 @@ export default function AnimatedRecruiterAvatar({
 
           {/* Right Eye */}
           {isBlinking ? (
-            // Closed eye line on blink
             <path
-              d="M 128 114 Q 138 118, 150 114"
-              stroke="#2E1B12"
-              strokeWidth="2.5"
+              d="M 126 113 Q 139 117, 152 113"
+              stroke={p.hairBottom}
+              strokeWidth="2.4"
               strokeLinecap="round"
               fill="none"
             />
           ) : (
-            // Open Eye
             <g>
-              <ellipse cx="139" cy="113" rx="8" ry="6.5" fill="#FFFFFF" />
-              <ellipse
+              <ellipse cx="139" cy="112" rx="8" ry="6.5" fill="#FFFFFF" />
+              {/* Iris */}
+              <circle
                 cx={emotion === 'thoughtful' ? '137.5' : '139'}
-                cy="113"
-                rx="4.2"
-                ry="4.5"
-                fill={isAlisor ? '#633B23' : '#1E293B'}
+                cy="112"
+                r="4.2"
+                fill={p.iris}
               />
-              <circle cx="137.5" cy="111.5" r="1.4" fill="#FFFFFF" />
-              {/* Eyelash for Mme Alisor */}
-              {isAlisor && (
+              <circle cx="139" cy="112" r="2" fill="#0F172A" />
+              {/* Specular Catchlight */}
+              <circle cx="137.5" cy="110.5" r="1.4" fill="#FFFFFF" />
+              <circle cx="140.5" cy="113.5" r="0.7" fill="#FFFFFF" opacity="0.8" />
+              {/* Eyelash accent for female */}
+              {p.isFemale && (
                 <path
-                  d="M 130 110 Q 139 106, 148 110"
-                  stroke="#2E1B12"
+                  d="M 128 109 Q 139 105, 150 109"
+                  stroke={p.hairBottom}
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   fill="none"
@@ -338,167 +449,146 @@ export default function AnimatedRecruiterAvatar({
             </g>
           )}
 
-          {/* Glasses for Marc Laurent */}
-          {!isAlisor && (
+          {/* Minimalist Tech Glasses if enabled */}
+          {p.hasGlasses && (
             <g>
-              {/* Left rim */}
               <rect
-                x="88"
-                y="103"
-                width="26"
+                x="87"
+                y="102"
+                width="28"
                 height="20"
-                rx="5"
+                rx="6"
                 fill="none"
                 stroke="#334155"
-                strokeWidth="2"
+                strokeWidth="1.8"
               />
-              {/* Right rim */}
               <rect
-                x="126"
-                y="103"
-                width="26"
+                x="125"
+                y="102"
+                width="28"
                 height="20"
-                rx="5"
+                rx="6"
                 fill="none"
                 stroke="#334155"
-                strokeWidth="2"
+                strokeWidth="1.8"
               />
-              {/* Bridge */}
               <path
-                d="M 114 111 L 126 111"
+                d="M 115 110 L 125 110"
                 stroke="#334155"
-                strokeWidth="2"
+                strokeWidth="1.8"
                 fill="none"
               />
-              {/* Glare reflections */}
+              {/* Subtle glass glare */}
               <line
-                x1="92"
-                y1="106"
+                x1="91"
+                y1="105"
                 x2="100"
-                y2="106"
+                y2="105"
                 stroke="#FFFFFF"
-                strokeWidth="1.4"
+                strokeWidth="1.2"
                 strokeLinecap="round"
-                opacity="0.6"
+                opacity="0.5"
               />
               <line
-                x1="130"
-                y1="106"
+                x1="129"
+                y1="105"
                 x2="138"
-                y2="106"
+                y2="105"
                 stroke="#FFFFFF"
-                strokeWidth="1.4"
+                strokeWidth="1.2"
                 strokeLinecap="round"
-                opacity="0.6"
+                opacity="0.5"
               />
             </g>
           )}
         </g>
 
-        {/* 5. Nose */}
+        {/* 5. Natural Nose Contour */}
         <path
-          d={
-            isAlisor
-              ? 'M 119 118 Q 123 129, 118 132 Q 120 133, 122 133'
-              : 'M 118 116 L 122 129 L 117 133 L 123 133'
-          }
-          stroke="#C28D69"
+          d="M 119 116 Q 123 128, 118 132 Q 120 133, 122 133"
+          stroke={p.skinShadow}
           strokeWidth="1.8"
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
         />
 
-        {/* 6. Dynamic Mouth (Speaking Viseme Animation) */}
+        {/* 6. Dynamic Organic Mouth & Viseme Animation */}
         <g>
           {isSpeaking ? (
-            // Animated Speaking Mouth Visemes
             <motion.path
               fill="#991B1B"
               stroke="#6B1212"
-              strokeWidth="1.5"
+              strokeWidth="1.4"
               animate={{
                 d: [
                   'M 108 146 Q 120 148, 132 146 Q 120 152, 108 146 Z', // slight open
                   'M 106 145 Q 120 144, 134 145 Q 120 158, 106 145 Z', // wide open
-                  'M 110 146 Q 120 147, 130 146 Q 120 155, 110 146 Z', // round viseme
-                  'M 107 145 Q 120 149, 133 145 Q 120 150, 107 145 Z', // smile talking
+                  'M 110 146 Q 120 147, 130 146 Q 120 155, 110 146 Z', // rounded
+                  'M 107 145 Q 120 149, 133 145 Q 120 151, 107 145 Z', // smiling articulation
                 ],
               }}
               transition={{
                 repeat: Infinity,
-                duration: 0.55,
+                duration: 0.52,
                 ease: 'easeInOut',
               }}
             />
           ) : (
-            // Resting Closed Mouth according to emotion
             <path
               d={
                 emotion === 'smiling' || emotion === 'impressed'
-                  ? 'M 108 146 Q 120 154, 132 146' // warm upward smile
+                  ? 'M 107 145 Q 120 154, 133 145' // natural warm smile
                   : emotion === 'skeptical'
-                  ? 'M 108 148 Q 120 148, 132 145' // slight asymmetric pursed lip
+                  ? 'M 108 147 Q 120 147, 132 144'
                   : emotion === 'thoughtful'
-                  ? 'M 110 147 Q 120 146, 130 147' // straight line
-                  : 'M 109 146 Q 120 150, 131 146' // soft natural closed
+                  ? 'M 110 146 Q 120 145, 130 146'
+                  : 'M 108 145 Q 120 149, 132 145'
               }
-              stroke={isAlisor ? '#9F3A4B' : '#78350F'}
-              strokeWidth="2.4"
+              stroke={p.isFemale ? '#A83244' : '#6B3A1C'}
+              strokeWidth="2.3"
               strokeLinecap="round"
-              fill="none"
-            />
-          )}
-
-          {/* Upper lip highlight */}
-          {!isSpeaking && isAlisor && (
-            <path
-              d="M 113 144 Q 120 143, 127 144"
-              stroke="#D97706"
-              strokeWidth="0.8"
-              opacity="0.35"
               fill="none"
             />
           )}
         </g>
 
-        {/* 7. Hair (Styled Forehead & Contours) */}
-        {isAlisor ? (
-          // Mme Alisor: Elegant wavy professional hairstyle
+        {/* 7. Beautiful Hair Styling per Archetype */}
+        {p.isFemale ? (
+          // Elegant executive styling (smooth flowing contour)
           <g>
-            {/* Back Hair Mass */}
             <path
-              d="M 64 120 C 58 170, 72 205, 82 220 L 72 170 C 60 130, 68 85, 85 68 Z"
-              fill="url(#hair-alisor)"
+              d="M 64 122 C 58 172, 70 205, 80 220 L 70 170 C 58 130, 66 82, 84 66 Z"
+              fill={`url(#${uid}-hair)`}
             />
             <path
-              d="M 176 120 C 182 170, 168 205, 158 220 L 168 170 C 180 130, 172 85, 155 68 Z"
-              fill="url(#hair-alisor)"
+              d="M 176 122 C 182 172, 170 205, 160 220 L 170 170 C 182 130, 174 82, 156 66 Z"
+              fill={`url(#${uid}-hair)`}
             />
-            {/* Forehead Hair Crown & Waves */}
+            {/* Crown & flowing forehead wave */}
             <path
-              d="M 68 108 C 65 52, 175 52, 172 108 C 160 82, 136 78, 118 84 C 98 78, 78 84, 68 108 Z"
-              fill="url(#hair-alisor)"
+              d="M 68 106 C 64 48, 176 48, 172 106 C 160 80, 134 76, 118 82 C 98 76, 78 82, 68 106 Z"
+              fill={`url(#${uid}-hair)`}
             />
-            {/* Side Bangs Accent */}
+            {/* Soft highlight strand */}
             <path
-              d="M 72 100 C 80 82, 102 82, 114 86 C 98 90, 84 102, 78 120 Z"
-              fill="#522C1B"
-              opacity="0.75"
+              d="M 76 92 C 86 74, 110 74, 122 78 C 104 82, 90 92, 82 110 Z"
+              fill={p.hairHighlight}
+              opacity="0.6"
             />
           </g>
         ) : (
-          // Marc Laurent: Contemporary sculpted executive haircut
+          // Sleek executive haircut
           <g>
             <path
-              d="M 70 102 C 68 56, 172 56, 170 102 C 166 78, 146 70, 120 70 C 94 70, 74 78, 70 102 Z"
-              fill="url(#hair-marc)"
+              d="M 69 100 C 66 52, 174 52, 171 100 C 166 74, 146 66, 120 66 C 94 66, 74 74, 69 100 Z"
+              fill={`url(#${uid}-hair)`}
             />
-            {/* Textured Hair Highlights */}
+            {/* Volumetric texture strand */}
             <path
-              d="M 85 70 C 100 58, 130 58, 155 66 C 145 62, 125 62, 100 68 Z"
-              fill="#374151"
-              opacity="0.4"
+              d="M 84 68 C 100 56, 132 56, 156 64 C 144 60, 122 60, 98 66 Z"
+              fill={p.hairHighlight}
+              opacity="0.5"
             />
           </g>
         )}

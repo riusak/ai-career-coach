@@ -11,6 +11,7 @@ import {
   FileText,
   GraduationCap,
   Upload,
+  Video,
 } from 'lucide-react';
 import type { DashboardActivity, DashboardActivityType } from '@/types/dashboard';
 import { formatRelativeTime } from '@/lib/dashboard/relative-time';
@@ -26,6 +27,7 @@ const TYPE_STYLES: Record<DashboardActivityType, { Icon: typeof Upload; bg: stri
   education: { Icon: GraduationCap, bg: 'bg-purple-50 text-purple-600' },
   certification: { Icon: Award, bg: 'bg-amber-50 text-amber-600' },
   skill: { Icon: FileText, bg: 'bg-navy-50 text-navy-600' },
+  interview: { Icon: Video, bg: 'bg-sky-50 text-sky-600' },
 };
 
 /**

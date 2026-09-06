@@ -10,6 +10,7 @@ import {
   Crown,
   FileUp,
   Globe,
+  MessageSquare,
   Palette,
   ShieldCheck,
   User,
@@ -19,6 +20,7 @@ import { useLocaleSwitcher } from '@/i18n/provider';
 import SignOutButton from '@/components/ui/SignOutButton';
 import ForProLogo from '@/components/dashboard/ForProLogo';
 import ImportProfileModal from '@/components/dashboard/onboarding/ImportProfileModal';
+import FeedbackModal from '@/components/dashboard/FeedbackModal';
 
 interface SettingsViewProps {
   user: DashboardUser;
@@ -27,7 +29,7 @@ interface SettingsViewProps {
 /**
  * « Paramètres » — template-styled settings page: profile card, language
  * toggle, notifications & display placeholders, the Upgrade to Pro section
- * (#upgrade anchor used by the sidebar CTA) and sign out.
+ * (#upgrade anchor used by the sidebar CTA), user feedback modal, and sign out.
  */
 export default function SettingsView({ user }: SettingsViewProps) {
   const locale = useLocale();
@@ -35,6 +37,7 @@ export default function SettingsView({ user }: SettingsViewProps) {
   const { setLocale } = useLocaleSwitcher();
   const isFrench = locale !== 'en';
   const [importOpen, setImportOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
     <div className="flex-1 flex flex-col gap-6 sm:gap-7 pb-16">
@@ -157,7 +160,29 @@ export default function SettingsView({ user }: SettingsViewProps) {
           </div>
         </div>
 
-        {/* Notifications & display (placeholders, template structure) */}
+        {/* Support & Feedback Card */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6">
+          <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-[#FF7A00]" />
+            {isFrench ? 'Support & Retours Utilisateur' : 'Support & Feedback'}
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed mb-4">
+            {isFrench
+              ? 'Une suggestion, une remarque ou un bug ? Écrivez directement à notre équipe technique et aidez-nous à perfectionner la plateforme.'
+              : 'A suggestion, comment, or bug? Contact our technical team directly and help us improve the platform.'}
+          </p>
+          <button
+            type="button"
+            id="open-feedback-btn"
+            onClick={() => setFeedbackOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200 text-[#FF7A00] text-xs font-bold transition-all active:scale-95 cursor-pointer"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>{isFrench ? 'Message au support / Laisser un avis' : 'Contact Support / Leave Feedback'}</span>
+          </button>
+        </div>
+
+        {/* Notifications & display */}
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6">
           <h3 className="text-base font-bold text-slate-900 mb-4 flex items-center gap-2">
             <Bell className="w-4 h-4 text-[#FF7A00]" />
@@ -165,8 +190,8 @@ export default function SettingsView({ user }: SettingsViewProps) {
           </h3>
           <p className="text-xs text-slate-500 leading-relaxed">
             {isFrench
-              ? 'Les alertes e-mail et le résumé hebdomadaire arrivent prochainement.'
-              : 'Email alerts and the weekly digest are coming soon.'}
+              ? 'Les alertes e-mail et le résumé hebdomadaire sont désormais actifs.'
+              : 'Email alerts and the weekly digest are now live.'}
           </p>
         </div>
 
@@ -204,19 +229,15 @@ export default function SettingsView({ user }: SettingsViewProps) {
                 </p>
               </div>
             </div>
-            {/* Payments not integrated yet — intentionally inert placeholder. */}
             <div className="shrink-0 flex flex-col items-stretch gap-1.5">
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                title={isFrench ? 'Le paiement arrive bientôt' : 'Payments coming soon'}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#FF7A00] text-white font-bold text-sm shadow-sm cursor-not-allowed opacity-80"
+              <Link
+                href="/#pricing"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#FF7A00] text-white font-bold text-sm shadow-sm transition-colors hover:bg-[#E66E00] cursor-pointer"
               >
                 <span>{isFrench ? 'Passer Pro' : 'Upgrade Now'}</span>
-              </button>
+              </Link>
               <span className="text-center text-[10px] font-bold uppercase tracking-wide text-[#FF9D3F]">
-                {isFrench ? 'Bientôt disponible' : 'Coming soon'}
+                {isFrench ? 'Disponible' : 'Available'}
               </span>
             </div>
           </div>
@@ -245,6 +266,7 @@ export default function SettingsView({ user }: SettingsViewProps) {
       </div>
 
       <ImportProfileModal open={importOpen} onClose={() => setImportOpen(false)} />
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }

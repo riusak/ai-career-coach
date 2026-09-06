@@ -40,6 +40,22 @@ const UsersIcon = (): ReactNode => (
   </svg>
 );
 
+const FeedbackIcon = (): ReactNode => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    className="h-4 w-4"
+  >
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
 const AuditIcon = (): ReactNode => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -66,6 +82,7 @@ type NavEntry = {
 const NAV_ENTRIES: ReadonlyArray<NavEntry> = [
   { href: '/admin', key: 'overview', Icon: OverviewIcon },
   { href: '/admin/users', key: 'users', Icon: UsersIcon },
+  { href: '/admin/feedback', key: 'feedback', Icon: FeedbackIcon },
   { href: '/admin/audit', key: 'audit', Icon: AuditIcon },
 ];
 

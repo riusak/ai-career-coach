@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cleanSpokenText } from '@/hooks/useSpeechSynthesis';
+import { checkRateLimit, getClientIp } from '@/lib/security/rate-limit';
 import type { InterviewLanguage, InterviewerId } from '@/types/interview';
 
 export const runtime = 'nodejs';
@@ -11,6 +12,16 @@ const MAX_CACHE_ITEMS = 60;
 
 export async function POST(request: Request) {
   try {
+    // 0. DoS & Flood protection: 30 TTS calls per minute per IP
+    const ip = getClientIp(new Headers(request.headers));
+    const rateCheck = checkRateLimit(`tts:${ip}`, 30, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Trop de requêtes vocales. Veuillez patienter un instant.' },
+        { status: 429 }
+      );
+    }
+
     const body = (await request.json()) as {
       text?: string;
       speakerId?: InterviewerId;
@@ -24,6 +35,13 @@ export async function POST(request: Request) {
     const cleanedText = cleanSpokenText(body.text);
     if (!cleanedText) {
       return NextResponse.json({ error: 'Texte vide après nettoyage.' }, { status: 400 });
+    }
+
+    if (cleanedText.length > 2000) {
+      return NextResponse.json(
+        { error: 'Texte trop long pour la synthèse vocale (maximum 2000 caractères).' },
+        { status: 413 }
+      );
     }
 
     const language = body.language === 'en' ? 'en' : 'fr';

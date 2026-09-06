@@ -68,3 +68,36 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const body: unknown = await request.json();
+    if (typeof body !== 'object' || body === null) {
+      return NextResponse.json({ error: 'Payload invalide.' }, { status: 400 });
+    }
+
+    const { sessionId } = body as { sessionId?: string };
+
+    if (!sessionId || typeof sessionId !== 'string') {
+      return NextResponse.json({ error: 'sessionId est requis.' }, { status: 400 });
+    }
+
+    const { deleteInterviewSession } = await import('@/lib/supabase/interviews');
+    const result = await deleteInterviewSession(sessionId);
+
+    if (result.error) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('[api/interview/session] DELETE error:', err);
+    return NextResponse.json(
+      { error: 'Erreur lors de la suppression de la session.' },
+      { status: 500 }
+    );
+  }
+}

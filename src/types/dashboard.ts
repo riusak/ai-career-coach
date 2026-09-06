@@ -14,7 +14,8 @@ export type DashboardActivityType =
   | 'experience'
   | 'education'
   | 'certification'
-  | 'skill';
+  | 'skill'
+  | 'interview';
 
 /** Translation keys allowed for activity titles (keeps t() typed & finite). */
 export type DashboardActivityTitleKey =
@@ -23,7 +24,8 @@ export type DashboardActivityTitleKey =
   | 'activityExperienceAdded'
   | 'activityEducationAdded'
   | 'activityCertificationAdded'
-  | 'activitySkillAdded';
+  | 'activitySkillAdded'
+  | 'activityInterviewCompleted';
 
 export interface DashboardActivity {
   id: string;
@@ -135,6 +137,20 @@ export interface ProfileMetrics {
   resumeQuality: number;
 }
 
+/** Aggregated mock-interview practice stats for the Analytics page. */
+export interface SimulationStatsData {
+  /** Number of interview simulation sessions ever started. */
+  total: number;
+  /** Sessions completed with a full STAR debrief. */
+  completed: number;
+  /** Sessions still in progress or abandoned. */
+  inProgress: number;
+  /** Average STAR score over evaluated sessions (null when none scored). */
+  averageScore: number | null;
+  /** Best STAR score over evaluated sessions (null when none scored). */
+  bestScore: number | null;
+}
+
 /** Everything the client dashboard root (DashboardView) needs, precomputed. */
 export interface DashboardViewData {
   isEmptyState: boolean;
@@ -146,6 +162,8 @@ export interface DashboardViewData {
   cvs: CvDetailData[];
   activities: DashboardActivity[];
   primaryCvId: string | null;
+  /** Aggregated mock-interview practice stats (Analytics page). */
+  simulations: SimulationStatsData;
   /** Template-style user card (sidebar footer + header welcome). */
   user: DashboardUser;
 }
