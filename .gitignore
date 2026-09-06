@@ -34,6 +34,13 @@ yarn-error.log*
 .env*
 !.env.example
 
+# one-shot temp debug artifacts (never commit credentials/CV dumps)
+/env-temp.txt
+/cv-test-temp.pdf
+/cv-test-temp.txt
+/gen-cv-pdf.mjs
+/quick-test-response.json
+
 # vercel
 .vercel
 
