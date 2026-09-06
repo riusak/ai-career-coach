@@ -326,3 +326,62 @@ export async function getUserInterviewSessions(
     return { data: null, error: message };
   }
 }
+
+/**
+ * Marks an in-progress session as abandoned with a professional and friendly note.
+ */
+export async function abandonInterviewSession(
+  sessionId: string,
+  userMessage?: string
+): Promise<InterviewResponse<InterviewSession>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { data: null, error: authError?.message ?? 'Non authentifié.' };
+    }
+
+    const verdict =
+      userMessage ||
+      'Entretien interrompu par le candidat. Vous pouvez vous réentraîner à tout moment pour compléter les 5 étapes et décrocher votre bilan STAR complet !';
+
+    const { data, error } = await supabase
+      .from('interview_simulations')
+      .update({
+        status: 'abandoned',
+        star_evaluation: {
+          recruiterVerdict: verdict,
+          overallScore: 0,
+          situationScore: 0,
+          taskScore: 0,
+          actionScore: 0,
+          resultScore: 0,
+          strengthsSummary: ['Prise d’initiative pour s’entraîner à l’oral'],
+          weaknessesSummary: ['Session suspendue avant les étapes de clôture'],
+          keyAdvice: [
+            'Prévoyez 5 à 10 minutes d’affilée pour franchir les 5 questions clés du recruteur.',
+          ],
+          questionsFeedback: [],
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .select(INTERVIEW_SELECT)
+      .single();
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    return { data: mapDbRowToSession(data as unknown as DbInterviewRow), error: null };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Erreur lors de l’interruption de la session.';
+    return { data: null, error: message };
+  }
+}

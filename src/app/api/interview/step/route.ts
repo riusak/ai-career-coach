@@ -77,6 +77,7 @@ export async function POST(request: Request) {
       role: 'recruiter',
       content: recruiterFullContent,
       emotion: stepResult.emotion,
+      speaker: stepResult.speaker,
       isFollowup: stepResult.isFollowup,
       stage: stepResult.currentStep,
       timestamp: new Date().toISOString(),

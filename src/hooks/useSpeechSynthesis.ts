@@ -1,21 +1,32 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { extractCleanSpeech } from '@/lib/interview/prompts';
 
 /**
  * Strips bracketed emotion or stage tags like [rit légèrement], [soupir bienveillant],
- * *sourire*, etc. so the spoken synthesis sounds strictly human and fluid.
+ * *sourire*, etc. as well as any raw JSON codeblocks, so the spoken synthesis sounds strictly human and fluid.
+ */
+/**
+ * Strips bracketed emotion or stage tags like [rit légèrement], [soupir bienveillant],
+ * *sourire*, etc. as well as any raw JSON codeblocks, so the spoken synthesis sounds strictly human and fluid.
  */
 export function cleanSpokenText(raw: string): string {
-  return raw
+  const extracted = extractCleanSpeech(raw).text;
+  return extracted
     .replace(/\[[^\]]*\]/g, '') // remove [emotion] tags
     .replace(/\*[^*]*\*/g, '') // remove *action* markdown cues
+    .replace(/```[a-z]*[\s\S]*?```/gi, '') // remove any codeblocks
+    .replace(/\{[^}]*\}/g, '') // remove any JSON object remnants
+    .replace(/"[a-zA-Z0-9_]+"\s*:\s*(?:"[^"]*"|true|false|\d+|null)/g, '') // strip dangling JSON key-values
+    .replace(/[{}[\]`]/g, '') // strip remaining brackets/backticks
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
 export interface SpeakOptions {
   lang?: 'fr' | 'en';
+  gender?: 'female' | 'male';
   rate?: number;
   pitch?: number;
   onStart?: () => void;
@@ -53,7 +64,7 @@ export function useSpeechSynthesis() {
   }, []);
 
   const findBestVoice = useCallback(
-    (lang: 'fr' | 'en'): SpeechSynthesisVoice | null => {
+    (lang: 'fr' | 'en', gender?: 'female' | 'male'): SpeechSynthesisVoice | null => {
       if (voices.length === 0) return null;
 
       const targetLangPrefix = lang === 'en' ? 'en' : 'fr';
@@ -63,9 +74,19 @@ export function useSpeechSynthesis() {
 
       if (matchingVoices.length === 0) return voices[0] ?? null;
 
-      // Prefer high-quality/natural OS voices
-      const preferredKeywords = ['natural', 'google', 'paul', 'julie', 'denise', 'samantha', 'siri', 'premium'];
-      for (const keyword of preferredKeywords) {
+      // Prefer high-quality natural voices matched to gender
+      const femaleKeywords = ['denise', 'julie', 'eloise', 'claire', 'hortense', 'samantha', 'jenny', 'aria', 'female', 'natural'];
+      const maleKeywords = ['henri', 'paul', 'guy', 'thomas', 'nicolas', 'alain', 'david', 'male', 'natural'];
+      const defaultKeywords = ['natural', 'google', 'paul', 'julie', 'denise', 'samantha', 'siri', 'premium'];
+
+      const keywords =
+        gender === 'female'
+          ? femaleKeywords
+          : gender === 'male'
+          ? maleKeywords
+          : defaultKeywords;
+
+      for (const keyword of keywords) {
         const found = matchingVoices.find((v) =>
           v.name.toLowerCase().includes(keyword)
         );
@@ -100,7 +121,7 @@ export function useSpeechSynthesis() {
       utterance.rate = options.rate ?? 0.98; // Natural human cadence
       utterance.pitch = options.pitch ?? 1.0;
 
-      const voice = findBestVoice(lang);
+      const voice = findBestVoice(lang, options.gender);
       if (voice) {
         utterance.voice = voice;
       }

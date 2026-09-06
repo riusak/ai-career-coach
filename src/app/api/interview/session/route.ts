@@ -29,3 +29,42 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body: unknown = await request.json();
+    if (typeof body !== 'object' || body === null) {
+      return NextResponse.json({ error: 'Payload invalide.' }, { status: 400 });
+    }
+
+    const { sessionId, action, message } = body as {
+      sessionId?: string;
+      action?: 'abandon';
+      message?: string;
+    };
+
+    if (!sessionId) {
+      return NextResponse.json({ error: 'sessionId est requis.' }, { status: 400 });
+    }
+
+    if (action === 'abandon') {
+      const { abandonInterviewSession } = await import('@/lib/supabase/interviews');
+      const result = await abandonInterviewSession(sessionId, message);
+      if (result.error || !result.data) {
+        return NextResponse.json(
+          { error: result.error ?? 'Erreur lors de l’interruption de la session.' },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({ success: true, session: result.data });
+    }
+
+    return NextResponse.json({ error: 'Action non supportée.' }, { status: 400 });
+  } catch (err) {
+    console.error('[api/interview/session] PATCH error:', err);
+    return NextResponse.json(
+      { error: 'Erreur interne lors de la mise à jour.' },
+      { status: 500 }
+    );
+  }
+}

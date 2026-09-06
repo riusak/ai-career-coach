@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       role: 'recruiter',
       content: greeting.text,
       emotion: greeting.emotion,
+      speaker: greeting.speaker,
       isFollowup: false,
       stage: 1,
       timestamp: new Date().toISOString(),

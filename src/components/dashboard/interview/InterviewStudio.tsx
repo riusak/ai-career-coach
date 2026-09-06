@@ -4,25 +4,34 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   Award,
-  Headphones,
   Keyboard,
   Loader2,
   Mic,
   MicOff,
+  Radio,
   Send,
   Sparkles,
+  Users,
+  Video,
   Volume2,
   VolumeX,
   X,
 } from 'lucide-react';
 import AudioVisualizer from '@/components/dashboard/interview/AudioVisualizer';
 import InterviewReportModal from '@/components/dashboard/interview/InterviewReportModal';
+import RecruiterVideoTile from '@/components/dashboard/interview/RecruiterVideoTile';
+import { useInterviewAudioPlayer } from '@/hooks/useInterviewAudioPlayer';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
-import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
+import {
+  RECRUITER_PANEL,
+  RECRUITER_PANEL_EN,
+  extractCleanSpeech,
+} from '@/lib/interview/prompts';
 import type {
   InterviewEmotion,
   InterviewSession,
   InterviewTurn,
+  InterviewerSpeaker,
   StarEvaluation,
   StepInterviewResponse,
 } from '@/types/interview';
@@ -32,6 +41,7 @@ interface InterviewStudioProps {
   initialTurn: InterviewTurn;
   onClose: () => void;
   onCompleted?: (session: InterviewSession) => void;
+  onSessionUpdated?: (session: InterviewSession) => void;
 }
 
 export default function InterviewStudio({
@@ -39,16 +49,24 @@ export default function InterviewStudio({
   initialTurn,
   onClose,
   onCompleted,
+  onSessionUpdated,
 }: InterviewStudioProps) {
   const [session, setSession] = useState<InterviewSession>(initialSession);
   const [currentStep, setCurrentStep] = useState(initialSession.currentStep || 1);
   const [isFollowup, setIsFollowup] = useState(false);
 
-  // Current recruiter prompt & emotion
+  const isFrench = session.language !== 'en';
+  const panel = isFrench ? RECRUITER_PANEL : RECRUITER_PANEL_EN;
+
+  // Current recruiter prompt & emotion & active speaker
   const [latestRecruiterTurn, setLatestRecruiterTurn] = useState<InterviewTurn>(initialTurn);
   const [currentEmotion, setCurrentEmotion] = useState<InterviewEmotion>(
     initialTurn.emotion || 'smiling'
   );
+
+  const activeSpeaker: InterviewerSpeaker =
+    latestRecruiterTurn.speaker ||
+    (currentStep >= 3 && currentStep <= 4 ? panel.marc : panel.alisor);
 
   // Input modes: 'voice' | 'text'
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice');
@@ -65,16 +83,26 @@ export default function InterviewStudio({
   // Final evaluation report modal
   const [finalReport, setFinalReport] = useState<StarEvaluation | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showQuitModal, setShowQuitModal] = useState(false);
 
-  // Native Speech Hooks
+  // High-Definition Neural Audio Player Hook
   const {
-    isSupported: sttSupported,
+    isSpeaking,
+    activeSpeakerId,
+    play: playAudio,
+    stop: stopAudio,
+  } = useInterviewAudioPlayer();
+
+  // Native Speech Recognition Hook with Diagnostic Help
+  const {
     isListening,
     transcript: voiceTranscript,
     interimTranscript,
     error: speechError,
+    errorCode: speechErrorCode,
     startListening,
     stopListening,
+    requestPermission: requestMicPermission,
     resetTranscript,
   } = useSpeechRecognition({
     lang: session.language === 'en' ? 'en-US' : 'fr-FR',
@@ -82,34 +110,32 @@ export default function InterviewStudio({
     interimResults: true,
   });
 
-  const {
-    isSupported: ttsSupported,
-    isSpeaking,
-    speak,
-    cancel: cancelSpeech,
-  } = useSpeechSynthesis();
+  const playTurn = useCallback(
+    (turn: InterviewTurn) => {
+      const speakerId = turn.speaker?.id || (currentStep >= 3 && currentStep <= 4 ? 'marc' : 'alisor');
+      playAudio({
+        text: turn.content,
+        speakerId,
+        language: session.language,
+      });
+    },
+    [currentStep, playAudio, session.language]
+  );
 
   // Play initial recruiter greeting on mount if autoPlay enabled
   const hasSpokenInitialRef = useRef(false);
   useEffect(() => {
-    if (!hasSpokenInitialRef.current && autoPlayAudio && ttsSupported) {
+    if (!hasSpokenInitialRef.current && autoPlayAudio) {
       hasSpokenInitialRef.current = true;
-      speak(initialTurn.content, { lang: session.language });
+      playTurn(initialTurn);
     }
-  }, [autoPlayAudio, initialTurn.content, session.language, speak, ttsSupported]);
-
-  // Read latest recruiter question aloud
-  const speakCurrentRecruiterTurn = () => {
-    if (latestRecruiterTurn.content) {
-      speak(latestRecruiterTurn.content, { lang: session.language });
-    }
-  };
+  }, [autoPlayAudio, initialTurn, playTurn]);
 
   // Handle final completion & STAR evaluation
   const triggerStarEvaluation = useCallback(async () => {
     setIsEvaluating(true);
     setErrorMessage(null);
-    cancelSpeech();
+    stopAudio();
     stopListening();
 
     try {
@@ -130,6 +156,7 @@ export default function InterviewStudio({
         if (result.session) {
           setSession(result.session);
           onCompleted?.(result.session);
+          onSessionUpdated?.(result.session);
         }
       } else {
         throw new Error(result.error || 'Aucune évaluation reçue.');
@@ -140,23 +167,23 @@ export default function InterviewStudio({
     } finally {
       setIsEvaluating(false);
     }
-  }, [cancelSpeech, onCompleted, session.id, stopListening]);
+  }, [onCompleted, onSessionUpdated, session.id, stopAudio, stopListening]);
 
   // Handle candidate answer submission
   const handleSubmitAnswer = async () => {
     const rawAnswer = inputMode === 'voice' ? voiceTranscript.trim() : textInput.trim();
     if (!rawAnswer) {
       setErrorMessage(
-        session.language === 'en'
-          ? 'Please provide an answer before submitting.'
-          : 'Veuillez formuler une réponse avant de valider.'
+        isFrench
+          ? 'Veuillez formuler une réponse avant de valider.'
+          : 'Please provide an answer before submitting.'
       );
       return;
     }
 
     setErrorMessage(null);
     setIsSubmitting(true);
-    cancelSpeech();
+    stopAudio();
     stopListening();
 
     resetTranscript();
@@ -182,7 +209,6 @@ export default function InterviewStudio({
       };
 
       if (stepData.isCompleted) {
-        // Interview cycle finished -> generate final STAR evaluation
         await triggerStarEvaluation();
         return;
       }
@@ -193,49 +219,30 @@ export default function InterviewStudio({
       setIsFollowup(stepData.isFollowup);
       setCurrentStep(stepData.currentStep);
 
-      if (autoPlayAudio && ttsSupported && nextRecruiterTurn.content) {
-        speak(nextRecruiterTurn.content, { lang: session.language });
+      if (autoPlayAudio && nextRecruiterTurn.content) {
+        playTurn(nextRecruiterTurn);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erreur de communication avec le recruteur.';
+      const msg = err instanceof Error ? err.message : 'Erreur de communication avec le jury.';
       setErrorMessage(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getEmotionBadge = (emotion: InterviewEmotion) => {
-    const isFrench = session.language !== 'en';
-    switch (emotion) {
-      case 'smiling':
-        return { label: isFrench ? 'Souriant & Chaleureux' : 'Warm & Smiling', icon: '😊', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
-      case 'curious':
-        return { label: isFrench ? 'Curieux & Attentif' : 'Curious & Attentive', icon: '🧐', color: 'bg-blue-50 text-blue-700 border-blue-200' };
-      case 'thoughtful':
-        return { label: isFrench ? 'Réfléchi & Analytique' : 'Thoughtful & Analytical', icon: '🤔', color: 'bg-purple-50 text-purple-700 border-purple-200' };
-      case 'skeptical':
-        return { label: isFrench ? 'Challenger & Exigeant' : 'Challenging & Skeptical', icon: '🤨', color: 'bg-amber-50 text-amber-800 border-amber-300' };
-      case 'impressed':
-        return { label: isFrench ? 'Impressionné' : 'Impressed', icon: '✨', color: 'bg-orange-50 text-[#FF7A00] border-orange-200' };
-      default:
-        return { label: isFrench ? 'Professionnel' : 'Professional', icon: '💼', color: 'bg-slate-100 text-slate-700 border-slate-200' };
-    }
-  };
-
-  const emotionBadge = getEmotionBadge(currentEmotion);
-  const isFrench = session.language !== 'en';
+  const cleanDisplayQuestion = extractCleanSpeech(latestRecruiterTurn.content).text;
 
   return (
     <div
       role="region"
-      aria-label="Studio d’Entretien IA"
-      className="relative flex flex-col min-h-[650px] w-full rounded-3xl border border-slate-200/80 bg-white shadow-xl overflow-hidden"
+      aria-label="Studio d’Entretien IA en Visioconférence"
+      className="relative flex flex-col min-h-[700px] w-full rounded-3xl border border-slate-800 bg-[#0B0F19] text-white shadow-2xl overflow-hidden"
     >
-      {/* Top Header Bar */}
-      <header className="flex items-center justify-between border-b border-slate-100 bg-slate-900 px-5 sm:px-7 py-4 text-white">
+      {/* Top Visio Header Bar */}
+      <header className="flex items-center justify-between border-b border-slate-800 bg-slate-950/80 px-5 sm:px-7 py-3.5 backdrop-blur-md">
         <div className="flex items-center gap-3 min-w-0">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/20 text-[#FF7A00] border border-orange-500/30">
-            <Headphones className="h-4 w-4" />
+            <Video className="h-4 w-4" />
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -246,27 +253,35 @@ export default function InterviewStudio({
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-400">
-              {isFrench ? 'Simulation Vocale & STAR en direct' : 'Live Voice & STAR Simulation'}
-            </p>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400">
+              <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                <Radio className="w-3 h-3 animate-pulse" />
+                {isFrench ? 'Visio en direct' : 'Live Video Room'}
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <Users className="w-3 h-3 text-slate-400" />
+                {isFrench ? 'Jury de 2 recruteurs' : '2-Recruiter Panel'}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           {/* Audio Auto-Play Toggle */}
           <button
             type="button"
             onClick={() => {
-              if (autoPlayAudio) cancelSpeech();
+              if (autoPlayAudio) stopAudio();
               setAutoPlayAudio(!autoPlayAudio);
             }}
-            title={autoPlayAudio ? 'Couper la voix du recruteur' : 'Activer la voix du recruteur'}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors cursor-pointer"
+            title={autoPlayAudio ? 'Couper la voix du jury' : 'Activer la voix du jury'}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-semibold text-slate-300 border border-slate-700/60 transition-colors cursor-pointer"
           >
             {autoPlayAudio ? (
               <>
                 <Volume2 className="w-3.5 h-3.5 text-[#FF7A00]" />
-                <span className="hidden sm:inline">Voix active</span>
+                <span className="hidden sm:inline">Voix HD Active</span>
               </>
             ) : (
               <>
@@ -276,7 +291,7 @@ export default function InterviewStudio({
             )}
           </button>
 
-          {/* Early finish / debriefing button */}
+          {/* STAR Report Action */}
           <button
             type="button"
             onClick={triggerStarEvaluation}
@@ -287,15 +302,15 @@ export default function InterviewStudio({
             <span className="hidden sm:inline">{isFrench ? 'Bilan STAR' : 'STAR Report'}</span>
           </button>
 
-          {/* Close Studio */}
+          {/* Close / Interruption */}
           <button
             type="button"
             onClick={() => {
-              cancelSpeech();
+              stopAudio();
               stopListening();
-              onClose();
+              setShowQuitModal(true);
             }}
-            aria-label="Quitter le studio"
+            aria-label="Quitter la visio"
             className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -303,22 +318,22 @@ export default function InterviewStudio({
         </div>
       </header>
 
-      {/* Progress & Stage Status Bar */}
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-2.5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-700">
+      {/* Progress & Stage Bar */}
+      <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/50 px-6 py-2.5 text-xs">
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-slate-300">
             {isFrench ? `Étape ${currentStep}/5` : `Stage ${currentStep}/5`}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {[1, 2, 3, 4, 5].map((step) => (
               <span
                 key={step}
-                className={`h-2 w-5 rounded-full transition-all ${
+                className={`h-2 rounded-full transition-all ${
                   step === currentStep
                     ? 'bg-[#FF7A00] w-7'
                     : step < currentStep
-                    ? 'bg-emerald-500'
-                    : 'bg-slate-200'
+                    ? 'bg-emerald-500 w-4'
+                    : 'bg-slate-700 w-4'
                 }`}
               />
             ))}
@@ -326,113 +341,140 @@ export default function InterviewStudio({
         </div>
 
         {isFollowup && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold animate-pulse">
-            <Sparkles className="w-3 h-3 text-amber-700" />
-            {isFrench ? '⚡ Relance d’approfondissement' : '⚡ Follow-up Challenge'}
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold animate-pulse">
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            {isFrench ? 'Relance d’approfondissement' : 'Follow-up Challenge'}
           </span>
         )}
       </div>
 
-      {/* Central Arena */}
-      <div className="flex-1 p-5 sm:p-7 flex flex-col gap-6 overflow-y-auto">
-        {/* Recruiter Persona & Question Card */}
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 text-white shadow-md relative overflow-hidden">
-          {/* Subtle glow background */}
-          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-[#FF7A00]/10 blur-3xl pointer-events-none" />
+      {/* Main Video Call Arena */}
+      <div className="flex-1 p-4 sm:p-6 flex flex-col gap-5 overflow-y-auto">
+        {/* The 2-Recruiter Visio Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Tile 1: Mme Alisor (RH) */}
+          <RecruiterVideoTile
+            speaker={panel.alisor}
+            emotion={activeSpeaker.id === 'alisor' ? currentEmotion : 'smiling'}
+            isSpeaking={isSpeaking && (activeSpeakerId === 'alisor' || activeSpeaker.id === 'alisor')}
+            onReplayAudio={() => playTurn(latestRecruiterTurn)}
+          />
 
-          <div className="flex items-start gap-4">
-            {/* Recruiter Avatar with Sound Aura */}
-            <div className="relative shrink-0">
-              <div
-                className={`flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#FF7A00] to-[#FF9E40] text-white shadow-lg transition-transform ${
-                  isSpeaking ? 'scale-105 ring-4 ring-orange-500/40' : ''
-                }`}
-              >
-                <span className="text-2xl" role="img" aria-label="avatar">
-                  {emotionBadge.icon}
-                </span>
-              </div>
-              {isSpeaking && (
-                <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-4 w-4 bg-[#FF7A00]" />
-                </span>
-              )}
-            </div>
-
-            {/* Recruiter Header & Speech */}
-            <div className="flex-1 min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black text-white tracking-wide">
-                    {isFrench ? 'Recruteur Senior' : 'Lead Recruiter'}
-                  </h3>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${emotionBadge.color}`}
-                  >
-                    <span>{emotionBadge.icon}</span>
-                    <span>{emotionBadge.label}</span>
-                  </span>
-                </div>
-
-                {/* Re-listen Button */}
-                <button
-                  type="button"
-                  onClick={speakCurrentRecruiterTurn}
-                  disabled={isSpeaking}
-                  className="flex items-center gap-1 text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
-                >
-                  <Volume2 className="w-3.5 h-3.5 text-[#FF7A00]" />
-                  <span>{isFrench ? 'Réécouter' : 'Replay audio'}</span>
-                </button>
-              </div>
-
-              {/* The lively question text */}
-              <p className="text-sm sm:text-base font-medium text-slate-100 leading-relaxed pt-1">
-                {latestRecruiterTurn.content}
-              </p>
-            </div>
-          </div>
-
-          {/* Audio Visualizer underneath */}
-          <div className="mt-4 pt-4 border-t border-slate-700/60 flex items-center justify-center">
-            <AudioVisualizer
-              isSpeaking={isSpeaking}
-              isListening={isListening}
-              mode="compact"
-            />
-          </div>
+          {/* Tile 2: Marc Laurent (Directeur Technique) */}
+          <RecruiterVideoTile
+            speaker={panel.marc}
+            emotion={activeSpeaker.id === 'marc' ? currentEmotion : 'thoughtful'}
+            isSpeaking={isSpeaking && (activeSpeakerId === 'marc' || activeSpeaker.id === 'marc')}
+            onReplayAudio={() => playTurn(latestRecruiterTurn)}
+          />
         </div>
 
-        {/* Live Pro-Tip for STAR Method */}
-        <div className="rounded-xl border border-brand-200/60 bg-brand-50/50 p-3.5 flex items-start gap-2.5 text-xs text-slate-700">
-          <Sparkles className="w-4 h-4 text-[#FF7A00] shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            <strong className="font-bold text-slate-900">
-              {isFrench ? 'Conseil STAR en direct : ' : 'Live STAR Advice: '}
-            </strong>
-            {isFrench
-              ? "Privilégiez le 'Je' plutôt que le 'On'. Citez une action précise que vous avez personnellement initiée et donnez un résultat mesurable."
-              : "Use 'I' instead of 'We'. Explain what you specifically owned, decided, and quantify the final outcome."}
+        {/* Live Subtitle & Current Recruiter Dialogue Bar */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 sm:p-5 backdrop-blur-sm space-y-2 shadow-lg">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                {activeSpeaker.name} • {activeSpeaker.title}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => playTurn(latestRecruiterTurn)}
+              disabled={isSpeaking}
+              className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-[#FF7A00]" />
+              <span>{isFrench ? 'Réécouter' : 'Replay audio'}</span>
+            </button>
+          </div>
+
+          <p className="text-sm sm:text-base font-medium text-slate-100 leading-relaxed pt-1">
+            {cleanDisplayQuestion}
           </p>
         </div>
 
-        {/* Candidate Input Arena */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-          {/* Mode Switcher (Vocal vs Text) */}
+        {/* Microphone Diagnostic Alert if error occurs */}
+        {speechError && (
+          <div className="rounded-2xl border border-amber-500/40 bg-amber-950/40 p-4 text-amber-200 space-y-3">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs leading-relaxed">
+                <h4 className="font-bold text-amber-300">
+                  {speechErrorCode === 'not-allowed'
+                    ? isFrench
+                      ? 'Accès au microphone bloqué'
+                      : 'Microphone permission blocked'
+                    : isFrench
+                    ? 'Problème de périphérique microphone'
+                    : 'Microphone device issue'}
+                </h4>
+                <p>{speechError}</p>
+                <p className="text-[11px] text-amber-300/80">
+                  {isFrench
+                    ? '💡 Astuce Casque Bluetooth : vérifiez dans les Paramètres Son de Windows que votre casque est bien activé comme périphérique d’entrée par défaut.'
+                    : '💡 Bluetooth Headset Tip: Ensure your headset is set as the default input device in Windows Sound settings.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  const granted = await requestMicPermission();
+                  if (granted) {
+                    startListening();
+                  }
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                {isFrench ? 'Réessayer l’autorisation' : 'Retry Permission'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  stopListening();
+                  setInputMode('text');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all cursor-pointer"
+              >
+                {isFrench ? 'Passer en saisie écrite' : 'Switch to Text Input'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Live Pro-Tip STAR */}
+        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3.5 flex items-start gap-2.5 text-xs text-slate-400">
+          <Sparkles className="w-4 h-4 text-[#FF7A00] shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <strong className="font-bold text-slate-200">
+              {isFrench ? 'Méthode STAR en visio : ' : 'STAR Method Live Tip: '}
+            </strong>
+            {isFrench
+              ? "Parlez à la 1ère personne ('Je'). Donnez un contexte clair, vos actions clés et un résultat mesurable."
+              : "Use 'I' instead of 'We'. Explain what you specifically delivered and quantify the outcome."}
+          </p>
+        </div>
+
+        {/* Candidate Interactive Response Arena */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 shadow-md space-y-4">
+          {/* Mode Switcher */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              {isFrench ? 'Votre Réponse' : 'Your Answer'}
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+              {isFrench ? 'Votre Intervention' : 'Your Answer'}
             </span>
 
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
               <button
                 type="button"
                 onClick={() => setInputMode('voice')}
                 className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                   inputMode === 'voice'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Mic className="w-3.5 h-3.5 text-[#FF7A00]" />
@@ -446,127 +488,115 @@ export default function InterviewStudio({
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                   inputMode === 'text'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Keyboard className="w-3.5 h-3.5 text-slate-500" />
+                <Keyboard className="w-3.5 h-3.5 text-[#FF7A00]" />
                 <span>{isFrench ? 'Clavier' : 'Text'}</span>
               </button>
             </div>
           </div>
 
-          {/* Vocal Mode UI */}
-          {inputMode === 'voice' ? (
-            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 space-y-4 text-center">
-              {/* Big Interactive Mic Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (isListening) {
-                    stopListening();
-                  } else {
-                    startListening();
-                  }
-                }}
-                disabled={isSubmitting || isEvaluating}
-                className={`relative flex h-20 w-20 items-center justify-center rounded-3xl transition-all shadow-md cursor-pointer ${
-                  isListening
-                    ? 'bg-emerald-500 text-white scale-105 shadow-emerald-500/30'
-                    : 'bg-[#0B1528] text-white hover:bg-[#FF7A00]'
-                }`}
-              >
-                {isListening ? (
-                  <MicOff className="h-8 w-8 animate-pulse" />
-                ) : (
-                  <Mic className="h-8 w-8" />
-                )}
-                {isListening && (
-                  <span className="absolute -inset-1 rounded-3xl border-2 border-emerald-400 animate-ping opacity-60" />
-                )}
-              </button>
+          {/* Voice Arena */}
+          {inputMode === 'voice' && (
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isListening) {
+                        stopListening();
+                      } else {
+                        stopAudio();
+                        startListening();
+                      }
+                    }}
+                    className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all cursor-pointer ${
+                      isListening
+                        ? 'bg-rose-500 text-white ring-4 ring-rose-500/30 animate-pulse'
+                        : 'bg-[#FF7A00] hover:bg-[#E66E00] text-white shadow-md'
+                    }`}
+                  >
+                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
 
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-slate-800">
-                  {isListening
-                    ? isFrench
-                      ? 'Écoute en cours... Parlez naturellement.'
-                      : 'Listening... Speak naturally.'
-                    : isFrench
-                    ? 'Cliquez sur le micro pour parler'
-                    : 'Click microphone to answer'}
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {!sttSupported
-                    ? isFrench
-                      ? 'Micro non supporté par ce navigateur (basculez sur le mode Clavier)'
-                      : 'Voice input not supported on this browser (switch to Text mode)'
-                    : isFrench
-                    ? 'Web Speech API native • 100% gratuit et privé'
-                    : 'Native Web Speech API • 100% free and private'}
-                </p>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white">
+                      {isListening
+                        ? isFrench
+                          ? 'Microphone actif • Enregistrement en cours'
+                          : 'Microphone active • Recording'
+                        : isFrench
+                        ? 'Cliquez sur le micro pour parler'
+                        : 'Click mic to speak'}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {isFrench
+                        ? 'Parlez naturellement face à votre caméra'
+                        : 'Speak naturally to your camera'}
+                    </p>
+                  </div>
+                </div>
+
+                <AudioVisualizer isSpeaking={false} isListening={isListening} mode="compact" />
               </div>
 
-              {/* Live transcript bubble */}
-              {(voiceTranscript || interimTranscript) && (
-                <div className="w-full text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
-                    <span>{isFrench ? 'Transcription en direct :' : 'Live transcript:'}</span>
-                    <button
-                      type="button"
-                      onClick={resetTranscript}
-                      className="text-rose-600 hover:underline cursor-pointer"
-                    >
-                      {isFrench ? 'Effacer' : 'Clear'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-800 leading-relaxed">
-                    {voiceTranscript} <span className="italic text-slate-400">{interimTranscript}</span>
+              {/* Transcript Display */}
+              <div className="min-h-[80px] p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-xs sm:text-sm text-slate-200">
+                {voiceTranscript ? (
+                  <p className="leading-relaxed">
+                    <span>{voiceTranscript}</span>
+                    {interimTranscript && (
+                      <span className="text-slate-400 italic"> {interimTranscript}</span>
+                    )}
                   </p>
-                </div>
-              )}
-
-              {speechError && (
-                <div className="flex items-center gap-2 text-xs text-rose-700 bg-rose-50 p-3 rounded-xl border border-rose-200">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{speechError}</span>
-                </div>
-              )}
+                ) : (
+                  <p className="text-slate-500 italic">
+                    {isFrench
+                      ? 'Votre réponse vocale transcrite s’affichera ici en temps réel...'
+                      : 'Your voice answer transcript will appear here in real-time...'}
+                  </p>
+                )}
+              </div>
             </div>
-          ) : (
-            /* Text Mode UI */
+          )}
+
+          {/* Written Text Input */}
+          {inputMode === 'text' && (
             <div className="space-y-2">
               <textarea
-                rows={4}
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
+                rows={4}
                 placeholder={
                   isFrench
-                    ? 'Formulez votre réponse ici en précisant votre situation, la tâche à accomplir, vos actions concrètes et le résultat chiffré...'
-                    : 'Formulate your answer here using Situation, Task, Action, Result...'
+                    ? 'Rédigez votre réponse selon la méthode STAR...'
+                    : 'Type your answer using the STAR method...'
                 }
-                className="w-full rounded-2xl border border-slate-200 p-4 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#FF7A00] focus:outline-none focus:ring-1 focus:ring-[#FF7A00] resize-none"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-4 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:border-[#FF7A00] focus:outline-none focus:ring-1 focus:ring-[#FF7A00] resize-none"
               />
-              <div className="flex justify-between items-center text-[11px] text-slate-400">
+              <div className="flex justify-between items-center text-[11px] text-slate-500">
                 <span>{textInput.length} caractères</span>
-                <span>{isFrench ? 'Appuyez sur Envoyer pour répondre' : 'Press Submit to answer'}</span>
+                <span>{isFrench ? 'Appuyez sur Valider pour répondre' : 'Press Submit to answer'}</span>
               </div>
             </div>
           )}
 
           {errorMessage && (
-            <div className="flex items-center gap-2 text-xs text-rose-700 bg-rose-50 p-3 rounded-xl border border-rose-200">
+            <div className="flex items-center gap-2 text-xs text-rose-300 bg-rose-950/40 p-3 rounded-xl border border-rose-500/30">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          {/* Submit Action Button */}
+          {/* Submit Action */}
           <div className="flex items-center justify-between pt-2">
             <span className="text-[11px] text-slate-400">
               {isFrench
-                ? 'L’IA réagira instantanément à votre intervention.'
-                : 'The AI will react dynamically to your answer.'}
+                ? 'Le jury réagira de concert à votre intervention.'
+                : 'The panel will react directly to your answer.'}
             </span>
 
             <button
@@ -578,7 +608,7 @@ export default function InterviewStudio({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{isFrench ? 'Analyse du recruteur...' : 'Recruiter thinking...'}</span>
+                  <span>{isFrench ? 'Le jury délibère...' : 'Panel thinking...'}</span>
                 </>
               ) : (
                 <>
@@ -593,7 +623,7 @@ export default function InterviewStudio({
 
       {/* Evaluating Overlay */}
       {isEvaluating && (
-        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-sm p-6 text-center text-white space-y-4">
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm p-6 text-center text-white space-y-4">
           <div className="relative">
             <div className="h-16 w-16 rounded-3xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-[#FF7A00]">
               <Award className="h-8 w-8 animate-bounce" />
@@ -606,8 +636,8 @@ export default function InterviewStudio({
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed">
               {isFrench
-                ? 'Gemini analyse l’intégralité de vos réponses, calibre vos scores Situation, Tâche, Action, Résultat et prépare vos formulations idéales.'
-                : 'Gemini is assessing all your answers against the STAR criteria to produce your custom debriefing.'}
+                ? 'Le jury analyse l’intégralité de vos réponses, calibre vos scores Situation, Tâche, Action, Résultat et prépare vos formulations idéales.'
+                : 'The panel is assessing your answers against the STAR criteria to produce your debriefing.'}
             </p>
           </div>
         </div>
@@ -625,6 +655,86 @@ export default function InterviewStudio({
         company={session.company}
         language={session.language}
       />
+
+      {/* Interruption / Quit Modal */}
+      {showQuitModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-sm animate-fade-slide-in"
+        >
+          <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4 text-white">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <AlertCircle className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white">
+                  {isFrench ? 'Interrompre la visioconférence' : 'Interrupt Video Interview'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {isFrench ? 'Comment souhaitez-vous clore cette session ?' : 'How would you like to exit?'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              {isFrench
+                ? 'Vous pouvez archiver définitivement cette session (marquée comme interrompue dans votre tableau de bord) ou la conserver en cours pour y revenir plus tard.'
+                : 'You can close and archive this session as interrupted or keep it in progress to resume later.'}
+            </p>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  stopAudio();
+                  stopListening();
+                  try {
+                    const res = await fetch('/api/interview/session', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ sessionId: session.id, action: 'abandon' }),
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      if (data.session) {
+                        onSessionUpdated?.(data.session);
+                      }
+                    }
+                  } catch {
+                    // ignore
+                  }
+                  onClose();
+                }}
+                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-[#FF7A00] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                {isFrench ? 'Clore et marquer comme interrompue' : 'Close and Mark as Interrupted'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  stopAudio();
+                  stopListening();
+                  onClose();
+                }}
+                className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+              >
+                {isFrench ? 'Garder en cours pour reprendre plus tard' : 'Keep In Progress to Resume Later'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowQuitModal(false)}
+                className="w-full py-2 text-center text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                {isFrench ? 'Retourner à la visio' : 'Return to Video Room'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

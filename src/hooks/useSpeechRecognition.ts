@@ -57,6 +57,13 @@ export interface UseSpeechRecognitionOptions {
   interimResults?: boolean;
 }
 
+export type SpeechRecognitionErrorCode =
+  | 'not-allowed'
+  | 'no-device'
+  | 'device-busy'
+  | 'network'
+  | 'unknown';
+
 export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) {
   const { lang = 'fr-FR', continuous = true, interimResults = true } = options;
 
@@ -68,9 +75,43 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<SpeechRecognitionErrorCode | null>(null);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const isManuallyStoppedRef = useRef(false);
+
+  /**
+   * Explicitly triggers browser microphone permission prompt and tests device accessibility.
+   */
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      return false;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop dummy test tracks immediately
+      stream.getTracks().forEach((track) => track.stop());
+      setError(null);
+      setErrorCode(null);
+      return true;
+    } catch (err: unknown) {
+      const name = err instanceof Error ? err.name : '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setErrorCode('not-allowed');
+        setError('Accès au microphone refusé. Veuillez autoriser le micro dans votre navigateur.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setErrorCode('no-device');
+        setError('Aucun microphone détecté. Vérifiez la connexion de votre casque Bluetooth ou micro.');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setErrorCode('device-busy');
+        setError('Microphone indisponible ou déjà utilisé par une autre application (Teams, Zoom...).');
+      } else {
+        setErrorCode('unknown');
+        setError('Impossible d’accéder au microphone.');
+      }
+      return false;
+    }
+  }, []);
 
   const stopListening = useCallback(() => {
     isManuallyStoppedRef.current = true;
@@ -93,10 +134,12 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
 
       if (!SpeechRecognitionApi) {
         setError('La reconnaissance vocale n’est pas supportée par ce navigateur.');
+        setErrorCode('unknown');
         return;
       }
 
       setError(null);
+      setErrorCode(null);
       isManuallyStoppedRef.current = false;
 
       // Stop any existing instance before restarting
@@ -117,6 +160,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
         recognition.onstart = () => {
           setIsListening(true);
           setError(null);
+          setErrorCode(null);
         };
 
         recognition.onresult = (event: SpeechRecognitionEventLike) => {
@@ -145,8 +189,13 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
             return;
           }
           if (event.error === 'not-allowed') {
+            setErrorCode('not-allowed');
             setError('Accès au microphone refusé. Veuillez autoriser le micro dans votre navigateur.');
+          } else if (event.error === 'audio-capture') {
+            setErrorCode('no-device');
+            setError('Périphérique audio introuvable ou casque Bluetooth en mode écoute seule.');
           } else {
+            setErrorCode('unknown');
             setError(`Erreur de reconnaissance vocale : ${event.error}`);
           }
           setIsListening(false);
@@ -154,12 +203,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
 
         recognition.onend = () => {
           setInterimTranscript('');
-          // If continuous listening was not manually stopped, keep state synced
-          if (!isManuallyStoppedRef.current && continuous) {
-            setIsListening(false);
-          } else {
-            setIsListening(false);
-          }
+          setIsListening(false);
         };
 
         recognitionRef.current = recognition;
@@ -167,6 +211,7 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Impossible de démarrer le micro.';
         setError(msg);
+        setErrorCode('unknown');
         setIsListening(false);
       }
     },
@@ -202,8 +247,10 @@ export function useSpeechRecognition(options: UseSpeechRecognitionOptions = {}) 
     transcript,
     interimTranscript,
     error,
+    errorCode,
     startListening,
     stopListening,
+    requestPermission,
     resetTranscript,
     setManualTranscript,
   };

@@ -24,6 +24,15 @@ export type InterviewStatus = 'in_progress' | 'completed' | 'abandoned';
 
 export type InterviewLanguage = 'fr' | 'en';
 
+export type InterviewerId = 'alisor' | 'marc';
+
+export interface InterviewerSpeaker {
+  id: InterviewerId;
+  name: string;
+  title: string;
+  gender: 'female' | 'male';
+}
+
 /** A single conversational turn exchanged between recruiter and candidate. */
 export interface InterviewTurn {
   id: string;
@@ -32,6 +41,7 @@ export interface InterviewTurn {
   emotion?: InterviewEmotion;
   isFollowup?: boolean;
   stage?: number;
+  speaker?: InterviewerSpeaker;
   timestamp: string;
 }
 
@@ -119,4 +129,6 @@ export interface StepInterviewResponse {
   currentStep: number;
   totalSteps: number;
   isCompleted: boolean;
+  speaker?: InterviewerSpeaker;
 }
+

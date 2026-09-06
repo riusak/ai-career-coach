@@ -226,6 +226,30 @@ export default function MockInterviewsView({
     }
   };
 
+  /**
+   * Marks an in-progress session as abandoned directly from the past sessions list.
+   */
+  const handleAbandonFromList = async (sessionId: string) => {
+    try {
+      const response = await fetch('/api/interview/session', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, action: 'abandon' }),
+      });
+      if (response.ok) {
+        setPastInterviewsList((prev) =>
+          prev.map((s) =>
+            s.id === sessionId
+              ? { ...s, status: 'abandoned', hasEvaluation: true }
+              : s
+          )
+        );
+      }
+    } catch (err) {
+      console.error('[MockInterviewsView] Error abandoning session:', err);
+    }
+  };
+
   const sourceTabs: { id: DirectSource; label: string; hint: string }[] = [
     {
       id: 'file',
@@ -320,23 +344,50 @@ export default function MockInterviewsView({
             session={activeStudioSession.session}
             initialTurn={activeStudioSession.initialTurn}
             onClose={() => setActiveStudioSession(null)}
+            onSessionUpdated={(updatedSession) => {
+              setPastInterviewsList((prev) => {
+                const idx = prev.findIndex((s) => s.id === updatedSession.id);
+                const summaryItem: InterviewSessionSummary = {
+                  id: updatedSession.id,
+                  resumeId: updatedSession.resumeId,
+                  jobTitle: updatedSession.jobTitle,
+                  company: updatedSession.company,
+                  language: updatedSession.language,
+                  interviewType: updatedSession.interviewType,
+                  status: updatedSession.status,
+                  score: updatedSession.score,
+                  totalQuestions: updatedSession.currentStep,
+                  createdAt: updatedSession.createdAt,
+                  hasEvaluation: Boolean(updatedSession.starEvaluation),
+                };
+                if (idx !== -1) {
+                  const next = [...prev];
+                  next[idx] = summaryItem;
+                  return next;
+                }
+                return [summaryItem, ...prev];
+              });
+            }}
             onCompleted={(completedSession) => {
-              setPastInterviewsList((prev) => [
-                {
-                  id: completedSession.id,
-                  resumeId: completedSession.resumeId,
-                  jobTitle: completedSession.jobTitle,
-                  company: completedSession.company,
-                  language: completedSession.language,
-                  interviewType: completedSession.interviewType,
-                  status: completedSession.status,
-                  score: completedSession.score,
-                  totalQuestions: completedSession.currentStep,
-                  createdAt: completedSession.createdAt,
-                  hasEvaluation: Boolean(completedSession.starEvaluation),
-                },
-                ...prev,
-              ]);
+              setPastInterviewsList((prev) => {
+                const filtered = prev.filter((s) => s.id !== completedSession.id);
+                return [
+                  {
+                    id: completedSession.id,
+                    resumeId: completedSession.resumeId,
+                    jobTitle: completedSession.jobTitle,
+                    company: completedSession.company,
+                    language: completedSession.language,
+                    interviewType: completedSession.interviewType,
+                    status: completedSession.status,
+                    score: completedSession.score,
+                    totalQuestions: completedSession.currentStep,
+                    createdAt: completedSession.createdAt,
+                    hasEvaluation: Boolean(completedSession.starEvaluation),
+                  },
+                  ...filtered,
+                ];
+              });
             }}
           />
         </section>
@@ -771,7 +822,10 @@ export default function MockInterviewsView({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {pastInterviewsList.map((item) => {
-              const hasScore = typeof item.score === 'number';
+              const isCompleted = item.status === 'completed';
+              const isAbandoned = item.status === 'abandoned';
+              const hasScore = typeof item.score === 'number' && item.score > 0;
+
               return (
                 <article
                   key={item.id}
@@ -780,13 +834,17 @@ export default function MockInterviewsView({
                   <div className="space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="truncate text-xs font-bold text-slate-900">{item.jobTitle}</h4>
-                      {hasScore ? (
+                      {isCompleted && hasScore ? (
                         <span
                           className={`inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-xs font-bold ring-1 ring-inset ${scoreTone(
                             item.score
                           )}`}
                         >
                           {item.score}% STAR
+                        </span>
+                      ) : isAbandoned ? (
+                        <span className="inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200">
+                          {isFrench ? 'Interrompu' : 'Interrupted'}
                         </span>
                       ) : (
                         <span className="inline-flex shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200">
@@ -808,7 +866,43 @@ export default function MockInterviewsView({
                   </div>
 
                   <div className="pt-2">
-                    {item.hasEvaluation ? (
+                    {isAbandoned ? (
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-slate-500">
+                          {isFrench
+                            ? `Entretien suspendu (étape ${item.totalQuestions || 1}/5)`
+                            : `Interview interrupted (stage ${item.totalQuestions || 1}/5)`}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {item.hasEvaluation && (
+                            <button
+                              type="button"
+                              onClick={() => viewPastEvaluation(item)}
+                              disabled={isLoadingReport}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-[#FF7A00] text-white text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                            >
+                              <Award className="w-3.5 h-3.5 text-[#FF7A00]" />
+                              <span>{isFrench ? 'Bilan' : 'Debrief'}</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              startSimulation({
+                                resumeId: item.resumeId,
+                                jobTitle: item.jobTitle,
+                                company: item.company,
+                              })
+                            }
+                            disabled={isStartingSession}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-[#FF7A00] border border-orange-500/30 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            <Mic className="w-3.5 h-3.5" />
+                            <span>{isFrench ? 'Recommencer' : 'Restart'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : item.hasEvaluation ? (
                       <button
                         type="button"
                         onClick={() => viewPastEvaluation(item)}
@@ -819,21 +913,30 @@ export default function MockInterviewsView({
                         <span>{isFrench ? 'Consulter le bilan STAR' : 'View STAR Debrief'}</span>
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startSimulation({
-                            resumeId: item.resumeId,
-                            jobTitle: item.jobTitle,
-                            company: item.company,
-                          })
-                        }
-                        disabled={isStartingSession}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-[#FF7A00] border border-orange-500/30 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                      >
-                        <Mic className="w-3.5 h-3.5" />
-                        <span>{isFrench ? 'Reprendre la simulation' : 'Resume Simulation'}</span>
-                      </button>
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            startSimulation({
+                              resumeId: item.resumeId,
+                              jobTitle: item.jobTitle,
+                              company: item.company,
+                            })
+                          }
+                          disabled={isStartingSession}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-[#FF7A00] border border-orange-500/30 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <Mic className="w-3.5 h-3.5" />
+                          <span>{isFrench ? 'Reprendre la simulation' : 'Resume Simulation'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAbandonFromList(item.id)}
+                          className="w-full text-center text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                        >
+                          {isFrench ? 'Marquer comme interrompue' : 'Mark as interrupted'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </article>
