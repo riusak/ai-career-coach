@@ -1,7 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 import MockInterviewsView from '@/components/dashboard/MockInterviewsView';
 import { parseJobMatchingDetails } from '@/lib/analysis/matching-output';
+import { getUserInterviewSessions } from '@/lib/supabase/interviews';
 import { getUserMatchings } from '@/lib/supabase/matchings';
+import { getUserResumes } from '@/lib/supabase/resumes';
 import type { JobMatchingSummary } from '@/types/matching';
 
 export async function generateMetadata() {
@@ -43,17 +45,28 @@ export default async function MockPage({
 }: {
   searchParams: Promise<{ role?: string; cv?: string; company?: string }>;
 }) {
-  const [params, matchingsResult] = await Promise.all([
+  const [params, matchingsResult, interviewsResult, resumesResult] = await Promise.all([
     searchParams,
     getUserMatchings(),
+    getUserInterviewSessions(20),
+    getUserResumes(),
   ]);
 
   const rawRole = typeof params.role === 'string' ? params.role.trim() : '';
   const targetRole = rawRole.length > 0 ? rawRole.slice(0, 120) : null;
   const rawCompany = typeof params.company === 'string' ? params.company.trim() : '';
   const targetCompany = rawCompany.length > 0 ? rawCompany.slice(0, 300) : null;
+  const targetCv = typeof params.cv === 'string' ? params.cv.trim() : null;
 
   const matchings = buildCompletedSummaries(matchingsResult.data);
+  const pastInterviews = interviewsResult.data ?? [];
+  const cvs = (resumesResult.data ?? []).map((r) => ({
+    id: r.id,
+    name: r.file_name,
+    isPrimary: r.is_primary,
+  }));
+
+  const primaryCvId = targetCv || cvs.find((c) => c.isPrimary)?.id || cvs[0]?.id || null;
 
   return (
     <div className="px-4 pb-10 pt-6 sm:px-6 lg:px-8">
@@ -61,7 +74,10 @@ export default async function MockPage({
         <MockInterviewsView
           targetRole={targetRole}
           targetCompany={targetCompany}
+          targetCvId={primaryCvId}
+          cvs={cvs}
           matchings={matchings}
+          pastInterviews={pastInterviews}
         />
       </div>
     </div>
