@@ -231,10 +231,19 @@ describe('buildCvSummaries', () => {
       createdAt: '2026-03-01T00:00:00Z',
       score: 66,
       hasAnalysis: true,
+      sizeBytes: null,
     });
     expect(summaries[1].score).toBeNull();
     expect(summaries[1].hasAnalysis).toBe(false);
     expect(JSON.stringify(summaries)).not.toContain('raw_text');
+  });
+
+  it('attaches the storage file size when a sizes map is provided', () => {
+    const resume = makeResume({ id: 'cv-1' });
+    const summaries = buildCvSummaries([resume], null, {
+      [resume.file_path]: 1_887_436,
+    });
+    expect(summaries[0].sizeBytes).toBe(1_887_436);
   });
 });
 

@@ -111,7 +111,9 @@
     "servicesSubtitle": "KI-Lebenslaufanalyse, Stellenabgleich, Interview-Simulationen und eine Versionsbibliothek — ein kompletter Karriere-Coach.",
     "servicesAiBadge": "KI-gestützt",
     "comingSoon": "Demnächst verfügbar",
-    "unlockedWithFreeAccount": "Mit Ihrem kostenlosen Konto freigeschaltet",
+    "servicesLiveBadge": "Verfügbar",
+    "serviceFreeUnlock": "Dieser Service ist kostenlos. Erstellen Sie einfach ein Konto, um ihn zu nutzen",
+    "servicePaidUnlock": "Fast kostenloser Bezahlservice. Konto erforderlich",
     "servicesCards": {
       "analyzeTitle": "KI-Lebenslaufanalyse",
       "analyzeDesc": "Erhalten Sie eine vollständige, detaillierte Analyse Ihres Lebenslaufs: Punktzahl pro Dimension, Stärken, Schwächen und priorisierte Empfehlungen.",
@@ -236,8 +238,8 @@
     "digitLabel": "Ziffer {index} von {length}"
   },
   "dashboard": {
-    "myResumes": "Meine Lebensläufe",
-    "myResumesSubtitle": "Verwalten Sie Ihre Lebenslauf-Bibliothek und rufen Sie Ihre Analysen mit einem Klick auf.",
+    "myResumes": "Meine professionellen CVs",
+    "myResumesSubtitle": "Verwalten Sie Ihre CVs und machen Sie ATS-Tests.",
     "pageTitle": "Dashboard",
     "welcome": "Willkommen bei ForPro AI",
     "uploadCta": "Lebenslauf hochladen",
@@ -385,19 +387,18 @@
     "cvScoreLabel": "Score",
     "cvUploadCard": "CV hochladen",
     "cvUploadFormats": "PDF, DOCX • max. 5 MB",
-    "previewTabDocument": "Vorschau",
-    "previewTabAnalysis": "Neueste Analyseergebnisse",
+    "previewTabDocument": "Dokumentvorschau",
+    "previewTabAnalysis": "ATS-Diagnose",
     "previewTabServices": "KI-Services",
     "previewSetPrimary": "Als Haupt-CV festlegen",
     "previewAddedOn": "Hinzugefügt am {date}",
     "previewScoreAts": "ATS-Score",
     "previewWords": "Wörter",
-    "previewTruncated": "Vorschau gekürzt — öffne die Detailansicht für das gesamte Dokument.",
+    "previewTruncated": "Vorschau gekürzt — laden Sie das Dokument herunter, um es vollständig zu sehen.",
     "previewRawEmpty": "Für diesen CV wurde noch kein Text extrahiert.",
     "previewAnalysisTitle": "KI-CV-Diagnose",
     "previewAnalysisNone": "Noch keine Analyse für diesen CV — starte die Diagnose, um Stärken und Verbesserungsbereiche zu entdecken.",
     "previewRunAnalysis": "KI-Analyse starten",
-    "previewOpenReport": "Vollständigen Bericht öffnen",
     "previewSubImpact": "Wirkung & Zahlen",
     "previewSubKeywords": "Keyword-Übereinstimmung",
     "previewSubGrammar": "Grammatik & Klarheit",
@@ -410,9 +411,9 @@
     "previewServiceInterviewTitle": "KI-Interviewsimulation",
     "previewServiceInterviewDesc": "Übe Fragen basierend auf den Projekten in diesem CV.",
     "previewManageTitle": "Dokumentverwaltung",
-    "previewManageDesc": "Lade deinen CV herunter, öffne die Detailansicht oder lösche ihn.",
-    "previewOpenDetail": "Detailansicht",
+    "previewManageDesc": "Exportieren Sie Ihren CV oder löschen Sie ihn aus der Datenbank.",
     "previewDownload": "Herunterladen",
+    "previewMatchCta": "Job-Matching starten",
     "previewDownloadError": "Der Download-Link konnte nicht erstellt werden. Bitte erneut versuchen.",
     "previewConfirmDelete": "Löschen bestätigen",
     "previewCancel": "Abbrechen",
@@ -436,18 +437,47 @@
     "headerStrength": "Profilstärke",
     "headerYears": "{years, plural, one {# Jahr Erfahrung} other {# Jahre Erfahrung}}",
     "headerNoExp": "Erste Erfahrung kommt bald",
-    "cvsAnalyze": "Analysieren",
-    "cvsAnalyzePending": "Wird eingereiht…",
-    "cvsQueuedHint": "Analyse eingereiht — Verlauf auf der CV-Seite verfolgen.",
+    "cvsDocumentsStored": "{count, plural, one {# gespeichertes Dokument} other {# gespeicherte Dokumente}}",
+    "cvsBackToDashboard": "Zurück zum Dashboard",
+    "cvsUploadNew": "Neuen CV hochladen",
+    "cvsKpiAria": "Kennzahlen der CV-Bibliothek",
+    "cvsKpiTotalTitle": "CVs insgesamt",
+    "cvsKpiTotalValue": "{count, plural, one {# Datei} other {# Dateien}}",
+    "cvsKpiPrimaryTitle": "Haupt-CV festgelegt",
+    "cvsKpiPrimaryNone": "Keiner festgelegt",
+    "cvsKpiAvgScore": "Ø ATS-Score",
+    "cvsKpiStorage": "Datenbankspeicher",
+    "cvsKpiStorageValue": "Persistent & Sicher",
+    "cvsDropzoneTitle": "CV hierher ziehen oder klicken zum Auswählen",
+    "cvsDropzoneHint": "Akzeptierte Formate: PDF, DOCX, TXT (max. 5 MB). Der CV wird automatisch in Ihrer Datenbank gespeichert.",
+    "cvsDropzoneUploading": "Wird hochgeladen…",
+    "cvsDropzoneSuccess": "CV zu Ihrer Bibliothek hinzugefügt!",
+    "cvsDropzoneSuccessName": "„{name}“ wurde zu Ihrer Bibliothek hinzugefügt!",
+    "cvsSearchPlaceholder": "CV nach Name oder Rolle suchen…",
+    "cvsFilterAll": "Alle CVs ({count})",
+    "cvsFilterPrimary": "Nur Haupt-CV",
+    "cvsFilterHighScore": "ATS-Score ≥ 80 %",
+    "cvsPrimaryBadgeShort": "Haupt-CV",
+    "cvsSizeUnknown": "Größe n/v",
+    "cvsScoreGlobal": "Gesamt-ATS-Score",
+    "cvsScoreImprove": "Verbesserungen empfohlen",
+    "cvsScoreOptimized": "Optimiert für Recruiting",
+    "cvsDetails": "Details",
+    "cvsPreviewDoc": "Dokumentvorschau",
+    "cvsMatching": "Matching",
+    "cvsMatchingTitle": "Stellen mit diesem CV abgleichen",
+    "cvsEmptyTitle": "Ihre Bibliothek ist leer",
+    "cvsEmptyDesc": "Laden Sie Ihren ersten CV hoch, um ihn vorzuzeigen, als Haupt-CV festzulegen und eine ATS-Diagnose zu starten.",
+    "cvsNoResults": "Kein CV entspricht Ihren aktuellen Filtern.",
+    "cvsNoResultsReset": "Filter zurücksetzen",
+    "cvsUploadErrorTitle": "Upload fehlgeschlagen",
+    "cvsUploadErrorGeneric": "Der CV konnte nicht hochgeladen werden. Bitte erneut versuchen.",
     "cvsNoScore": "Nicht analysiert",
-    "cvsQueuedBadge": "Wartend",
-    "cvsMatchOffer": "Mit einem Angebot abgleichen",
-    "cvsAnalyzedCount": "{count, plural, one {# analysierter CV} other {# analysierte CVs}}",
     "matchingTitle": "Stellenabgleich & Angebotsbewertung",
-    "matchingSubtitle": "Wählen Sie den zu bewertenden Lebenslauf, fügen Sie das Angebot ein (Text oder Link) und erfahren Sie Ihre Passung, Ihre Stärken und die zu schließenden Lücken.",
+    "matchingSubtitle": "Wählen Sie den zu bewertenden Lebenslauf, laden Sie das Angebot hoch (PDF/Word oder Link) und entdecken Sie Ihren Passungsgrad sowie die wichtigsten Punkte für das Vorstellungsgespräch.",
     "matchingNewCta": "Neuer Abgleich",
     "matchingSelectCvForNew": "Zu bewertender Lebenslauf:",
-    "matchingHistoryTitle": "Abgleich-Verlauf",
+    "matchingHistoryTitle": "Ihre letzten Stellenabgleiche",
     "matchingRequiresCv": "Noch kein Lebenslauf in Ihrer Bibliothek",
     "matchingRequiresCvDesc": "Laden Sie zuerst einen Lebenslauf unter „Meine Lebensläufe“ hoch, um einen Stellenabgleich zu starten.",
     "matchingEmptyTitle": "Noch kein Abgleich",
@@ -467,18 +497,27 @@
     "matchingModalClose": "Schließen",
     "matchingSelectCv": "Lebenslauf für den Abgleich",
     "matchingNoCv": "Kein Lebenslauf verfügbar",
-    "matchingJobTitle": "Stellenbezeichnung *",
+    "matchingJobTitle": "Stellenbezeichnung (optional)",
     "matchingJobPlaceholder": "z. B. Lead Cloud & Solutions Architect",
-    "matchingCompany": "Unternehmen (optional)",
-    "matchingCompanyPlaceholder": "z. B. Wave Mobile Money",
+    "matchingCompany": "Unternehmen / Organisation",
+    "matchingCompanyPlaceholder": "z. B. Wave Mobile Money, Paystack, Orange…",
     "matchingLocation": "Standort (optional)",
     "matchingLocationPlaceholder": "z. B. Dakar / Remote",
-    "matchingUrl": "Angebotslink (optional)",
+    "matchingUrl": "Angebots-URL",
     "matchingUrlPlaceholder": "https://beispiel.com/angebot",
+    "matchingOfferSource": "Quelle des Angebots",
+    "matchingTabFile": "Datei (PDF / Word)",
+    "matchingTabUrl": "Angebots-URL",
+    "matchingTabText": "Klartext",
+    "matchingFileDropHint": "Stellenanzeige hierher ziehen oder klicken, um zu durchsuchen",
+    "matchingFileFormats": "Akzeptierte Formate: PDF (.pdf), Word (.docx) oder Text (.txt) — max. 5 MB.",
+    "matchingFileRequired": "Wählen Sie die Angebotsdatei aus oder ziehen Sie sie hierher.",
+    "matchingFileRemove": "Datei entfernen",
+    "matchingUrlTabHint": "Fügen Sie den öffentlichen Link des Angebots ein (LinkedIn, Welcome to the Jungle, Indeed…): Der Inhalt wird automatisch abgerufen und analysiert.",
     "matchingDescription": "Text des Stellenangebots *",
     "matchingDescriptionHint": "min. {min} Zeichen",
     "matchingDescriptionPlaceholder": "Fügen Sie hier den vollständigen Angebotstext ein: Aufgaben, Anforderungen, Tech-Stack, erwartete Fähigkeiten…",
-    "matchingQueueCta": "KI-Abgleich starten",
+    "matchingQueueCta": "Passung bewerten",
     "matchingQueuePending": "Wird gestartet…",
     "matchingQueuedHint": "Abgleich eingereiht — die Diagnose erscheint, sobald die Analyse abgeschlossen ist.",
     "matchingDone": "Fertig",
@@ -486,9 +525,9 @@
     "matchingReadyHint": "Diagnose fertig! Schließen oder starten Sie einen neuen Abgleich, um Ihre Bewerbung weiter zu optimieren.",
     "matchingCancel": "Schließen",
     "matchingSteps": [
-      "Lebenslauf wird gelesen und Kompetenzen extrahiert…",
-      "Semantischer Abgleich mit dem Angebot und Scoring…",
-      "Stärken, Lücken und Empfehlungen werden erkannt…"
+      "Semantische Analyse von Angebot und Lebenslauf…",
+      "Prüfung der ATS-Kompatibilität…",
+      "Erkennung von Kompetenzlücken…"
     ],
     "matchingQueued": "Abgleich läuft",
     "matchingQueuedBadge": "KI aktiv",
@@ -532,7 +571,34 @@
     "analyseQuickNoCv": "Keine Lebensläufe in Ihrer Bibliothek — laden Sie unten einen temporären hoch.",
     "analyseQuickUploadCta": "Temporären Lebenslauf hochladen",
     "analyseQuickUploading": "Wird hochgeladen…",
-    "analyseQuickHint": "Schnelltests verändern Ihre vorhandenen Lebensläufe nicht."
+    "analyseQuickHint": "Schnelltests verändern Ihre vorhandenen Lebensläufe nicht.",
+    "matchingHistorySubtitle": "Finden Sie Ihre bewerteten Angebote und starten Sie jederzeit ein Training.",
+    "matchingHistoryCount": "{count, plural, =0 {keine Bewertungen} one {# Bewertung} other {# Bewertungen}}",
+    "matchingHistoryCv": "CV: {name}",
+    "matchingSourceFile": "PDF-Datei",
+    "matchingSourceUrl": "Weblink",
+    "matchingSourceText": "Klartext",
+    "matchingSimulateInterview": "Interview simulieren",
+    "matchingBackToDashboard": "← Dashboard",
+    "matchingPreviewEmptyTitle": "Keine Bewertung im Gange",
+    "matchingPreviewEmptyDesc": "Wählen Sie links einen Lebenslauf, geben Sie die Stellenanzeige an (Datei oder Link) und klicken Sie auf „Passung bewerten“.",
+    "matchingPerk1": "Semantische Passungsberechnung und ATS-Kompatibilität",
+    "matchingPerk2": "Erkennung von Stärken und fehlenden Kompetenzen",
+    "matchingPerk3": "Direkter Einstieg in die gezielte Interviewsimulation",
+    "matchingStepSelectCv": "Zu bewertenden Lebenslauf auswählen",
+    "matchingCvAvailableCount": "{count, plural, =0 {kein CV verfügbar} one {# CV verfügbar} other {# CVs verfügbar}}",
+    "matchingPrimaryBadge": "Primär",
+    "matchingCvAtsScore": "ATS-Score",
+    "matchingStepSubmitOffer": "Stellenanzeige übermitteln",
+    "matchingSelectedCv": "Ausgewählter CV: {name}",
+    "matchingNoCvSelected": "Kein Lebenslauf ausgewählt",
+    "matchingDefaultJobTitle": "Stellenangebot",
+    "matchingEvalTitle": "Bewertung läuft",
+    "matchingEvalHint": "Die vollständige Diagnose erscheint hier, sobald die Analyse abgeschlossen ist.",
+    "matchingDiagnosticTitle": "Abgleich-Diagnose",
+    "matchingStatusRunning": "KI aktiv",
+    "matchingStatusSuccess": "Erfolg",
+    "matchingStatusFailed": "Fehlgeschlagen"
   },
   "profile": {
     "title": "Profilverwaltung",
@@ -872,6 +938,134 @@
       "skills": "Kompetenzen",
       "educations": "Ausbildung",
       "certifications": "Zertifikate"
+    }
+  },
+  "guides": {
+    "show": "Seiten-Guide",
+    "hide": "Guide ausblenden",
+    "toggleTitle": "Schnellstart-Guide dieser Seite ein- oder ausblenden",
+    "collapse": "Einklappen",
+    "showSteps": "Schritte anzeigen",
+    "expand": "Guide ausklappen",
+    "dismiss": "Verstanden",
+    "dismissTitle": "Diesen Guide ausblenden",
+    "globalTour": "Globale Tour",
+    "globalTourTitle": "Globale Dashboard-Tour erneut starten",
+    "proTipLabel": "ForPro-Tipp:",
+    "matching": {
+      "tag": "SCHNELLSTART-GUIDE • JOB-MATCHING",
+      "title": "Wie bewerten Sie Ihren Lebenslauf gegen eine Stellenanzeige?",
+      "subtitle": "Messen Sie Ihre technische Passung in 3 einfachen Schritten und starten Sie ein gezieltes Training.",
+      "steps": [
+        {
+          "title": "Wählen Sie Ihren Referenz-Lebenslauf",
+          "desc": "Wählen Sie Ihren Referenz-Lebenslauf (z. B. Cloud-Architekt) aus Ihren gespeicherten Versionen.",
+          "badge": "Auswahl"
+        },
+        {
+          "title": "Laden Sie die Stellenanzeige hoch",
+          "desc": "Ziehen Sie eine PDF- oder Word-Datei (DOCX) herüber oder fügen Sie den LinkedIn-/Karriere-Link ein.",
+          "badge": "PDF / Word / URL"
+        },
+        {
+          "title": "Diagnose & Simulation",
+          "desc": "Entdecken Sie Ihren Passungs-Score und klicken Sie auf „Interviewsimulation für dieses Angebot starten“.",
+          "badge": "Interview-Brücke"
+        }
+      ],
+      "proTip": "Die KI-Analyse erkennt fehlende Pflicht-Keywords und gewichtet Senioritätsabstände, um Ihre Chancen zu maximieren."
+    },
+    "cvs": {
+      "tag": "SCHNELLSTART-GUIDE • CV-MANAGER",
+      "title": "Wie optimieren und verwalten Sie Ihre Lebenslauf-Versionen?",
+      "subtitle": "Überwinden Sie ATS-Filter und passen Sie Ihr Profil an Ihre Zielstellen an.",
+      "steps": [
+        {
+          "title": "Importieren Sie Ihre CVs",
+          "desc": "Ziehen Sie Ihre PDF- oder Word-Dateien (.docx) herüber: Ihr Werdegang wird automatisch extrahiert.",
+          "badge": "Parsing"
+        },
+        {
+          "title": "ATS-Audit & Lesbarkeit",
+          "desc": "Sehen Sie Ihren Kompatibilitäts-Score, erkannte Stärken und hervorzuhebende Kompetenzen.",
+          "badge": "ATS-Score"
+        },
+        {
+          "title": "Primär-CV & Aktionen",
+          "desc": "Legen Sie Ihren Referenz-Lebenslauf fest, sehen Sie ihn sich an und starten Sie Matching oder Simulation mit einem Klick.",
+          "badge": "Stern ★"
+        }
+      ],
+      "proTip": "Ein auf ein Angebot zugeschnittener CV schlägt drei generische: duplizieren Sie Ihren Primär-CV und passen Sie ihn an die Zielstelle an."
+    },
+    "mock": {
+      "tag": "SCHNELLSTART-GUIDE • SIMULIERTE INTERVIEWS",
+      "title": "Wie meistern Sie Ihre KI-Mock-Interview-Session?",
+      "subtitle": "Üben Sie das Sprechen unter realen Bedingungen und erhalten Sie strukturiertes STAR-Feedback.",
+      "steps": [
+        {
+          "title": "Wählen Sie das Zielangebot",
+          "desc": "Wählen Sie ein kürzlich gematchtes Angebot (z. B. Wave, Paystack) oder laden Sie direkt eines hoch.",
+          "badge": "Zielangebot"
+        },
+        {
+          "title": "Aktivieren Sie Audio & Sprache",
+          "desc": "Wählen Sie Deutsch oder Englisch, hören Sie die Fragen laut vor und antworten Sie per Mikrofon.",
+          "badge": "Audio & Stimme"
+        },
+        {
+          "title": "STAR-Debriefing & Tipps",
+          "desc": "Erhalten Sie einen bewerteten Score (Klarheit, technische Tiefe) und konkrete Formulierungshinweise.",
+          "badge": "KI-Feedback"
+        }
+      ],
+      "proTip": "Strukturieren Sie Ihre mündlichen Antworten nach der STAR-Methode (Situation, Task, Action, Result), um über 90/100 zu erzielen."
+    },
+    "timeline": {
+      "tag": "SCHNELLSTART-GUIDE • KARRIERE-ROADMAP",
+      "title": "Wie steuern Sie Ihre Karriereentwicklung?",
+      "subtitle": "Visualisieren Sie Ihren Weg, Ihre wichtigsten Etappen und die zu festigenden Kompetenzen.",
+      "steps": [
+        {
+          "title": "Erkunden Sie Ihren Weg",
+          "desc": "Jede Karte ist eine echte Etappe Ihres Werdegangs mit Missionen und Technologien.",
+          "badge": "Panorama"
+        },
+        {
+          "title": "Detailieren Sie jede Etappe",
+          "desc": "Klicken Sie auf eine Karte, um die wichtigsten Missionen und eingesetzten Technologien zu sehen.",
+          "badge": "Details"
+        },
+        {
+          "title": "Setzen Sie Ihren Kurs",
+          "desc": "Hinterlegen Sie Ihr Karriereziel in Ihrem Profil: Es wird zur Referenz Ihrer Entwicklung.",
+          "badge": "Ziel"
+        }
+      ],
+      "proTip": "Ein dokumentiertes Karriereziel schaltet Passungsbewertungen frei und schärft Ihre Empfehlungen."
+    },
+    "analytics": {
+      "tag": "SCHNELLSTART-GUIDE • ANALYSEN & STATISTIKEN",
+      "title": "Wie lesen Sie Ihre Karriere-Kennzahlen?",
+      "subtitle": "Verfolgen Sie Ihre Profil-Stärke, Ihre ATS-Scores und Ihr Karriereziel.",
+      "steps": [
+        {
+          "title": "Messen Sie Ihr Profil",
+          "desc": "Die Profil-Stärke aggregiert Identität, Erfahrungen, Ausbildung, Kompetenzen und CVs.",
+          "badge": "KPIs"
+        },
+        {
+          "title": "Verfolgen Sie Ihre ATS-Scores",
+          "desc": "Vergleichen Sie den Durchschnitts- und den besten Score Ihrer analysierten CVs.",
+          "badge": "ATS-Score"
+        },
+        {
+          "title": "Richten Sie Ihr Ziel aus",
+          "desc": "Ihr Karriereziel (Zielrolle + Technologien) ist die Referenz für die Bewertungen.",
+          "badge": "Ziel"
+        }
+      ],
+      "proTip": "Vervollständigen Sie Ihr Profil und analysieren Sie mindestens einen CV, um Ihre Statistiken automatisch zu speisen."
     }
   }
 }

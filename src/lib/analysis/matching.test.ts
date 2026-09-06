@@ -27,6 +27,7 @@ const llmResult: JobMatchLlmResult = {
   matchedKeywords: ['Kafka', 'Kubernetes'],
   missingKeywords: ['PCI-DSS', 'FinOps'],
   recommendations: [{ title: 'Ajouter PCI-DSS', detail: 'Dans le résumé' }],
+  jobTitle: 'Principal Platform Architect',
   company: 'Wave',
   location: 'Dakar',
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import {
   Activity,
@@ -13,20 +13,26 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { DashboardViewData } from '@/types/dashboard';
+import PageGuideToggle from '@/components/dashboard/onboarding/PageGuideToggle';
+import PageOnboardingGuide from '@/components/dashboard/onboarding/PageOnboardingGuide';
+import { usePageGuide } from '@/components/dashboard/onboarding/usePageGuide';
+import { startDashboardTour } from '@/lib/dashboard/tour-events';
 
 interface AnalyticsViewProps {
   data: DashboardViewData;
 }
 
 /**
- * « Analytics » — template-styled analytics page (condensed port of the
- * template's AnalyticsView with real KPIs derived from the dashboard data
- * and the template's empty states for sections not backed yet).
+ * « Analyses et Statistiques » — template-styled analytics page (condensed
+ * port of the template's AnalyticsView with real KPIs derived from the
+ * dashboard data and the template's empty states for sections not backed yet).
  */
 export default function AnalyticsView({ data }: AnalyticsViewProps) {
   const locale = useLocale();
   const router = useRouter();
+  const pathname = usePathname();
   const isFrench = locale !== 'en';
+  const guide = usePageGuide('analytics');
 
   const analyzedCvs = data.cvs.filter((cv) => cv.score !== null);
   const bestScore = analyzedCvs.reduce<number | null>(
@@ -100,12 +106,23 @@ export default function AnalyticsView({ data }: AnalyticsViewProps) {
             </span>
           </div>
         </div>
+
+        <PageGuideToggle visible={guide.visible} onToggle={guide.toggle} />
       </div>
+
+      {/* Page guide (hidden by default — revealed by the header toggle). */}
+      {guide.visible && (
+        <PageOnboardingGuide
+          menu="analytics"
+          onDismiss={guide.hide}
+          onStartGlobalTour={() => startDashboardTour(pathname, (href) => router.push(href))}
+        />
+      )}
 
       {/* Page title */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-          Analytics
+          {isFrench ? 'Analyses et Statistiques' : 'Analytics'}
         </h1>
         <p className="text-sm text-slate-500 font-medium mt-1">
           {isFrench

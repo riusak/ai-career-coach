@@ -1,6 +1,10 @@
 import { cache } from 'react';
 import { getCurrentUserProfile } from '@/lib/supabase/profiles';
-import { getLatestCompletedAnalysesByResume, getUserResumes } from '@/lib/supabase/resumes';
+import {
+  getLatestCompletedAnalysesByResume,
+  getResumeFileSizes,
+  getUserResumes,
+} from '@/lib/supabase/resumes';
 import {
   getRoadmap,
   listCertifications,
@@ -34,6 +38,7 @@ export const getDashboardViewData = cache(async (): Promise<DashboardLoadResult>
     skillsResult,
     educationsResult,
     certificationsResult,
+    fileSizes,
   ] = await Promise.all([
     getCurrentUserProfile(),
     getUserResumes(),
@@ -43,6 +48,7 @@ export const getDashboardViewData = cache(async (): Promise<DashboardLoadResult>
     listSkills(),
     listEducations(),
     listCertifications(),
+    getResumeFileSizes(),
   ]);
 
   const { data: profile } = profileResult;
@@ -63,6 +69,7 @@ export const getDashboardViewData = cache(async (): Promise<DashboardLoadResult>
     resumes,
     analysesByResume,
     roadmap,
+    sizesByPath: fileSizes,
   });
 
   return { data, profile, certificationsCount: certifications.length };

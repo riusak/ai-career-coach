@@ -1,28 +1,32 @@
 ﻿/**
- * resume/match/route.ts â€” Job-matching worker pour les comptes authentifiÃ©s.
+ * resume/match/route.ts — Job-matching worker pour les comptes authentifiés.
  *
  * Miroir exact de l'architecture du worker d'analyse (`/api/resume/analyze`) :
  * la route est un ADAPTATEUR HTTP mince autour du pipeline de matching UNIQUE
- * (`src/lib/analysis/matching.ts`), lui-mÃªme alimentÃ© par le client Gemini
- * dÃ©diÃ© (`src/lib/quick-test/matching-llm.ts`).
+ * (`src/lib/analysis/matching.ts`), lui-même alimenté par le client Gemini
+ * dédié (`src/lib/quick-test/matching-llm.ts`).
  *
- * Responsibilities conservÃ©es ici (transport / file d'attente):
- *   1) RequÃªte authentifiÃ©e (session Supabase) + ownership checks;
+ * Responsibilities conservées ici (transport / file d'attente):
+ *   1) Requête authentifiée (session Supabase) + ownership checks;
  *   2) Claim atomique de la ligne en attente (`job_matchings`, match_score null)
- *      avec rÃ©clamation des claims pÃ©rimÃ©s (crashs);
- *   3) RÃ©solution du texte du CV (parsed_content, sinon extraction Ã  la volÃ©e
- *      depuis le fichier privÃ© de Storage) puis dÃ©lÃ©gation au pipeline partagÃ©;
+ *      avec réclamation des claims périmés (crashs);
+ *   3) Résolution du texte du CV (parsed_content, sinon extraction à la volée
+ *      depuis le fichier privé de Storage) puis délégation au pipeline partagé;
  *   4) Persistance {match_score, matching_details};
- *   5) Ã‰chec terminal â†’ suppression de la ligne en attente (anti-blocage UI).
+ *   5) Échec terminal → suppression de la ligne en attente (anti-blocage UI).
  *
- * Failure policy: toute erreur non rÃ©cupÃ©rable (CV illisible, texte d'offre
- * invalide, Ã©chec LLM aprÃ¨s retries...) supprime la ligne en attente â€” l'UI ne
- * reste jamais bloquÃ©e et l'utilisateur peut simplement relancer. Il n'y a
- * AUCUN fallback heuristique: un Ã©chec transitoire du LLM fait Ã©chouer
- * l'exÃ©cution explicitement, jamais avec un faux score.
+ * Failure policy: toute erreur non récupérable (CV illisible, texte d'offre
+ * invalide, échec LLM après retries...) supprime la ligne en attente — l'UI ne
+ * reste jamais bloquée et l'utilisateur peut simplement relancer. Il n'y a
+ * AUCUN fallback heuristique: un échec transitoire du LLM fait échouer
+ * l'exécution explicitement, jamais avec un faux score.
  */
 
 import { analyzeJobMatch } from '@/lib/analysis/matching';
+import {
+  extractOfferMetadata,
+  GENERIC_JOB_TITLE,
+} from '@/lib/analysis/offer-metadata';
 import {
   claimQueuedJobMatching,
   completeJobMatching,
@@ -81,7 +85,7 @@ async function extractResumeText(
       const message =
         err instanceof PdfExtractionError
           ? err.message
-          : 'Impossible de lire ce PDF (il est peut-Ãªtre corrompu ou scannÃ©).';
+          : 'Impossible de lire ce PDF (il est peut-être corrompu ou scanné).';
       return { text: '', error: message };
     }
   }
@@ -93,14 +97,14 @@ async function extractResumeText(
       const message =
         err instanceof DocxExtractionError
           ? err.message
-          : 'Impossible de lire ce document Word (il est peut-Ãªtre corrompu).';
+          : 'Impossible de lire ce document Word (il est peut-être corrompu).';
       return { text: '', error: message };
     }
   }
   if (lower.endsWith('.txt')) {
     return { text: buffer.toString('utf8').slice(0, MAX_MATCHING_RESUME_CHARS), error: null };
   }
-  return { text: '', error: 'Format de CV non supportÃ© pour le matching.' };
+  return { text: '', error: 'Format de CV non supporté pour le matching.' };
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -205,7 +209,21 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    // 4) Persist the result (match_score null -> filled; the polling UI picks it up).
+    // 4) Persist the result (match_score null -> filled; the polling UI picks
+    //    it up). Chart 8 — offer-derived metadata: a generic auto-filled job
+    //    title is replaced by the offer's real title (LLM detection, then the
+    //    text heuristic), and an empty company is filled the same way, so the
+    //    history and the diagnostic headline show meaningful labels. A
+    //    user-typed title/company is ALWAYS preserved.
+    const heuristics = extractOfferMetadata(matching.job_description);
+    const titleOverride =
+      matching.job_title === GENERIC_JOB_TITLE
+        ? (pipelineResult.result.jobTitle ?? heuristics.jobTitle)
+        : null;
+    const companyOverride = matching.company
+      ? null
+      : (pipelineResult.result.company ?? heuristics.company);
+
     const details: JobMatchingDetails = {
       source: 'llm',
       result: pipelineResult.result,
@@ -213,7 +231,8 @@ export async function POST(request: Request): Promise<Response> {
     const completion = await completeJobMatching(
       matchingId,
       pipelineResult.result.overall,
-      details
+      details,
+      { jobTitle: titleOverride, company: companyOverride }
     );
     if (completion.error) {
       throw new Error(completion.error);

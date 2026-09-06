@@ -58,6 +58,8 @@ export interface CvDetailData {
   rawText: string | null;
   rawTextTruncated: boolean;
   wordCount: number | null;
+  /** Stored file size in bytes (null = Storage metadata unavailable). */
+  sizeBytes: number | null;
 }
 
 /** Light CV card for management pages (no raw text — keeps payloads small). */
@@ -72,6 +74,8 @@ export interface CvSummaryData {
   score: number | null;
   /** True when a completed analysis exists for this CV. */
   hasAnalysis: boolean;
+  /** Stored file size in bytes (null = Storage metadata unavailable). */
+  sizeBytes: number | null;
 }
 
 /** The three fixed sub-cards of the ATS diagnostic layout. */

@@ -37,6 +37,8 @@ export interface JobMatchResult {
   subscores: JobMatchSubscores;
   /** One-paragraph recruiter-grade synthesis of the fit. */
   summary: string;
+  /** Job title EXACTLY as labelled in the offer (null when not detectable). */
+  jobTitle: string | null;
   /** What the CV demonstrates really well for THIS offer. */
   strengths: InsightItem[];
   /** Requirement-level gaps (missing skills, under-claimed proof…). */
@@ -100,6 +102,8 @@ export interface JobMatchingSummary {
   jobTitle: string;
   company: string | null;
   location: string | null;
+  /** How the offer was ingested (file / URL / pasted text) — history badge. */
+  sourceType: MatchingSourceType | null;
   /** Global score (0–100) — null while queued/processing or on failure. */
   matchScore: number | null;
   /** ISO timestamp rendered client-side with the active locale. */

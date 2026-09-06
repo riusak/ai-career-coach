@@ -110,6 +110,7 @@ function buildResult(
       keywords: clamp(llm.keywordsScore),
     },
     summary: llm.summary,
+    jobTitle: normalizeOptional(llm.jobTitle),
     strengths: llm.strengths.slice(0, 6),
     gaps: llm.gaps.slice(0, 6),
     matchedKeywords: llm.matchedKeywords.slice(0, 12),

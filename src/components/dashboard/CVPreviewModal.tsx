@@ -31,6 +31,7 @@ import {
 import { mapSubscores } from '@/lib/dashboard/adapters';
 import { parseDeepAnalysisOutput } from '@/lib/analysis/deep-output';
 import { parseQuickTestError } from '@/lib/quick-test/error-codes';
+import { formatBytes } from '@/lib/resume-validation';
 import type { QuickTestErrorPayload } from '@/lib/quick-test/error-codes';
 import LoadingSteps from '@/components/ui/LoadingSteps';
 import type { CvDetailData } from '@/types/dashboard';
@@ -391,6 +392,12 @@ export default function CVPreviewModal({
               </div>
               <p className="mt-0.5 text-xs text-slate-500">
                 {t('previewAddedOn', { date: formatShortDate(cv.createdAt, locale) })}
+                {cv.sizeBytes !== null && (
+                  <>
+                    {' • '}
+                    <span className="font-semibold text-slate-700">{formatBytes(cv.sizeBytes)}</span>
+                  </>
+                )}
                 {' • '}
                 {t('previewScoreAts')}{' '}
                 <strong className="text-slate-800">{view.score !== null ? `${view.score}%` : '—'}</strong>
@@ -597,12 +604,6 @@ export default function CVPreviewModal({
                     )}
                     {isQueueing ? t('previewAnalysisQueueing') : t('previewRunAnalysis')}
                   </button>
-                  <Link
-                    href={`/dashboard/resume/${cv.id}`}
-                    className="text-xs font-semibold text-slate-400 underline-offset-2 transition-colors hover:text-slate-600 hover:underline"
-                  >
-                    {t('previewOpenReport')}
-                  </Link>
                 </div>
               ) : (
                 <>
@@ -624,14 +625,6 @@ export default function CVPreviewModal({
                         )}
                       </div>
                     </div>
-
-                    <Link
-                      href={`/dashboard/resume/${cv.id}`}
-                      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all hover:bg-slate-800 active:scale-[0.98]"
-                    >
-                      <FileText className="h-4 w-4 text-amber-400" />
-                      {t('previewOpenReport')}
-                    </Link>
                   </div>
 
                   {/* Subscores grid */}
@@ -781,13 +774,6 @@ export default function CVPreviewModal({
                   )}
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <Link
-                    href={`/dashboard/resume/${cv.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:border-brand-300 hover:text-brand-600"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    {t('previewOpenDetail')}
-                  </Link>
                   <button
                     type="button"
                     onClick={() => void handleDownload()}
@@ -828,6 +814,53 @@ export default function CVPreviewModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Modal Bottom Sticky Bar — template standard: document export on the
+            left, the primary job-matching action on the right (navy/orange). */}
+        <div className="flex shrink-0 flex-col gap-3 border-t border-slate-200 bg-white px-6 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            {!cv.isPrimary && (
+              <form action={setPrimaryResumeAction}>
+                <input type="hidden" name="resumeId" value={cv.id} />
+                <button
+                  type="submit"
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-800 transition-colors hover:bg-emerald-100"
+                >
+                  <BadgeCheck className="h-3.5 w-3.5 fill-emerald-600 text-emerald-600" />
+                  {t('previewSetPrimary')}
+                </button>
+              </form>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleDownload()}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-200"
+            >
+              <Download className="h-3.5 w-3.5 text-slate-500" />
+              {t('previewDownload')}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {view.score !== null ? (
+              <Link
+                href={`/dashboard/matching?cv=${cv.id}`}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-slate-800 active:scale-95"
+              >
+                <Briefcase className="h-3.5 w-3.5 text-amber-400" />
+                {t('previewMatchCta')}
+              </Link>
+            ) : (
+              <span
+                title={t('matchNeedsParsing')}
+                className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-900/60 px-4 py-2 text-xs font-bold text-white/70"
+              >
+                <Briefcase className="h-3.5 w-3.5 text-amber-400/70" />
+                {t('previewMatchCta')}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

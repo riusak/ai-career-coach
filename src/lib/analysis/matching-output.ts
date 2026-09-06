@@ -78,6 +78,7 @@ export function parseJobMatchingDetails(value: unknown): JobMatchingDetails | nu
       matchedKeywords: stringList(r.matchedKeywords),
       missingKeywords: stringList(r.missingKeywords),
       recommendations: insightList(r.recommendations),
+      jobTitle: typeof r.jobTitle === 'string' ? r.jobTitle.slice(0, 200) : null,
       company: typeof r.company === 'string' ? r.company.slice(0, 120) : null,
       location: typeof r.location === 'string' ? r.location.slice(0, 120) : null,
     } satisfies JobMatchResult,

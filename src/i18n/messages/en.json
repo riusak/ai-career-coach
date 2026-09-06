@@ -110,7 +110,9 @@
     "servicesSubtitle": "AI resume analysis, job-offer matching, mock interviews and a version library — a complete career coach.",
     "servicesAiBadge": "AI-powered",
     "comingSoon": "Coming soon",
-    "unlockedWithFreeAccount": "Unlocked with your free account",
+    "servicesLiveBadge": "Available",
+    "serviceFreeUnlock": "This service is free. Simply create an account to access it",
+    "servicePaidUnlock": "Nearly-free paid service. Account required",
     "servicesCards": {
       "analyzeTitle": "AI resume analysis",
       "analyzeDesc": "Get a complete, detailed breakdown of your resume: score by dimension, strengths, weaknesses and priority recommendations.",
@@ -235,8 +237,8 @@
     "digitLabel": "Digit {index} of {length}"
   },
   "dashboard": {
-    "myResumes": "My Resumes",
-    "myResumesSubtitle": "Manage your resume library and revisit your analyses in one click.",
+    "myResumes": "My Professional CVs",
+    "myResumesSubtitle": "Manage your CVs and run ATS tests.",
     "pageTitle": "Dashboard",
     "welcome": "Welcome to ForPro AI",
     "uploadCta": "Upload a resume",
@@ -384,19 +386,18 @@
     "cvScoreLabel": "Score",
     "cvUploadCard": "Upload CV",
     "cvUploadFormats": "PDF, DOCX • 5 MB max",
-    "previewTabDocument": "Preview",
-    "previewTabAnalysis": "Latest analysis results",
+    "previewTabDocument": "Document Preview",
+    "previewTabAnalysis": "ATS Diagnostic",
     "previewTabServices": "AI Services",
     "previewSetPrimary": "Set as primary",
     "previewAddedOn": "Added on {date}",
     "previewScoreAts": "ATS Score",
     "previewWords": "words",
-    "previewTruncated": "Preview truncated — open the detailed view for the full document.",
+    "previewTruncated": "Preview truncated — download the document to see it in full.",
     "previewRawEmpty": "No text extracted for this CV yet.",
     "previewAnalysisTitle": "AI Resume Diagnostic",
     "previewAnalysisNone": "No analysis for this CV yet — run the diagnostic to reveal your strengths and areas of improvement.",
     "previewRunAnalysis": "Run AI analysis",
-    "previewOpenReport": "Open full report",
     "previewSubImpact": "Impact & Metrics",
     "previewSubKeywords": "Keyword Match",
     "previewSubGrammar": "Grammar & Clarity",
@@ -409,9 +410,9 @@
     "previewServiceInterviewTitle": "AI Mock Interview",
     "previewServiceInterviewDesc": "Practice questions based on the projects listed in this CV.",
     "previewManageTitle": "Document management",
-    "previewManageDesc": "Download your CV, open the detailed view or delete it.",
-    "previewOpenDetail": "Detailed view",
+    "previewManageDesc": "Export your CV or delete it from the database.",
     "previewDownload": "Download",
+    "previewMatchCta": "Match Jobs",
     "previewDownloadError": "The download link could not be created. Please retry.",
     "previewConfirmDelete": "Confirm deletion",
     "previewCancel": "Cancel",
@@ -435,18 +436,47 @@
     "headerStrength": "Profile strength",
     "headerYears": "{years, plural, one {# year of experience} other {# years of experience}}",
     "headerNoExp": "First experience coming soon",
-    "cvsAnalyze": "Analyze",
-    "cvsAnalyzePending": "Queueing…",
-    "cvsQueuedHint": "Analysis queued — follow its progress on the CV page.",
+    "cvsDocumentsStored": "{count, plural, one {# document stored} other {# documents stored}}",
+    "cvsBackToDashboard": "Back to Dashboard",
+    "cvsUploadNew": "Upload New CV",
+    "cvsKpiAria": "CV library key metrics",
+    "cvsKpiTotalTitle": "Total CVs",
+    "cvsKpiTotalValue": "{count, plural, one {# File} other {# Files}}",
+    "cvsKpiPrimaryTitle": "Primary CV Set",
+    "cvsKpiPrimaryNone": "None set",
+    "cvsKpiAvgScore": "Average ATS Score",
+    "cvsKpiStorage": "Database Storage",
+    "cvsKpiStorageValue": "Persistent & Secure",
+    "cvsDropzoneTitle": "Drag & drop your CV here, or click to browse",
+    "cvsDropzoneHint": "Accepted formats: PDF, DOCX, TXT (max size 5 MB). Your CV is automatically persisted in your database.",
+    "cvsDropzoneUploading": "Uploading…",
+    "cvsDropzoneSuccess": "CV added to your library!",
+    "cvsDropzoneSuccessName": "“{name}” has been added to your library!",
+    "cvsSearchPlaceholder": "Search a CV by name or role…",
+    "cvsFilterAll": "All CVs ({count})",
+    "cvsFilterPrimary": "Primary only",
+    "cvsFilterHighScore": "ATS score ≥ 80%",
+    "cvsPrimaryBadgeShort": "Primary CV",
+    "cvsSizeUnknown": "Size n/a",
+    "cvsScoreGlobal": "Overall ATS Score",
+    "cvsScoreImprove": "Improvements suggested",
+    "cvsScoreOptimized": "Optimized for hiring",
+    "cvsDetails": "Details",
+    "cvsPreviewDoc": "Preview Document",
+    "cvsMatching": "Match",
+    "cvsMatchingTitle": "Match jobs with this CV",
+    "cvsEmptyTitle": "Your library is empty",
+    "cvsEmptyDesc": "Upload your first CV to preview it, set it as primary and run an ATS diagnostic.",
+    "cvsNoResults": "No CV matches your current filters.",
+    "cvsNoResultsReset": "Reset filters",
+    "cvsUploadErrorTitle": "Upload failed",
+    "cvsUploadErrorGeneric": "The CV could not be uploaded. Please try again.",
     "cvsNoScore": "Not analyzed",
-    "cvsQueuedBadge": "Pending",
-    "cvsMatchOffer": "Match with an offer",
-    "cvsAnalyzedCount": "{count, plural, one {# analyzed CV} other {# analyzed CVs}}",
     "matchingTitle": "Job Matching & Offer Evaluation",
-    "matchingSubtitle": "Pick the CV to evaluate, paste the offer (text or link) and discover your fit score, strengths and gaps to close.",
+    "matchingSubtitle": "Pick the CV to evaluate, upload the offer (PDF/Word or URL link) and discover your fit score plus the key points to defend in the interview.",
     "matchingNewCta": "New matching",
     "matchingSelectCvForNew": "CV to evaluate:",
-    "matchingHistoryTitle": "Matching history",
+    "matchingHistoryTitle": "Recent job matching history",
     "matchingRequiresCv": "No resume in your library yet",
     "matchingRequiresCvDesc": "Upload a resume from “My Resumes” first to launch an offer matching.",
     "matchingEmptyTitle": "No matching yet",
@@ -466,18 +496,27 @@
     "matchingModalClose": "Close",
     "matchingSelectCv": "Resume to match against the offer",
     "matchingNoCv": "No resume available",
-    "matchingJobTitle": "Job title *",
+    "matchingJobTitle": "Job title (optional)",
     "matchingJobPlaceholder": "e.g. Lead Cloud & Solutions Architect",
-    "matchingCompany": "Company (optional)",
-    "matchingCompanyPlaceholder": "e.g. Wave Mobile Money",
+    "matchingCompany": "Company / Organization",
+    "matchingCompanyPlaceholder": "e.g. Wave Mobile Money, Paystack, Orange…",
     "matchingLocation": "Location (optional)",
     "matchingLocationPlaceholder": "e.g. Dakar / Remote",
-    "matchingUrl": "Offer link (optional)",
+    "matchingUrl": "Offer URL",
     "matchingUrlPlaceholder": "https://example.com/offer",
+    "matchingOfferSource": "Offer source",
+    "matchingTabFile": "File (PDF / Word)",
+    "matchingTabUrl": "Offer URL",
+    "matchingTabText": "Plain text",
+    "matchingFileDropHint": "Drag & drop the job offer or click to browse",
+    "matchingFileFormats": "Accepted formats: PDF (.pdf), Word (.docx) or text (.txt) — 5 MB max.",
+    "matchingFileRequired": "Select or drop the offer file.",
+    "matchingFileRemove": "Remove file",
+    "matchingUrlTabHint": "Paste the public offer link (LinkedIn, Welcome to the Jungle, Indeed…): its content is fetched and parsed automatically.",
     "matchingDescription": "Job offer text *",
     "matchingDescriptionHint": "{min} chars min.",
     "matchingDescriptionPlaceholder": "Paste the full offer text here: missions, requirements, tech stack, expected skills…",
-    "matchingQueueCta": "Run AI matching",
+    "matchingQueueCta": "Evaluate job match",
     "matchingQueuePending": "Launching…",
     "matchingQueuedHint": "Matching queued — the diagnostic appears as soon as the analysis completes.",
     "matchingDone": "Done",
@@ -485,9 +524,9 @@
     "matchingReadyHint": "Diagnostic ready! Close or launch a new matching to keep optimizing your application.",
     "matchingCancel": "Close",
     "matchingSteps": [
-      "Reading your resume and extracting skills…",
-      "Semantic comparison with the offer and scoring…",
-      "Detecting strengths, gaps and recommendations…"
+      "Semantic analysis of the offer and CV…",
+      "Checking ATS compatibility…",
+      "Detecting skill gaps…"
     ],
     "matchingQueued": "Matching in progress",
     "matchingQueuedBadge": "AI active",
@@ -531,7 +570,34 @@
     "analyseQuickNoCv": "No CV in your library — flash-upload a temporary one below.",
     "analyseQuickUploadCta": "Upload a temporary CV",
     "analyseQuickUploading": "Uploading…",
-    "analyseQuickHint": "Quick tests never alter your existing CVs."
+    "analyseQuickHint": "Quick tests never alter your existing CVs.",
+    "matchingHistorySubtitle": "Review your evaluated offers and launch a practice session anytime.",
+    "matchingHistoryCount": "{count, plural, =0 {no evaluations} one {# evaluation} other {# evaluations}}",
+    "matchingHistoryCv": "CV: {name}",
+    "matchingSourceFile": "PDF file",
+    "matchingSourceUrl": "Web link",
+    "matchingSourceText": "Plain text",
+    "matchingSimulateInterview": "Mock interview",
+    "matchingBackToDashboard": "← Dashboard",
+    "matchingPreviewEmptyTitle": "No evaluation in progress",
+    "matchingPreviewEmptyDesc": "Select a CV on the left, provide the job offer (file or URL link) then click “Evaluate job match”.",
+    "matchingPerk1": "Semantic fit computation and ATS compatibility",
+    "matchingPerk2": "Strengths and missing skills identification",
+    "matchingPerk3": "Direct bridge to targeted interview simulation",
+    "matchingStepSelectCv": "Select the CV to evaluate",
+    "matchingCvAvailableCount": "{count, plural, =0 {no CV available} one {# CV available} other {# CVs available}}",
+    "matchingPrimaryBadge": "Primary",
+    "matchingCvAtsScore": "ATS score",
+    "matchingStepSubmitOffer": "Submit the job offer",
+    "matchingSelectedCv": "Selected CV: {name}",
+    "matchingNoCvSelected": "No CV selected",
+    "matchingDefaultJobTitle": "Job offer",
+    "matchingEvalTitle": "Evaluation in progress",
+    "matchingEvalHint": "The full diagnostic will appear here as soon as the analysis completes.",
+    "matchingDiagnosticTitle": "Matching diagnostic",
+    "matchingStatusRunning": "AI active",
+    "matchingStatusSuccess": "Success",
+    "matchingStatusFailed": "Failed"
   },
   "profile": {
     "title": "Profile management",
@@ -871,6 +937,134 @@
       "skills": "Skills",
       "educations": "Education",
       "certifications": "Certifications"
+    }
+  },
+  "guides": {
+    "show": "Page guide",
+    "hide": "Hide guide",
+    "toggleTitle": "Show or hide this page’s quick-start guide",
+    "collapse": "Collapse",
+    "showSteps": "View steps",
+    "expand": "Expand the guide",
+    "dismiss": "Got it",
+    "dismissTitle": "Dismiss this guide",
+    "globalTour": "Global Tour",
+    "globalTourTitle": "Replay the global dashboard tour",
+    "proTipLabel": "ForPro Tip:",
+    "matching": {
+      "tag": "QUICK START GUIDE • JOB MATCHING",
+      "title": "How to match your CV against any job offer?",
+      "subtitle": "Measure your technical compatibility in 3 steps and trigger targeted practice.",
+      "steps": [
+        {
+          "title": "Select your target CV",
+          "desc": "Pick your benchmark CV (e.g. Cloud Architect) from your stored versions.",
+          "badge": "Selection"
+        },
+        {
+          "title": "Upload or paste job offer",
+          "desc": "Drag & drop a PDF/Word file, or paste a LinkedIn / career-site URL.",
+          "badge": "PDF / Word / URL"
+        },
+        {
+          "title": "Diagnosis & Simulation",
+          "desc": "Get your compatibility breakdown and click “Launch an interview simulation for this offer”.",
+          "badge": "Interview Bridge"
+        }
+      ],
+      "proTip": "The AI model spots missing core keywords and weights seniority gaps to maximize your callback rate."
+    },
+    "cvs": {
+      "tag": "QUICK START GUIDE • CV MANAGER",
+      "title": "How to manage and optimize your CV versions?",
+      "subtitle": "Beat ATS filters and tailor your profile for the roles you target.",
+      "steps": [
+        {
+          "title": "Import your CVs",
+          "desc": "Drop your PDF or Word (.docx) files: your career history is extracted automatically.",
+          "badge": "Parsing"
+        },
+        {
+          "title": "ATS Audit & Readability",
+          "desc": "Review your compatibility score, detected strengths and skills to showcase.",
+          "badge": "ATS score"
+        },
+        {
+          "title": "Primary CV & Actions",
+          "desc": "Set your benchmark CV, preview it and launch matching or a mock interview in one click.",
+          "badge": "Star ★"
+        }
+      ],
+      "proTip": "One offer-tailored CV beats three generic ones: duplicate your primary CV then adapt it to the target role."
+    },
+    "mock": {
+      "tag": "QUICK START GUIDE • MOCK INTERVIEWS",
+      "title": "How to ace your AI voice mock interview session?",
+      "subtitle": "Practice speaking under real conditions and receive thorough STAR structured feedback.",
+      "steps": [
+        {
+          "title": "Pick the target offer",
+          "desc": "Select a recently matched offer (e.g. Wave, Paystack) or upload a new one directly.",
+          "badge": "Target offer"
+        },
+        {
+          "title": "Enable Audio & Language",
+          "desc": "Choose French or English, listen to the questions read aloud and answer with your mic.",
+          "badge": "Audio & Voice"
+        },
+        {
+          "title": "STAR Debrief & Tips",
+          "desc": "Get a quantified score (clarity, technical depth) and concrete reformulation advice.",
+          "badge": "AI feedback"
+        }
+      ],
+      "proTip": "Structure your spoken answers with the STAR method (Situation, Task, Action, Result) to score above 90/100."
+    },
+    "timeline": {
+      "tag": "QUICK START GUIDE • CAREER ROADMAP",
+      "title": "How to steer your career progression?",
+      "subtitle": "Visualize your trajectory, key milestones and the skills to consolidate.",
+      "steps": [
+        {
+          "title": "Explore your trajectory",
+          "desc": "Each card is a real milestone of your journey with missions and technologies.",
+          "badge": "Panoramic"
+        },
+        {
+          "title": "Detail every milestone",
+          "desc": "Click a card to review its key missions and the technologies you mobilized.",
+          "badge": "Details"
+        },
+        {
+          "title": "Set your course",
+          "desc": "Fill in your career goal in your profile: it becomes the reference of your progression.",
+          "badge": "Goal"
+        }
+      ],
+      "proTip": "A documented career goal unlocks fit evaluations and sharpens your recommendations."
+    },
+    "analytics": {
+      "tag": "QUICK START GUIDE • ANALYTICS",
+      "title": "How to read your career metrics?",
+      "subtitle": "Track your profile strength, ATS scores and career goal.",
+      "steps": [
+        {
+          "title": "Measure your profile",
+          "desc": "Profile strength aggregates identity, experiences, education, skills and CVs.",
+          "badge": "KPIs"
+        },
+        {
+          "title": "Track your ATS scores",
+          "desc": "Compare the average and best scores across your analyzed CVs.",
+          "badge": "ATS score"
+        },
+        {
+          "title": "Align your goal",
+          "desc": "Your career goal (target role + technologies) is the reference for evaluations.",
+          "badge": "Goal"
+        }
+      ],
+      "proTip": "Complete your profile and analyze at least one CV to automatically feed your statistics."
     }
   }
 }

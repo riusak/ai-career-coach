@@ -266,11 +266,17 @@ export async function updateMatchingStage(
  * Persists the finished matching on a still-queued row (match_score null ->
  * filled). The `match_score is null` guard keeps completed rows immutable.
  * Returns `completed: false` when the row was concurrently completed or gone.
+ *
+ * `metadata` optionally enriches the SAME update with offer-derived values
+ * (Chart 8): the LLM-detected job title replaces a generic auto-filled title,
+ * and the detected company fills an empty one — so the history and the
+ * diagnostic headline show the real offer labels instead of placeholders.
  */
 export async function completeJobMatching(
   matchingId: string,
   score: number,
-  details: JobMatchingDetails
+  details: JobMatchingDetails,
+  metadata?: { jobTitle?: string | null; company?: string | null }
 ): Promise<{ completed: boolean; error: string | null }> {
   try {
     const supabase = await createClient();
@@ -284,9 +290,20 @@ export async function completeJobMatching(
       return { completed: false, error: authError?.message ?? 'No authenticated user found.' };
     }
 
+    const payload: Record<string, unknown> = {
+      match_score: score,
+      matching_details: details,
+    };
+    if (typeof metadata?.jobTitle === 'string' && metadata.jobTitle.trim().length > 0) {
+      payload.job_title = metadata.jobTitle.trim().slice(0, 200);
+    }
+    if (typeof metadata?.company === 'string' && metadata.company.trim().length > 0) {
+      payload.company = metadata.company.trim().slice(0, 300);
+    }
+
     const { data, error } = await supabase
       .from('job_matchings')
-      .update({ match_score: score, matching_details: details })
+      .update(payload)
       .eq('id', matchingId)
       .eq('user_id', user.id)
       .is('match_score', null)

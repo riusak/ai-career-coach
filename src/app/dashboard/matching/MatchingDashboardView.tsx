@@ -1,32 +1,34 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   Briefcase,
+  CheckCircle2,
   Clock,
   FileSearch,
   FileText,
   Loader2,
   Plus,
   Trash2,
+  Video,
 } from 'lucide-react';
 import { deleteJobMatchingAction, getLatestMatchingAction } from './actions';
-import JobMatchModal from './JobMatchModal';
+import MatchingOfferForm from './MatchingOfferForm';
 import LatestMatchingCard from './LatestMatchingCard';
 import MatchingReport from './MatchingReport';
+import PageGuideToggle from '@/components/dashboard/onboarding/PageGuideToggle';
+import PageOnboardingGuide from '@/components/dashboard/onboarding/PageOnboardingGuide';
+import { usePageGuide } from '@/components/dashboard/onboarding/usePageGuide';
+import { startDashboardTour } from '@/lib/dashboard/tour-events';
 import { parseJobMatchingDetails } from '@/lib/analysis/matching-output';
 import type { CvSummaryData } from '@/types/dashboard';
 import type { JobMatching, JobMatchingSummary } from '@/types/matching';
-
-/**
- * Job-Matching dashboard (Phase 5.2 — Step A). Client studio:
- *  — CV selector + "New matching" button opening the JobMatchModal;
- *  — history grid (latest first); clicking a card loads its full report via
- *    the read-only server action and renders MatchingReport inline;
- *  — delete reuses the server action, then reloads to refresh the RSC list.
- */
 
 interface MatchingDashboardViewProps {
   cvs: CvSummaryData[];
@@ -37,10 +39,20 @@ interface MatchingDashboardViewProps {
    * (?queued=<id>) — renders the live processing/result panel on arrival.
    */
   queuedMatchingId?: string | null;
+  /**
+   * Deep-link from the CV library (?cv=<id>): preselects the document in the
+   * Step 1 grid. Ignored for unknown ids.
+   */
+  initialCvId?: string | null;
 }
 
 function formatDate(iso: string, locale: string): string {
   return new Date(iso).toLocaleDateString(locale, { dateStyle: 'medium' });
+}
+
+/** Completed matching diagnostic of a row (defensive parse), or null. */
+function matchingResult(m: JobMatching) {
+  return parseJobMatchingDetails(m.matching_details)?.result ?? null;
 }
 
 function ScoreBadge({ score }: { score: number | null }) {
@@ -102,188 +114,401 @@ function DeleteMatchingButton({
   );
 }
 
+/** Compact outcome status indicator for the Zone 2 header (IA active / Succès / Échec). */
+function EvaluationStatusBadge({ state }: { state: 'running' | 'success' | 'failed' }) {
+  const t = useTranslations('dashboard');
+  if (state === 'success') {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+        <CheckCircle2 className="h-3 w-3" />
+        {t('matchingStatusSuccess')}
+      </span>
+    );
+  }
+  if (state === 'failed') {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 ring-1 ring-inset ring-rose-200">
+        <AlertTriangle className="h-3 w-3" />
+        {t('matchingStatusFailed')}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-bold text-brand-700 ring-1 ring-inset ring-brand-200">
+      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500 align-middle" />
+      {t('matchingStatusRunning')}
+    </span>
+  );
+}
+
 export default function MatchingDashboardView({
   cvs,
   matchings,
   primaryCvId,
   queuedMatchingId = null,
+  initialCvId = null,
 }: MatchingDashboardViewProps) {
-  const t = useTranslations('dashboard');
   const locale = useLocale();
   const router = useRouter();
+  const pathname = usePathname();
+  const isFrench = locale !== 'en';
+  const t = useTranslations('dashboard');
 
-  const [selectedCvId, setSelectedCvId] = useState<string>(
-    primaryCvId ?? cvs[0]?.id ?? ''
-  );
-  const [modalOpen, setModalOpen] = useState(false);
-  /** Frozen once so a re-render doesn't remount the live card. */
-  const [autoQueuedId] = useState<string | null>(queuedMatchingId);
+  // Chart 7 — page guide state (hidden by default, header toggle to reveal).
+  const guide = usePageGuide('matching');
+
+  const selectedCvDefault =
+    (initialCvId && cvs.some((cv) => cv.id === initialCvId) ? initialCvId : null) ??
+    primaryCvId ??
+    cvs[0]?.id ??
+    null;
+  const [selectedCvId, setSelectedCvId] = useState<string | null>(selectedCvDefault);
+  const [liveMatch, setLiveMatch] = useState<JobMatching | null>(null);
   const [selectedMatchingId, setSelectedMatchingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<JobMatching | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  /** Outcome-header state: whether the live evaluation finished (Succès/Échec). */
+  const [liveCompleted, setLiveCompleted] = useState(false);
+  const [liveFailed, setLiveFailed] = useState(false);
 
-  const openDetail = (matchingId: string) => {
-    if (matchingId === selectedMatchingId) {
-      return; // already visible
-    }
-    setSelectedMatchingId(matchingId);
-    setDetailLoading(true);
+  const selectedCv = cvs.find((cv) => cv.id === selectedCvId) ?? null;
+
+  /** True when the Zone 2 header should read « Diagnostic du matching ». */
+  const outcomeFinished =
+    liveCompleted || (detail !== null && matchingResult(detail) !== null);
+
+  const handleQueued = (matching: JobMatching) => {
+    setLiveMatch(matching);
+    setLiveCompleted(false);
+    setLiveFailed(false);
+    setSelectedMatchingId(null);
+    setDetail(null);
     setDetailError(null);
-    void getLatestMatchingAction(matchingId)
-      .then((row) => {
-        setDetail(row);
-        setDetailLoading(false);
-      })
-      .catch(() => {
-        setDetailError(t('matchingDetailError'));
-        setDetailLoading(false);
+    // Scroll to the outcome zone once it has rendered (state commit is async).
+    window.setTimeout(() => {
+      document.getElementById('matching-outcome')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
       });
+    }, 120);
   };
 
-  const detailParsed = detail ? parseJobMatchingDetails(detail.matching_details) : null;
-  const detailResult = detailParsed?.result ?? null;
+  const openDetail = async (id: string) => {
+    if (id === selectedMatchingId) return;
+    setSelectedMatchingId(id);
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const row = await getLatestMatchingAction(id);
+      setDetail(row);
+    } catch {
+      setDetailError(t('matchingDetailError'));
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   return (
-    <div id="matching-dashboard-view" className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-brand-200 bg-brand-50 text-brand-500">
-              <Briefcase className="h-5 w-5" />
+    <div id="job-matching-view" className="flex flex-col gap-6 sm:gap-7 pb-16">
+      {/* Top header — back link, page title/subtitle, guide toggle. */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="p-2 sm:p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors shadow-2xs flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer group"
+          >
+            <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:text-slate-900 group-hover:-translate-x-0.5 transition-transform" />
+            <span>{isFrench ? 'Retour au Dashboard' : 'Back to Dashboard'}</span>
+          </button>
+
+          <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-700 border border-brand-500/25">
+              {isFrench ? 'Adéquation IA' : 'AI Matching'}
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {t('matchingTitle')}
-            </h1>
+            <span className="text-xs font-medium text-slate-400 hidden md:inline">
+              {isFrench
+                ? 'Comparez votre CV à une offre et passez à la simulation.'
+                : 'Compare your CV against an offer and jump to the interview.'}
+            </span>
           </div>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500">{t('matchingSubtitle')}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          disabled={cvs.length === 0}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-500/25 transition-all hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" />
-          {t('matchingNewCta')}
-        </button>
+
+        <PageGuideToggle visible={guide.visible} onToggle={guide.toggle} />
       </div>
 
-      {/* CV selector for the new matching */}
-      {cvs.length > 0 && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <label htmlFor="matching-cv-select" className="text-xs font-bold text-slate-600">
-            {t('matchingSelectCvForNew')}
-          </label>
-          <select
-            id="matching-cv-select"
-            value={selectedCvId}
-            onChange={(event) => setSelectedCvId(event.target.value)}
-            className="w-full max-w-sm rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+      <div>
+        <h1 className="flex flex-wrap items-center gap-2 text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+          <span>{t('matchingTitle')}</span>
+        </h1>
+        <p className="mt-1 text-sm text-slate-500 font-medium">{t('matchingSubtitle')}</p>
+      </div>
+      {/* Page guide (hidden by default — revealed by the header toggle). */}
+      {guide.visible && (
+        <PageOnboardingGuide
+          menu="matching"
+          onDismiss={guide.hide}
+          onStartGlobalTour={() => startDashboardTour(pathname, (href) => router.push(href))}
+        />
+      )}
+      {/* ZONE 1 — action zone: Step 1 CV selection + Step 2 offer submission. */}
+      {cvs.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center">
+          <Briefcase className="mx-auto h-8 w-8 text-slate-400" />
+          <h3 className="mt-3 text-base font-bold text-slate-900">{t('matchingRequiresCv')}</h3>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 leading-relaxed">
+            {t('matchingRequiresCvDesc')}
+          </p>
+          <Link
+            href="/dashboard/cvs"
+            className="mt-4 inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#FF7A00] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-[#E66E00]"
           >
-            {cvs.map((cv) => (
-              <option key={cv.id} value={cv.id}>
-                {cv.name}
-                {cv.isPrimary ? ` · ${t('primaryBadge')}` : ''}
-              </option>
-            ))}
-          </select>
+            <Plus className="h-4 w-4" />
+            <span>{t('cvsUploadNew')}</span>
+          </Link>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-5">
+            {/* Step 1 — CV selection grid. */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">
+                    1
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">{t('matchingStepSelectCv')}</h3>
+                </div>
+                <span className="rounded-full border border-orange-200 bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold text-brand-600">
+                  {t('matchingCvAvailableCount', { count: cvs.length })}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {cvs.map((cv) => {
+                  const active = cv.id === selectedCvId;
+                  return (
+                    <button
+                      key={cv.id}
+                      type="button"
+                      onClick={() => setSelectedCvId(cv.id)}
+                      aria-pressed={active}
+                      className={`flex cursor-pointer flex-col justify-between rounded-xl border p-3 text-left transition-all ${
+                        active ? 'border-brand-400 bg-brand-50/50 ring-1 ring-inset ring-brand-200' : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1.5">
+                        <FileText className={`h-4 w-4 shrink-0 ${active ? 'text-brand-600' : 'text-slate-400'}`} />
+                        {cv.isPrimary && (
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                            {t('matchingPrimaryBadge')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs font-bold text-slate-800">{cv.name}</p>
+                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                        <span>{t('matchingCvAtsScore')} :</span>
+                        {cv.score !== null ? (
+                          <span className="font-bold text-brand-600">{cv.score}%</span>
+                        ) : (
+                          <span className="font-medium">{t('cvsNoScore')}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 2 — shared offer submission form (file / URL / text). */}
+            <MatchingOfferForm
+              resumeId={selectedCvId}
+              selectedCvName={selectedCv?.name}
+              onQueued={handleQueued}
+            />
+          </div>
         </div>
       )}
+      {/* ZONE 2 — evaluation outcome: compact status → full central diagnostic.
+          Shown while a run is queued (from the inline form, the quick-access
+          deep-link or a history card), then seamlessly replaced by the full
+          « Diagnostic du matching » card — never a stretched sidebar widget. */}
+      {(liveMatch || selectedMatchingId || queuedMatchingId) && (
+        <section
+          id="matching-outcome"
+          aria-live="polite"
+          className="animate-fade-slide-in rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-[#FF7A00]">
+                <FileSearch className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-slate-900 sm:text-base">
+                  {outcomeFinished ? t('matchingDiagnosticTitle') : t('matchingEvalTitle')}
+                </h2>
+                <p className="truncate text-[11px] text-slate-500">{t('matchingEvalHint')}</p>
+              </div>
+            </div>
 
-      {/* Live panel for a matching queued from the dashboard quick modal */}
-      {autoQueuedId && (
-        <section className="rounded-3xl border border-brand-200 bg-brand-50/40 p-5">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
-            <FileSearch className="h-4 w-4 text-brand-500" />
-            {t('matchingQuickResultTitle')}
-          </h2>
-          <LatestMatchingCard
-            key={autoQueuedId}
-            matchingId={autoQueuedId}
-            initialMatching={null}
-            onCompleted={() => {
-              // Refresh the RSC history list once the worker is done.
-              void router.refresh();
-            }}
-          />
+            <div className="flex shrink-0 items-center gap-2">
+              <EvaluationStatusBadge
+                state={
+                  liveFailed || detailError
+                    ? 'failed'
+                    : outcomeFinished
+                      ? 'success'
+                      : 'running'
+                }
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setLiveMatch(null);
+                  setLiveCompleted(false);
+                  setLiveFailed(false);
+                  setSelectedMatchingId(null);
+                  setDetail(null);
+                  setDetailError(null);
+                }}
+                className="cursor-pointer text-xs font-bold text-slate-500 hover:text-slate-900"
+              >
+                {t('matchingCloseDetail')}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {/* Live run — compact status card that becomes the diagnostic. */}
+            {liveMatch && !selectedMatchingId && (
+              <LatestMatchingCard
+                matchingId={liveMatch.id}
+                initialMatching={liveMatch}
+                onCompleted={() => setLiveCompleted(true)}
+                onFailed={() => setLiveFailed(true)}
+              />
+            )}
+            {!liveMatch && !selectedMatchingId && queuedMatchingId && (
+              <LatestMatchingCard
+                matchingId={queuedMatchingId}
+                initialMatching={null}
+                onCompleted={() => setLiveCompleted(true)}
+                onFailed={() => setLiveFailed(true)}
+              />
+            )}
+
+            {/* History card drill-down — loading / error / report states. */}
+            {detailLoading && (
+              <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50/60 p-8 text-slate-400">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span className="text-xs">{t('matchingDetailLoading')}</span>
+              </div>
+            )}
+            {detailError && (
+              <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
+                {detailError}
+              </p>
+            )}
+            {detail && matchingResult(detail) && (
+              <MatchingReport
+                result={matchingResult(detail)!}
+                jobTitle={detail.job_title}
+                company={detail.company ?? matchingResult(detail)!.company}
+                location={detail.location ?? matchingResult(detail)!.location}
+                completedAt={detail.created_at}
+                simulateHref={`/dashboard/mock?role=${encodeURIComponent(detail.job_title)}`}
+              />
+            )}
+            {detail && !matchingResult(detail) && detail.match_score === null && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5 text-center text-xs text-amber-800">
+                {t('matchingStillPending')}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
-      {/* History */}
-      <div>
-        <div className="mb-3 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-slate-400" />
-          <h2 className="text-sm font-bold text-slate-900">{t('matchingHistoryTitle')}</h2>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-            {matchings.length}
+      {/* Recent matching history — template « Historique récent » block. */}
+      <section className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 sm:text-base">
+              <Clock className="h-4 w-4 text-brand-500" />
+              {t('matchingHistoryTitle')}
+            </h2>
+            <p className="text-xs font-medium text-slate-500">{t('matchingHistorySubtitle')}</p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold text-slate-500">
+            {t('matchingHistoryCount', { count: matchings.length })}
           </span>
         </div>
 
-        {cvs.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
-            <p className="text-sm font-semibold text-slate-900">{t('matchingRequiresCv')}</p>
-            <p className="mt-1 text-xs text-slate-500">{t('matchingRequiresCvDesc')}</p>
-          </div>
-        ) : matchings.length === 0 ? (
-          <div className="flex flex-col items-center rounded-2xl border-2 border-dashed border-brand-200 bg-brand-50/30 px-6 py-10 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-brand-500">
-              <FileSearch className="h-6 w-6" />
-            </span>
-            <h3 className="mt-4 text-base font-semibold text-slate-900">
-              {t('matchingEmptyTitle')}
-            </h3>
-            <p className="mt-1.5 max-w-sm text-sm text-slate-500">{t('matchingEmptyDesc')}</p>
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brand-600"
-            >
-              <Plus className="h-4 w-4" />
-              {t('matchingNewCta')}
-            </button>
+        {matchings.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center">
+            <FileSearch className="mx-auto h-7 w-7 text-slate-400" />
+            <h3 className="mt-3 text-sm font-bold text-slate-900">{t('matchingEmptyTitle')}</h3>
+            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+              {t('matchingEmptyDesc')}
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             {matchings.map((item) => {
-              const selected = item.id === selectedMatchingId;
+              const sourceLabel = item.sourceType === 'file'
+                ? t('matchingSourceFile')
+                : item.sourceType === 'url'
+                  ? t('matchingSourceUrl')
+                  : item.sourceType === 'text'
+                    ? t('matchingSourceText')
+                    : null;
+              const selected = selectedMatchingId === item.id;
               return (
                 <article
                   key={item.id}
-                  onClick={() => openDetail(item.id)}
-                  className={`flex cursor-pointer flex-col justify-between rounded-xl border bg-white p-4 shadow-xs transition-all ${
-                    selected
-                      ? 'border-brand-500 ring-1 ring-inset ring-brand-500/30'
-                      : 'border-slate-200 hover:border-brand-300'
+                  onClick={() => void openDetail(item.id)}
+                  className={`flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-all ${
+                    selected ? 'border-[#FF7A00] bg-orange-50/30 shadow-xs' : 'border-slate-200 bg-white hover:border-slate-300'
                   }`}
                 >
-                  <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3
-                          className="truncate text-sm font-bold text-slate-900"
-                          title={item.jobTitle}
-                        >
-                          {item.jobTitle}
-                        </h3>
-                        <p className="truncate text-[11px] font-medium text-slate-500">
-                          {[item.company, item.location].filter(Boolean).join(' • ') ||
-                            t('matchingNoContext')}
-                        </p>
-                      </div>
-                      <ScoreBadge score={item.matchScore} />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="truncate text-xs font-bold text-slate-900 hover:text-[#FF7A00] transition-colors">
+                        {item.jobTitle}
+                      </h4>
+                      <p className="text-[11px] font-medium text-slate-500">
+                        {[item.company, item.location].filter(Boolean).join(' • ') || t('matchingNoContext')}
+                      </p>
                     </div>
-                    <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-400">
-                      <FileText className="h-3 w-3" />
-                      {t('matchingCvUsed', { date: formatDate(item.createdAt, locale) })}
-                    </p>
+                    <ScoreBadge score={item.matchScore} />
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+                    {sourceLabel && (
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+                        {sourceLabel}
+                      </span>
+                    )}
+                    <Clock className="h-3 w-3" />
+                    <span>{formatDate(item.createdAt, locale)}</span>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
                     <span className="text-[11px] font-semibold text-brand-600">
                       {selected ? t('matchingReportVisible') : t('matchingSeeReport')}
                     </span>
+                    <Link
+                      href={`/dashboard/mock?role=${encodeURIComponent(item.jobTitle)}`}
+                      onClick={(event) => event.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF7A00] hover:text-[#E66E00] hover:underline"
+                    >
+                      <Video className="h-3 w-3" />
+                      <span>{t('matchingSimulateInterview')}</span>
+                      <ArrowRight className="w-2.5 h-2.5" />
+                    </Link>
                     <DeleteMatchingButton
                       matchingId={item.id}
                       label={t('matchingDelete')}
@@ -300,61 +525,7 @@ export default function MatchingDashboardView({
             })}
           </div>
         )}
-      </div>
-
-      {/* Detail panel */}
-      {selectedMatchingId && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900">{t('matchingDetailTitle')}</h2>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedMatchingId(null);
-                setDetail(null);
-              }}
-              className="text-xs font-bold text-slate-500 hover:text-slate-900"
-            >
-              {t('matchingCloseDetail')}
-            </button>
-          </div>
-          {detailLoading && (
-            <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-slate-400">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <span className="text-xs">{t('matchingDetailLoading')}</span>
-            </div>
-          )}
-          {detailError && (
-            <p
-              role="alert"
-              className="rounded-xl bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700"
-            >
-              {detailError}
-            </p>
-          )}
-          {detail && detailResult && (
-            <MatchingReport
-              result={detailResult}
-              jobTitle={detail.job_title}
-              company={detail.company ?? detailResult.company}
-              location={detail.location ?? detailResult.location}
-              completedAt={detail.created_at}
-            />
-          )}
-          {detail && !detailResult && detail.match_score === null && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 text-center text-xs text-amber-800">
-              {t('matchingStillPending')}
-            </div>
-          )}
-        </div>
-      )}
-
-      <JobMatchModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        cvs={cvs}
-        initialResumeId={selectedCvId}
-      />
+      </section>
     </div>
   );
 }

@@ -507,6 +507,52 @@ export async function getLatestCompletedAnalysesByResume(): Promise<
 }
 
 /**
+ * Lists the user's private storage folder once and maps each object path to
+ * its byte size (`resumes.file_path` → size). Used by the CV library cards
+ * and the preview modal header ("1.8 MB" chip). Best-effort: any failure
+ * (auth, permissions, empty folder) degrades to an empty map — the UI simply
+ * hides the size chip instead of blocking the page.
+ */
+export async function getResumeFileSizes(): Promise<Record<string, number>> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {};
+    }
+
+    // One list call per page render — the objects live flat under "<user_id>/".
+    const { data, error } = await supabase.storage
+      .from(RESUME_BUCKET)
+      .list(user.id, { limit: 200, offset: 0, sortBy: { column: 'name', order: 'asc' } });
+
+    if (error || !data) {
+      return {};
+    }
+
+    const sizes: Record<string, number> = {};
+    for (const object of data) {
+      const size = object.metadata?.size;
+      if (typeof size === 'number' && size >= 0) {
+        sizes[`${user.id}/${object.name}`] = size;
+      }
+    }
+    return sizes;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Returns a short-lived signed URL for downloading the user's own resume
+ * file from the private `resumes` bucket (ownership re-checked server-side).
+ */
+/**
  * Returns a short-lived signed URL for downloading the user's own resume
  * file from the private `resumes` bucket (ownership re-checked server-side).
  */

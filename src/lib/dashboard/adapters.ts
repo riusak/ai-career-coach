@@ -231,10 +231,12 @@ export function buildMilestones(
 /**
  * Builds the light CV summaries for management pages (the /dashboard/cvs
  * grid): no parsed raw text is carried, only card-level metadata.
+ * `sizesByPath` (optional, storage path → bytes) feeds the file-size chip.
  */
 export function buildCvSummaries(
   resumes: Resume[],
-  analysesByResume: Record<string, ResumeAnalysis> | null
+  analysesByResume: Record<string, ResumeAnalysis> | null,
+  sizesByPath?: Record<string, number> | null
 ): CvSummaryData[] {
   return resumes.map((resume) => {
     const analysis = analysesByResume?.[resume.id] ?? null;
@@ -250,14 +252,19 @@ export function buildCvSummaries(
       createdAt: resume.created_at,
       score,
       hasAnalysis: score !== null,
+      sizeBytes: sizesByPath?.[resume.file_path] ?? null,
     };
   });
 }
 
-/** Builds the CV cards + their preview-modal payload from raw rows. */
+/**
+ * Builds the CV cards + their preview-modal payload from raw rows.
+ * `sizesByPath` (optional, storage path → bytes) feeds the header metadata.
+ */
 export function buildCvDetails(
   resumes: Resume[],
-  analysesByResume: Record<string, ResumeAnalysis> | null
+  analysesByResume: Record<string, ResumeAnalysis> | null,
+  sizesByPath?: Record<string, number> | null
 ): CvDetailData[] {
   return resumes.map((resume) => {
     const analysis = analysesByResume?.[resume.id] ?? null;
@@ -297,6 +304,7 @@ export function buildCvDetails(
       rawText: truncated ? rawText.slice(0, RAW_TEXT_PREVIEW_LIMIT) : rawText,
       rawTextTruncated: truncated,
       wordCount: resume.parsed_content?.word_count ?? null,
+      sizeBytes: sizesByPath?.[resume.file_path] ?? null,
     };
   });
 }
@@ -428,6 +436,8 @@ export function buildDashboardViewData(input: {
   resumes: Resume[];
   analysesByResume: Record<string, ResumeAnalysis> | null;
   roadmap: ProfileRoadmap | null;
+  /** Optional storage path → bytes map for the CV file-size chips. */
+  sizesByPath?: Record<string, number> | null;
 }): DashboardViewData {
   const {
     profile,
@@ -438,6 +448,7 @@ export function buildDashboardViewData(input: {
     resumes,
     analysesByResume,
     roadmap,
+    sizesByPath,
   } = input;
 
   const completedAnalyses = Object.values(analysesByResume ?? {}).filter(
@@ -468,7 +479,7 @@ export function buildDashboardViewData(input: {
     metrics: buildProfileMetrics(strengthInput, bestScore),
     roadmapProgress: roadmap?.progress_percent ?? null,
     milestones: buildMilestones(experiences, profile),
-    cvs: buildCvDetails(resumes, analysesByResume),
+    cvs: buildCvDetails(resumes, analysesByResume, sizesByPath),
     user: buildDashboardUser({
       profile,
       profileStrength: computeProfileStrength(strengthInput),

@@ -10,7 +10,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import TransitionOverlay from '@/components/ui/TransitionOverlay';
 
 /**
- * Password reset completion page â€” the user lands here from the recovery
+ * Password reset completion page — the user lands here from the recovery
  * email. The Supabase browser client detects the recovery code in the URL
  * (detectSessionInUrl, PKCE flow) and establishes the recovery session
  * automatically; this page only collects the new password.
@@ -136,7 +136,7 @@ export default function ResetPasswordPage() {
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 disabled={loading}
                 className="mt-1 block w-full rounded-md border border-navy-200 bg-white px-3 py-2 text-sm text-navy-900 shadow-sm placeholder:text-navy-400 focus:border-orange-600 focus:outline-none focus:ring-1 focus:ring-orange-600 disabled:opacity-50"
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                placeholder="••••••••"
               />
             </div>
           </div>

@@ -13,7 +13,7 @@ import TransitionOverlay from '@/components/ui/TransitionOverlay';
 import { classifyAuthError } from '@/lib/supabase/auth-errors';
 
 /**
- * Email verification page â€” the visitor types the 6-digit OTP code sent by
+ * Email verification page — the visitor types the 6-digit OTP code sent by
  * Supabase Auth at signup ("Confirm signup" email template must render
  * {{ .Token }} so the code appears in the message body).
  *
@@ -54,7 +54,7 @@ function VerifyOtpForm() {
 
   // If a session already exists (e.g. the visitor clicked the confirmation
   // link of the default email template, which auto-confirms), skip the form:
-  // the email is already verified â€” route to /login with the success banner.
+  // the email is already verified — route to /login with the success banner.
   useEffect(() => {
     let cancelled = false;
     const checkExistingSession = async () => {
@@ -67,7 +67,7 @@ function VerifyOtpForm() {
           router.replace('/login?verified=1');
         }
       } catch {
-        // Not signed in â€” normal path, show the code form.
+        // Not signed in — normal path, show the code form.
       }
     };
     void checkExistingSession();
@@ -175,7 +175,7 @@ function VerifyOtpForm() {
         return;
       }
 
-      // Verification succeeded â€” discard the auto-created session so the
+      // Verification succeeded — discard the auto-created session so the
       // auth proxy does not bounce the user away from /login.
       await supabase.auth.signOut();
       setRedirecting(true);

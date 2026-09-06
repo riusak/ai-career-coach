@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import type { DashboardViewData, CvDetailData, MilestoneData } from '@/types/dashboard';
@@ -8,6 +8,11 @@ import type { CvSummaryData } from '@/types/dashboard';
 import { completeOnboardingAction } from '@/app/dashboard/onboarding-actions';
 import { flashUploadResumeAction } from '@/app/dashboard/resume/actions';
 import { setPendingCvUploadFile } from '@/lib/pending-cv-upload';
+import {
+  START_DASHBOARD_TOUR_EVENT,
+  clearDashboardTourQueryParam,
+  hasDashboardTourQueryParam,
+} from '@/lib/dashboard/tour-events';
 import QuickActions from '@/components/dashboard/QuickActions';
 import CareerRoadmap from '@/components/dashboard/CareerRoadmap';
 import ProfileOverview from '@/components/dashboard/ProfileOverview';
@@ -58,6 +63,7 @@ export default function DashboardView({
   profileComplete,
 }: DashboardViewProps) {
   const locale = useLocale();
+  const isFrench = locale !== 'en';
   const router = useRouter();
   const [previewCvId, setPreviewCvId] = useState<string | null>(null);
   const [initialTab, setInitialTab] = useState<'preview' | 'analysis' | 'services'>('preview');
@@ -89,6 +95,7 @@ export default function DashboardView({
     createdAt: cv.createdAt,
     score: cv.score,
     hasAnalysis: cv.score !== null,
+    sizeBytes: cv.sizeBytes,
   }));
   const primaryCvId = primaryCv?.id ?? null;
 
@@ -147,6 +154,7 @@ export default function DashboardView({
         rawText: null,
         rawTextTruncated: false,
         wordCount: null,
+        sizeBytes: null,
       };
       setFlashCv(uploaded);
       setAnalyseModalOpen(false);
@@ -166,16 +174,35 @@ export default function DashboardView({
     void completeOnboardingAction();
   };
 
-  const startTour = () => {
+  // Stable so the tour-replay listeners below can subscribe once.
+  const startTour = useCallback(() => {
     setOnboardingOpen(false);
     setHowItWorksOpen(false);
     setTourActive(true);
-  };
+  }, []);
 
   const endTour = () => {
     setTourActive(false);
     void completeOnboardingAction();
   };
+
+  // Chart 7 — global tour replay: the header « Visite guidée » button and
+  // the page guides' « Tour Global » button can re-trigger the spotlight tour
+  // at ANY time, even long after onboarding was completed. On this page the
+  // request arrives through a window event; from other pages through the
+  // ?tour=1 deep-link, which is consumed (and cleaned from the URL) here.
+  useEffect(() => {
+    window.addEventListener(START_DASHBOARD_TOUR_EVENT, startTour);
+    return () => window.removeEventListener(START_DASHBOARD_TOUR_EVENT, startTour);
+  }, [startTour]);
+
+  useEffect(() => {
+    if (hasDashboardTourQueryParam(window.location.search)) {
+      clearDashboardTourQueryParam();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      startTour();
+    }
+  }, [startTour]);
 
   return (
     <>
@@ -319,7 +346,13 @@ export default function DashboardView({
 
       {/* Screen-reader announcement of the current dashboard state. */}
       <p className="sr-only" aria-live="polite">
-        {data.isEmptyState ? 'No activity yet' : 'Dashboard'}
+        {data.isEmptyState
+          ? isFrench
+            ? 'Aucune activité pour le moment'
+            : 'No activity yet'
+          : isFrench
+            ? 'Tableau de bord'
+            : 'Dashboard'}
       </p>
     </>
   );

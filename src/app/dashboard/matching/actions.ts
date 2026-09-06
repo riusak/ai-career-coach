@@ -1,15 +1,17 @@
 'use server';
 
 import { revalidateDashboardData } from '@/lib/dashboard/revalidate';
+import { MAX_OFFER_TEXT_CHARS, ingestOfferText } from '@/lib/analysis/offer-ingest';
+import {
+  extractOfferMetadata,
+  GENERIC_JOB_TITLE,
+} from '@/lib/analysis/offer-metadata';
 import {
   createJobMatching,
   deleteJobMatching,
   getJobMatchingById,
 } from '@/lib/supabase/matchings';
-import type {
-  JobMatching,
-  MatchingSourceType,
-} from '@/types/matching';
+import type { JobMatching } from '@/types/matching';
 
 export type MatchingQueueState = {
   success: boolean;
@@ -24,16 +26,11 @@ export type MatchingActionState = {
 
 /** Server-side input guards mirroring the pipeline bounds (cheap early rejects). */
 const MIN_OFFER_CHARS = 20;
-const MAX_OFFER_CHARS = 12_000;
 const MAX_TITLE_CHARS = 200;
 
 function readOptional(formData: FormData, key: string): string | null {
   const value = formData.get(key);
   return typeof value === 'string' ? value : null;
-}
-
-function allowedSourceType(value: string | null): MatchingSourceType {
-  return value === 'file' || value === 'url' ? value : 'text';
 }
 
 /**
@@ -42,14 +39,18 @@ function allowedSourceType(value: string | null): MatchingSourceType {
  * fires POST /api/resume/match exactly once for the queued row (referenced by
  * its id), then polls this fresh row via getLatestMatchingAction (mirror of
  * the deep-analysis queue contract).
+ *
+ * The offer itself is ingested in ANY of the three supported formats
+ * (uploaded PDF/Word file, public offer URL, raw pasted text) and normalized
+ * into a clean `job_description` by `ingestOfferText` BEFORE any validation
+ * or persistence — the Gemini pipeline only ever sees clean raw text.
  */
 export async function queueJobMatchingAction(
   prevState: MatchingQueueState,
   formData: FormData
 ): Promise<MatchingQueueState> {
   const resumeId = readOptional(formData, 'resumeId');
-  const jobTitle = readOptional(formData, 'jobTitle')?.trim() ?? '';
-  const jobDescription = readOptional(formData, 'jobDescription')?.trim() ?? '';
+  const userTitle = readOptional(formData, 'jobTitle')?.trim() ?? '';
 
   if (!resumeId) {
     return {
@@ -58,20 +59,19 @@ export async function queueJobMatchingAction(
       data: prevState.data,
     };
   }
-  if (jobTitle.length === 0) {
+
+  // Multimodal ingestion: file (PDF/Word/TXT) → URL → raw text, whichever
+  // format was submitted; failures return a user-actionable French message.
+  const ingested = await ingestOfferText(formData);
+  if (ingested.error) {
     return {
       success: false,
-      message: 'L’intitulé du poste cible est requis.',
+      message: ingested.error,
       data: prevState.data,
     };
   }
-  if (jobTitle.length > MAX_TITLE_CHARS) {
-    return {
-      success: false,
-      message: `L’intitulé du poste dépasse ${MAX_TITLE_CHARS} caractères.`,
-      data: prevState.data,
-    };
-  }
+
+  const jobDescription = ingested.text;
   if (jobDescription.length === 0) {
     return {
       success: false,
@@ -86,15 +86,22 @@ export async function queueJobMatchingAction(
       data: prevState.data,
     };
   }
-  if (jobDescription.length > MAX_OFFER_CHARS) {
+  if (jobDescription.length > MAX_OFFER_TEXT_CHARS) {
     return {
       success: false,
-      message: `Le texte de l’offre dépasse la limite de ${MAX_OFFER_CHARS} caractères.`,
+      message: `Le texte de l’offre dépasse la limite de ${MAX_OFFER_TEXT_CHARS} caractères.`,
       data: prevState.data,
     };
   }
 
-  const sourceType = allowedSourceType(readOptional(formData, 'sourceType'));
+  // Chart 8 — offer-derived job title: when the user leaves the field empty,
+  // the title is pulled from the offer itself (document text, fetched URL
+  // page or raw paste). The canonical generic label is the last resort; the
+  // worker then refines it at completion with the LLM detection.
+  const heuristics = extractOfferMetadata(jobDescription);
+  const jobTitle = (
+    userTitle.length > 0 ? userTitle : (heuristics.jobTitle ?? GENERIC_JOB_TITLE)
+  ).slice(0, MAX_TITLE_CHARS);
 
   const { data, error } = await createJobMatching({
     resumeId,
@@ -102,9 +109,9 @@ export async function queueJobMatchingAction(
     jobDescription,
     company: readOptional(formData, 'company'),
     location: readOptional(formData, 'location'),
-    sourceType,
-    sourceUrl: sourceType === 'url' ? readOptional(formData, 'sourceUrl') : null,
-    offerFileName: sourceType === 'file' ? readOptional(formData, 'offerFileName') : null,
+    sourceType: ingested.sourceType,
+    sourceUrl: ingested.sourceUrl,
+    offerFileName: ingested.offerFileName,
   });
 
   if (error || !data) {

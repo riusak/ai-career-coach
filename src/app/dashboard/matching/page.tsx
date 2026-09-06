@@ -19,6 +19,7 @@ function buildSummaries(rows: Awaited<ReturnType<typeof getUserMatchings>>['data
     jobTitle: row.job_title,
     company: row.company,
     location: row.location,
+    sourceType: row.source_type,
     matchScore: row.match_score,
     createdAt: row.created_at,
     hasDetails: parseJobMatchingDetails(row.matching_details) !== null,
@@ -37,6 +38,7 @@ function buildCvSummaries(
     createdAt: resume.created_at,
     score: null,
     hasAnalysis: Boolean(resume.parsed_content),
+    sizeBytes: null,
   }));
 }
 
@@ -50,7 +52,7 @@ function buildCvSummaries(
 export default async function MatchingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ queued?: string }>;
+  searchParams: Promise<{ queued?: string; cv?: string }>;
 }) {
   const [resumesResult, matchingsResult, params] = await Promise.all([
     getUserResumes(),
@@ -62,6 +64,9 @@ export default async function MatchingPage({
   const matchings = buildSummaries(matchingsResult.data);
   const queuedMatchingId =
     typeof params.queued === 'string' && params.queued.length > 0 ? params.queued : null;
+  // Deep-link from the CV library cards / preview modal (?cv=<id>): preselects
+  // the document and auto-opens the matching modal (validated in the view).
+  const initialCvId = typeof params.cv === 'string' && params.cv.length > 0 ? params.cv : null;
 
   return (
     <div className="px-4 pb-10 pt-6 sm:px-6 lg:px-8">
@@ -71,6 +76,7 @@ export default async function MatchingPage({
           matchings={matchings}
           primaryCvId={cvs.find((cv) => cv.isPrimary)?.id ?? cvs[0]?.id ?? null}
           queuedMatchingId={queuedMatchingId}
+          initialCvId={initialCvId}
         />
       </div>
     </div>

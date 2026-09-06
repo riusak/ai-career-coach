@@ -1,20 +1,23 @@
 ﻿'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   FileSearch,
   Lightbulb,
   Target,
   TrendingUp,
+  Video,
   Wrench,
 } from 'lucide-react';
 import type { JobMatchResult } from '@/types/matching';
 
 /**
- * Matching diagnostic report â€” the full Phase 5.2 result card.
+ * Matching diagnostic report — the full Phase 5.2 result card.
  * Clean-slate styling (white cards on brand-bg, #FF7A00 brand accents):
  * animated score ring, the 3 sub-score bars (skills / experience / keywords),
  * the recruiter synthesis, strengths, per-requirement gaps, matched/missing
@@ -28,6 +31,11 @@ interface MatchingReportProps {
   location?: string | null;
   /** ISO timestamp of the completed run (rendered with the active locale). */
   completedAt?: string;
+  /**
+   * When set, renders a prominent « Simuler un entretien » CTA below the
+   * diagnostic (launches the mock interview for the matched offer).
+   */
+  simulateHref?: string;
 }
 
 function ScoreRing({ score }: { score: number }) {
@@ -149,7 +157,7 @@ function FindingCard({
         {title}
       </h4>
       <ul className="space-y-3">
-        {items.length === 0 && <li className="text-xs text-slate-400">â€”</li>}
+        {items.length === 0 && <li className="text-xs text-slate-400">—</li>}
         {items.map((item) => (
           <li key={item.title} className="flex items-start gap-2 text-[13px] text-slate-700">
             <span
@@ -160,7 +168,7 @@ function FindingCard({
             />
             <span>
               <strong className="font-bold text-slate-900">{item.title}</strong>
-              {item.detail && <span className="text-slate-600"> â€” {item.detail}</span>}
+              {item.detail && <span className="text-slate-600"> — {item.detail}</span>}
             </span>
           </li>
         ))}
@@ -201,6 +209,7 @@ export default function MatchingReport({
   company,
   location,
   completedAt,
+  simulateHref,
 }: MatchingReportProps) {
   const t = useTranslations('dashboard');
   const locale = useLocale();
@@ -221,7 +230,7 @@ export default function MatchingReport({
           </h3>
           {(company || location) && (
             <p className="mt-1 text-xs font-semibold text-slate-500">
-              {[company, location].filter(Boolean).join(' â€¢ ')}
+              {[company, location].filter(Boolean).join(' • ')}
             </p>
           )}
           {completedAt && (
@@ -294,7 +303,7 @@ export default function MatchingReport({
           </h4>
           <div className="flex flex-wrap gap-1.5">
             {result.matchedKeywords.length === 0 && (
-              <span className="text-xs text-slate-400">â€”</span>
+              <span className="text-xs text-slate-400">—</span>
             )}
             {result.matchedKeywords.map((keyword) => (
               <KeywordChip key={keyword} label={keyword} tone="matched" />
@@ -308,7 +317,7 @@ export default function MatchingReport({
           </h4>
           <div className="flex flex-wrap gap-1.5">
             {result.missingKeywords.length === 0 && (
-              <span className="text-xs text-slate-400">â€”</span>
+              <span className="text-xs text-slate-400">—</span>
             )}
             {result.missingKeywords.map((keyword) => (
               <KeywordChip key={keyword} label={keyword} tone="missing" />
@@ -325,7 +334,7 @@ export default function MatchingReport({
         </h4>
         <ol className="space-y-3">
           {result.recommendations.length === 0 && (
-            <li className="text-xs text-slate-500">â€”</li>
+            <li className="text-xs text-slate-500">—</li>
           )}
           {result.recommendations.map((item) => (
             <li key={item.title} className="flex items-start gap-2.5 text-[13px] text-slate-700">
@@ -334,12 +343,26 @@ export default function MatchingReport({
               </span>
               <span>
                 <strong className="font-bold text-slate-900">{item.title}</strong>
-                {item.detail && <span className="text-slate-600"> â€” {item.detail}</span>}
+                {item.detail && <span className="text-slate-600"> — {item.detail}</span>}
               </span>
             </li>
           ))}
         </ol>
       </div>
+
+      {/* Interview simulation CTA — bridges the diagnostic to the mock interview. */}
+      {simulateHref && (
+        <div className="mt-5 flex justify-center">
+          <Link
+            href={simulateHref}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[#0B1528] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-[0.98]"
+          >
+            <Video className="h-4 w-4 text-amber-400" />
+            <span>{t('matchingSimulateInterview')}</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

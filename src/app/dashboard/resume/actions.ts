@@ -1,10 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import {
-  revalidateDashboardData,
-  revalidateDashboardDataAnd,
-} from '@/lib/dashboard/revalidate';
+import { revalidateDashboardData } from '@/lib/dashboard/revalidate';
 import {
   createResumeAnalysis,
   deleteResume,
@@ -12,7 +9,6 @@ import {
   getResumeDownloadUrl,
   setPrimaryResume,
   unsetPrimaryResume,
-  updateResumeLabel,
   uploadResume,
 } from '@/lib/supabase/resumes';
 import type { Resume, ResumeAnalysis } from '@/types/resume';
@@ -35,8 +31,8 @@ function readResumeId(formData: FormData): string | null {
 }
 
 /**
- * Uploads a resume file. On success the user is redirected to the dedicated
- * preview view — the full LLM analysis is NEVER triggered automatically
+ * Uploads a resume file. On success the user is redirected back to the CV
+ * library — the full LLM analysis is NEVER triggered automatically
  * (docs/product/mvp.md: the visitor/user chooses when to analyze).
  */
 export async function uploadResumeAction(
@@ -65,8 +61,8 @@ export async function uploadResumeAction(
 
   revalidateDashboardData();
 
-  // Redirect to the dedicated preview view (framework-handled exception).
-  redirect(`/dashboard/resume/${response.data.id}`);
+  // Redirect to the CV library (framework-handled exception).
+  redirect('/dashboard/cvs');
 }
 
 /**
@@ -137,25 +133,6 @@ export async function unsetPrimaryResumeAction(formData: FormData): Promise<void
   }
 }
 
-/** Updates the user-defined label/category of a resume. */
-export async function updateResumeLabelAction(formData: FormData): Promise<void> {
-  const resumeId = readResumeId(formData);
-  if (!resumeId) {
-    return;
-  }
-
-  const labelEntry = formData.get('label');
-  if (typeof labelEntry !== 'string') {
-    return;
-  }
-
-  const { error } = await updateResumeLabel(resumeId, labelEntry);
-  if (!error) {
-    // The label also shows on the dedicated detail route — refresh it too.
-    revalidateDashboardDataAnd([`/dashboard/resume/${resumeId}`]);
-  }
-}
-
 /**
  * Deletes a resume (DB row + storage object). Its analysis/matching logs are
  * removed by the ON DELETE CASCADE constraints (migration 003).
@@ -173,7 +150,7 @@ export async function deleteResumeAction(formData: FormData): Promise<void> {
 }
 
 /**
- * Explicit "Analyze my CV" action from the preview view: queues a deep
+ * Explicit "Analyze my CV" action from the preview modal: queues a deep
  * analysis by inserting an append-only log row (score null until the LLM
  * pipeline processes it). No upload path ever calls this automatically.
  */
@@ -196,15 +173,15 @@ export async function analyzeResumeAction(
     };
   }
 
-  // The detail page polls the fresh analysis row; the shared invalidation
-  // also refreshes the catalogue + dashboard scores in the background.
-  revalidateDashboardDataAnd([`/dashboard/resume/${resumeId}`]);
+  // The modal polls the fresh analysis row; the shared invalidation also
+  // refreshes the catalogue + dashboard scores in the background.
+  revalidateDashboardData();
 
   return { success: true, message: 'Analysis queued! Results will appear on this page.' };
 }
 
 /**
- * Read-only polling helper used by the client `LatestAnalysisCard` to refresh
+ * Read-only polling helper used by the client CV preview modal to refresh
  * the latest analysis row without a full page reload. Ownership is enforced
  * server-side by `getLatestResumeAnalysis` (user check + RLS).
  */

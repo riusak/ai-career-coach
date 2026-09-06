@@ -35,7 +35,6 @@ const DASHBOARD_PATHS = [
   '/dashboard/matching',
   '/dashboard/mock',
   '/dashboard/profile',
-  '/dashboard/resume',
   '/dashboard/settings',
   '/dashboard/timeline',
 ] as const;
@@ -53,16 +52,4 @@ export function revalidateDashboardData(): void {
   // revalidation runs in the background (stale-while-revalidate) — the right
   // semantics for user-scoped dashboard data once tags become active.
   revalidateTag(DASHBOARD_CACHE_TAG, 'max');
-}
-
-/**
- * Same as `revalidateDashboardData` plus extra exact paths — used when a
- * mutation also touches a dynamic detail route (e.g. `/dashboard/resume/<id>`)
- * whose prefetched payload must be refreshed as well.
- */
-export function revalidateDashboardDataAnd(extraPaths: string[]): void {
-  revalidateDashboardData();
-  for (const path of extraPaths) {
-    revalidatePath(path);
-  }
 }

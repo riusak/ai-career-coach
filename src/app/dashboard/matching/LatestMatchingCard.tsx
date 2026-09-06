@@ -29,6 +29,9 @@ interface LatestMatchingCardProps {
   initialMatching: JobMatching | null;
   /** Fired once the run completes so the parent can refresh the history list. */
   onCompleted?: (matching: JobMatching) => void;
+  /** Fired when the pipeline fails terminally (row deleted) — lets the parent
+   *  surface an explicit « Échec » status in its outcome header. */
+  onFailed?: () => void;
 }
 
 /** Maps the REAL pipeline stage persisted in the claim marker to a step index. */
@@ -61,6 +64,7 @@ export default function LatestMatchingCard({
   matchingId,
   initialMatching,
   onCompleted,
+  onFailed,
 }: LatestMatchingCardProps) {
   const t = useTranslations('dashboard');
   const matchingSteps = t.raw('matchingSteps') as string[];
@@ -143,6 +147,15 @@ export default function LatestMatchingCard({
       }
     });
   }, [isQueued, pollTimedOut, pipelineError, matching, matchingId]);
+
+  // Fire the failure callback once the terminal pipeline error is known.
+  const failedNotifiedRef = useRef(false);
+  useEffect(() => {
+    if (pipelineError && !failedNotifiedRef.current) {
+      failedNotifiedRef.current = true;
+      onFailed?.();
+    }
+  }, [pipelineError, onFailed]);
 
   // Fire the completion callback once the client sees the finished row.
   const notifiedRef = useRef(false);

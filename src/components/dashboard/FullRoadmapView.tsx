@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 import {
   ArrowLeft,
@@ -15,6 +15,10 @@ import {
   Users,
 } from 'lucide-react';
 import MilestoneModal from '@/components/dashboard/MilestoneModal';
+import PageGuideToggle from '@/components/dashboard/onboarding/PageGuideToggle';
+import PageOnboardingGuide from '@/components/dashboard/onboarding/PageOnboardingGuide';
+import { usePageGuide } from '@/components/dashboard/onboarding/usePageGuide';
+import { startDashboardTour } from '@/lib/dashboard/tour-events';
 import CompanyLogo from '@/components/dashboard/CompanyLogo';
 import type { MilestoneData } from '@/types/dashboard';
 
@@ -66,7 +70,9 @@ export default function FullRoadmapView({
 }: FullRoadmapViewProps) {
   const locale = useLocale();
   const router = useRouter();
+  const pathname = usePathname();
   const isFrench = locale !== 'en';
+  const guide = usePageGuide('timeline');
   const [showDetailDrawer, setShowDetailDrawer] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<MilestoneData | null>(null);
 
@@ -121,6 +127,7 @@ export default function FullRoadmapView({
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
+          <PageGuideToggle visible={guide.visible} onToggle={guide.toggle} />
           <button
             onClick={() => setShowDetailDrawer(!showDetailDrawer)}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs transition-colors shadow-2xs cursor-pointer"
@@ -138,6 +145,15 @@ export default function FullRoadmapView({
           </button>
         </div>
       </div>
+
+      {/* Page guide (hidden by default — revealed by the header toggle). */}
+      {guide.visible && (
+        <PageOnboardingGuide
+          menu="timeline"
+          onDismiss={guide.hide}
+          onStartGlobalTour={() => startDashboardTour(pathname, (href) => router.push(href))}
+        />
+      )}
 
       {/* Main Immersive Panoramic Board */}
       <div className="relative rounded-3xl bg-linear-to-b from-[#FAF8F5] via-[#F7F3EB] to-[#F1E9DA] border border-[#E9DFCE] shadow-[0_16px_40px_rgba(200,180,150,0.22)] p-6 sm:p-8 lg:p-10 overflow-hidden">

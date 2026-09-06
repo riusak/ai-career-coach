@@ -22,36 +22,51 @@ import LocaleSwitcher from '@/components/ui/LocaleSwitcher';
 
 type ServiceIcon = 'scan' | 'target' | 'mic' | 'library';
 
+/**
+ * Services overview model. « live » cards are fully clickable and routed to
+ * their dedicated dashboard page; « coming-soon » cards keep the lock badge.
+ * `unlockKey` renders the service-specific access copy at the card footer.
+ */
 const SERVICES: ReadonlyArray<{
   titleKey: string;
   descriptionKey: string;
-  locked: boolean;
+  status: 'live' | 'coming-soon';
+  href: string | null;
+  unlockKey: string | null;
   icon: ServiceIcon;
   featured?: boolean;
 }> = [
   {
     titleKey: 'servicesCards.analyzeTitle',
     descriptionKey: 'servicesCards.analyzeDesc',
-    locked: false,
+    status: 'live',
+    href: '/dashboard/resume',
+    unlockKey: null,
     icon: 'scan',
     featured: true,
   },
   {
     titleKey: 'servicesCards.matchingTitle',
     descriptionKey: 'servicesCards.matchingDesc',
-    locked: true,
+    status: 'live',
+    href: '/dashboard/matching',
+    unlockKey: 'serviceFreeUnlock',
     icon: 'target',
   },
   {
     titleKey: 'servicesCards.interviewTitle',
     descriptionKey: 'servicesCards.interviewDesc',
-    locked: true,
+    status: 'coming-soon',
+    href: null,
+    unlockKey: 'servicePaidUnlock',
     icon: 'mic',
   },
   {
     titleKey: 'servicesCards.libraryTitle',
     descriptionKey: 'servicesCards.libraryDesc',
-    locked: true,
+    status: 'live',
+    href: '/dashboard/cvs',
+    unlockKey: 'serviceFreeUnlock',
     icon: 'library',
   },
 ];
@@ -228,14 +243,8 @@ export default function Landing({ isAuthenticated }: LandingProps) {
             </Reveal>
 
             <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {SERVICES.map((service, index) => (
-                <Reveal
-                  key={service.titleKey}
-                  delay={((index % 3) * 100) as 0 | 100 | 200}
-                  className={`h-full ${
-                    service.featured || index === 3 ? 'sm:col-span-2 lg:col-span-2' : ''
-                  }`}
-                >
+              {SERVICES.map((service, index) => {
+                const card = (
                   <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-navy-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-orange hover:shadow-xl hover:shadow-orange-500/10 motion-reduce:transition-none motion-reduce:transform-none">
                     {/* Glow accent revealed on hover */}
                     <div
@@ -246,7 +255,7 @@ export default function Landing({ isAuthenticated }: LandingProps) {
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-navy-900 text-white shadow-md transition-colors duration-300 group-hover:bg-orange group-hover:shadow-lg group-hover:shadow-orange-500/25">
                         {SERVICE_ICONS[service.icon]}
                       </div>
-                      {service.locked ? (
+                      {service.status === 'coming-soon' ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-navy-50 px-2.5 py-0.5 text-[11px] font-semibold text-navy-500">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -264,7 +273,7 @@ export default function Landing({ isAuthenticated }: LandingProps) {
                           </svg>
                           {t('comingSoon')}
                         </span>
-                      ) : (
+                      ) : service.featured ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold text-orange-800">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -283,6 +292,23 @@ export default function Landing({ isAuthenticated }: LandingProps) {
                           </svg>
                           {t('servicesAiBadge')}
                         </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                            className="h-3 w-3"
+                          >
+                            <path d="M20 6 9 17l-5-5" />
+                          </svg>
+                          {t('servicesLiveBadge')}
+                        </span>
                       )}
                     </div>
                     <h3 className="mt-4 text-lg font-semibold text-navy-900">
@@ -291,14 +317,35 @@ export default function Landing({ isAuthenticated }: LandingProps) {
                     <p className="mt-2 text-sm leading-relaxed text-navy-600">
                       {t(service.descriptionKey)}
                     </p>
-                    {service.locked && (
+                    {service.unlockKey && (
                       <p className="mt-auto pt-4 text-xs font-medium text-orange-700">
-                        {t('unlockedWithFreeAccount')}
+                        {t(service.unlockKey)}
                       </p>
                     )}
                   </article>
-                </Reveal>
-              ))}
+                );
+
+                return (
+                  <Reveal
+                    key={service.titleKey}
+                    delay={((index % 3) * 100) as 0 | 100 | 200}
+                    className={`h-full ${
+                      service.featured || index === 3 ? 'sm:col-span-2 lg:col-span-2' : ''
+                    }`}
+                  >
+                    {service.href ? (
+                      <Link
+                        href={service.href}
+                        className="block h-full rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500"
+                      >
+                        {card}
+                      </Link>
+                    ) : (
+                      card
+                    )}
+                  </Reveal>
+                );
+              })}
             </div>
           </div>
         </section>

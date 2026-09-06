@@ -52,6 +52,8 @@ export interface JobMatchLlmResult {
   matchedKeywords: string[];
   missingKeywords: string[];
   recommendations: InsightItem[];
+  /** Job title EXACTLY as labelled in the offer ('' when not identifiable). */
+  jobTitle: string;
   company: string;
   location: string;
 }
@@ -180,6 +182,7 @@ export function coerceLlmMatchingResult(raw: unknown): JobMatchLlmResult | null 
     matchedKeywords: coerceKeywords(record.matched_keywords),
     missingKeywords,
     recommendations,
+    jobTitle: coerceText(record.job_title, 200),
     company: coerceText(record.company, 120),
     location: coerceText(record.location, 120),
   };
@@ -224,6 +227,7 @@ const MATCHING_RESPONSE_SCHEMA = {
     },
     company: { type: 'STRING' },
     location: { type: 'STRING' },
+    job_title: { type: 'STRING' },
   },
   required: [
     'overall_score',
@@ -267,7 +271,8 @@ export function buildMatchingPrompt(input: {
   "missing_keywords": ["<mots-clés techniques de l'offre ABSENTS du CV>"],
   "recommendations": [{"title": "<action concrète>", "detail": "<comment la mettre en œuvre (reformulation CV, préparation entretien...)>"}],
   "company": "<entreprise identifiée dans l'offre, ou chaîne vide>",
-  "location": "<localisation identifiée dans l'offre, ou chaîne vide>"
+  "location": "<localisation identifiée dans l'offre, ou chaîne vide>",
+  "job_title": "<intitulé EXACT du poste tel que libellé dans l'offre (hors nom de l'entreprise), ou chaîne vide>"
 }
 
 Règles :
@@ -278,6 +283,7 @@ Règles :
 - "matched_keywords" : liste les mots-clés d'ATS explicites de l'offre retrouvés dans le CV (max 8).
 - "recommendations" : 3 à 5 actions ACTIONNABLES et spécifiques (reformuler telle section, ajouter tel mot-clé, préparer tel sujet d'entretien).
 - N'invente JAMAIS une compétence ou une expérience absente du CV. Si l'offre ne mentionne pas d'entreprise ou de localisation, renvoie une chaîne vide.
+- "job_title" : reprend l'intitulé du poste TEL QU'ÉCRIT dans l'offre (sans l'entreprise, sans la localisation). Si l'offre ne le mentionne pas clairement, renvoie une chaîne vide.
 - Le CV comme l'offre peuvent être en français, anglais ou allemand : évalue dans leur langue.
 
 INTITULÉ DU POSTE CIBLE : ${input.jobTitle}

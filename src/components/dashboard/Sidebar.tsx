@@ -38,10 +38,15 @@ export default function Sidebar({ user }: SidebarProps) {
   const navItems = [
     { id: 'dashboard', href: '/dashboard', label: isFrench ? 'Tableau de bord' : 'Dashboard', icon: LayoutDashboard },
     { id: 'cvs', href: '/dashboard/cvs', label: isFrench ? 'Mes CVs' : 'My CVs', icon: FileText },
-    { id: 'matching', href: '/dashboard/matching', label: 'Job Matching', icon: Users },
+    {
+      id: 'matching',
+      href: '/dashboard/matching',
+      label: isFrench ? "Matching d'offres d'emploi" : 'Job Matching',
+      icon: Users,
+    },
     { id: 'mock', href: '/dashboard/mock', label: isFrench ? 'Simulations' : 'Mock Interviews', icon: Video },
     { id: 'timeline', href: '/dashboard/timeline', label: isFrench ? 'Roadmap Carrière' : 'Career Roadmap', icon: TrendingUp },
-    { id: 'analytics', href: '/dashboard/analytics', label: 'Analytics', icon: Activity },
+    { id: 'analytics', href: '/dashboard/analytics', label: isFrench ? 'Analyses et Statistiques' : 'Analytics', icon: Activity },
     { id: 'settings', href: '/dashboard/settings', label: isFrench ? 'Paramètres' : 'Settings', icon: Settings },
   ];
 
@@ -97,7 +102,9 @@ export default function Sidebar({ user }: SidebarProps) {
         >
           <div className="flex items-center gap-1.5 mb-1">
             <Crown className="w-4 h-4 text-[#FF7A00]" />
-            <h4 className="text-xs font-bold text-white tracking-wide">Upgrade to Pro</h4>
+            <h4 className="text-xs font-bold text-white tracking-wide">
+              {isFrench ? 'Passer Pro' : 'Upgrade to Pro'}
+            </h4>
           </div>
           <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
             {isFrench
@@ -143,7 +150,7 @@ export default function Sidebar({ user }: SidebarProps) {
                 {user?.name || 'ForPro User'}
               </p>
               <p className="text-[10px] text-slate-400 truncate">
-                {user?.plan || 'Free Plan'}
+                {user?.plan || (isFrench ? 'Plan gratuit' : 'Free Plan')}
               </p>
             </div>
           </div>

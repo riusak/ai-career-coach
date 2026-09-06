@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import { ArrowRight, Bell, Crown, Globe } from 'lucide-react';
+import { ArrowRight, Bell, Compass, Crown, Globe } from 'lucide-react';
 import type { DashboardUser } from '@/types/dashboard';
 import { useLocaleSwitcher } from '@/i18n/provider';
+import { startDashboardTour } from '@/lib/dashboard/tour-events';
 
 interface DashboardHeaderProps {
   user: DashboardUser;
@@ -14,13 +16,20 @@ interface DashboardHeaderProps {
  * « Tableau de bord » top header — exact port of the template's Header.tsx:
  * welcome area, language toggle (FR/EN), profile-strength ring widget, upgrade
  * CTA and notification bell, plus the dedicated mobile layout.
+ *
+ * Chart 7: the persistent « Visite guidée » trigger re-launches the global
+ * dashboard tour at any time — even long after onboarding was completed.
  */
 export default function DashboardHeader({ user }: DashboardHeaderProps) {
   const locale = useLocale();
   const { setLocale } = useLocaleSwitcher();
+  const router = useRouter();
+  const pathname = usePathname();
   const isFrench = locale !== 'en';
   const firstName = user.name ? user.name.split(' ')[0] : 'ForPro';
   const score = user.isEmptyState ? 0 : user.profileStrength || 0;
+
+  const handleStartTour = () => startDashboardTour(pathname, (href) => router.push(href));
 
   return (
     <header
@@ -62,6 +71,18 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
             >
               <Globe className="w-3.5 h-3.5" />
               <span>{isFrench ? 'FR' : 'EN'}</span>
+            </button>
+
+            {/* Guided tour replay (persistent trigger, works anytime). */}
+            <button
+              id="guided-tour-btn"
+              type="button"
+              onClick={handleStartTour}
+              title={isFrench ? 'Relancer le tour global du tableau de bord' : 'Replay the global dashboard tour'}
+              className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 shadow-2xs transition-all hover:bg-amber-100 cursor-pointer"
+            >
+              <Compass className="h-3.5 w-3.5 text-[#FF7A00]" />
+              <span>{isFrench ? 'Visite guidée' : 'Guided tour'}</span>
             </button>
 
             {/* Upgrade Button — payments not integrated yet: intentionally inert. */}
@@ -158,6 +179,18 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
               >
                 <Globe className="w-3.5 h-3.5" />
                 <span>{isFrench ? 'FR' : 'EN'}</span>
+              </button>
+
+              {/* Guided tour replay (mobile). */}
+              <button
+                id="mobile-guided-tour-btn"
+                type="button"
+                onClick={handleStartTour}
+                title={isFrench ? 'Relancer le tour global du tableau de bord' : 'Replay the global dashboard tour'}
+                className="flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-900 transition-all hover:bg-amber-100 cursor-pointer"
+              >
+                <Compass className="h-3.5 w-3.5 text-[#FF7A00]" />
+                <span>{isFrench ? 'Visite guidée' : 'Guided tour'}</span>
               </button>
 
               <button
