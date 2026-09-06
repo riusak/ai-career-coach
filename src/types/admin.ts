@@ -114,6 +114,71 @@ export interface DailyCount {
   count: number;
 }
 
+/** Comprehensive Resume and ATS scoring metrics */
+export interface AdminResumeMetrics {
+  totalResumes: number;
+  resumes30d: number;
+  averageScore: number | null;
+  scoreDistribution: {
+    critical: number; // < 50
+    average: number;  // 50 - 69
+    good: number;     // 70 - 84
+    excellent: number;// >= 85
+  };
+  languageBreakdown: {
+    fr: number;
+    en: number;
+  };
+}
+
+/** Job Matching analytics */
+export interface AdminMatchingMetrics {
+  totalMatchings: number;
+  matchings30d: number;
+  averageMatchScore: number | null;
+  scoreDistribution: {
+    low: number;      // < 50
+    medium: number;   // 50 - 69
+    high: number;     // 70 - 84
+    top: number;      // >= 85
+  };
+}
+
+/** Interview Simulation and STAR scoring telemetry */
+export interface AdminInterviewMetrics {
+  totalInterviews: number;
+  interviews30d: number;
+  completedInterviews: number;
+  completionRate: number | null;
+  averageStarScore: number | null;
+  byType: {
+    general: number;
+    technical: number;
+    sales: number;
+    managerial: number;
+    star: number;
+  };
+}
+
+/** Security, Rate-limiting, and Threat Protection telemetry */
+export interface AdminSecurityMetrics {
+  rateLimitProtectedEndpoints: number;
+  nonCvRejections: number;
+  blockedAttemptsCount: number;
+  securityAuditEventsCount: number;
+  systemHealth: 'healthy' | 'warning';
+  activeDefenses: string[];
+}
+
+/** Daily multi-module activity bucket */
+export interface DailyModuleActivity {
+  date: string;
+  quickTests: number;
+  signups: number;
+  matchings: number;
+  interviews: number;
+}
+
 /** Aggregated KPIs for the admin overview dashboard. */
 export interface AdminStats {
   totalUsers: number;
@@ -140,6 +205,16 @@ export interface AdminStats {
   dailyEvents: DailyCount[];
   /** Daily account signups over the last 14 days (oldest → newest). */
   dailyUsers: DailyCount[];
+  /** Multi-module daily comparison */
+  dailyModuleActivity: DailyModuleActivity[];
+  /** Deep resume analytics */
+  resumeMetrics: AdminResumeMetrics;
+  /** Deep job matching analytics */
+  matchingMetrics: AdminMatchingMetrics;
+  /** Deep interview simulation analytics */
+  interviewMetrics: AdminInterviewMetrics;
+  /** Cyber security telemetry */
+  securityMetrics: AdminSecurityMetrics;
   /** Most recent visitor Quick Test events (activity feed). */
   recentEvents: QuickTestEventRow[];
   /** Most recent admin audit entries. */

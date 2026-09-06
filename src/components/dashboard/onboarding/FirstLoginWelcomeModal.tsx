@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, FileUp, Sparkles, Target, Video, X } from 'lucide-react';
+import { ArrowRight, FileUp, Target, Video, X, Zap } from 'lucide-react';
 import ProfessionalTeamIllustration from './ProfessionalTeamIllustration';
 
 interface FirstLoginWelcomeModalProps {
@@ -19,7 +19,7 @@ interface FirstLoginWelcomeModalProps {
  * First-connection welcome modal for newly registered users.
  *
  * ✓ Centered, wide modal dialog with responsive adaptation (from smartphones to 4K displays).
- * ✓ Includes modern vector illustrations of professional man & woman with animated badges.
+ * ✓ Includes modern vector illustrations of professional team.
  * ✓ Personalized welcome greeting using the user's first name.
  * ✓ Clear, high-converting call-to-action to launch the guided tour or explore freely.
  */
@@ -81,7 +81,7 @@ export default function FirstLoginWelcomeModal({
         {/* Header Section */}
         <div className="px-6 pt-6 sm:px-10 sm:pt-8 text-center relative z-10">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#FF7A00]/30 bg-[#FF7A00]/10 px-3.5 py-1 text-xs font-bold tracking-wide text-[#FFA040] shadow-sm mb-3">
-            <Sparkles className="h-3.5 w-3.5 text-[#FF7A00]" />
+            <Zap className="h-3.5 w-3.5 text-[#FF7A00]" />
             <span>{t('welcomeBadge')}</span>
           </div>
 
@@ -94,24 +94,21 @@ export default function FirstLoginWelcomeModal({
                 Bienvenue dans l&apos;aventure,{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A00] via-[#FF9500] to-[#FFB347]">
                   {firstName}
-                </span>{' '}
-                ! 👋
+                </span>
               </>
             ) : locale === 'de' ? (
               <>
                 Willkommen bei ForPro AI,{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A00] via-[#FF9500] to-[#FFB347]">
                   {firstName}
-                </span>{' '}
-                ! 👋
+                </span>
               </>
             ) : (
               <>
                 Welcome aboard,{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A00] via-[#FF9500] to-[#FFB347]">
                   {firstName}
-                </span>{' '}
-                ! 👋
+                </span>
               </>
             )}
           </h2>

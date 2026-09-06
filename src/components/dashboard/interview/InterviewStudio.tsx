@@ -10,12 +10,13 @@ import {
   MicOff,
   Radio,
   Send,
-  Sparkles,
+  Target,
   Users,
   Video,
   Volume2,
   VolumeX,
   X,
+  Zap,
 } from 'lucide-react';
 import AudioVisualizer from '@/components/dashboard/interview/AudioVisualizer';
 import InterviewReportModal from '@/components/dashboard/interview/InterviewReportModal';
@@ -359,7 +360,7 @@ export default function InterviewStudio({
 
         {isFollowup && (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold animate-pulse">
-            <Sparkles className="w-3 h-3 text-amber-400" />
+            <Zap className="w-3 h-3 text-amber-400" />
             {isFrench ? 'Relance d’approfondissement' : 'Follow-up Challenge'}
           </span>
         )}
@@ -430,8 +431,8 @@ export default function InterviewStudio({
                 <h4 className="font-bold text-amber-300">
                   {speechErrorCode === 'not-allowed'
                     ? isFrench
-                      ? 'Accès au microphone bloqué'
-                      : 'Microphone permission blocked'
+                    ? 'Accès au microphone bloqué'
+                    : 'Microphone permission blocked'
                     : isFrench
                     ? 'Problème de périphérique microphone'
                     : 'Microphone device issue'}
@@ -439,8 +440,8 @@ export default function InterviewStudio({
                 <p>{speechError}</p>
                 <p className="text-[11px] text-amber-300/80">
                   {isFrench
-                    ? '💡 Astuce Casque Bluetooth : vérifiez dans les Paramètres Son de Windows que votre casque est bien activé comme périphérique d’entrée par défaut.'
-                    : '💡 Bluetooth Headset Tip: Ensure your headset is set as the default input device in Windows Sound settings.'}
+                    ? 'Conseil Casque Bluetooth : vérifiez dans les Paramètres Son de Windows que votre casque est bien activé comme périphérique d’entrée par défaut.'
+                    : 'Bluetooth Headset Tip: Ensure your headset is set as the default input device in Windows Sound settings.'}
                 </p>
               </div>
             </div>
@@ -474,7 +475,7 @@ export default function InterviewStudio({
 
         {/* Live Pro-Tip STAR */}
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-3.5 flex items-start gap-2.5 text-xs text-slate-400">
-          <Sparkles className="w-4 h-4 text-[#FF7A00] shrink-0 mt-0.5" />
+          <Target className="w-4 h-4 text-[#FF7A00] shrink-0 mt-0.5" />
           <p className="leading-relaxed">
             <strong className="font-bold text-slate-200">
               {isFrench ? 'Méthode STAR en visio : ' : 'STAR Method Live Tip: '}

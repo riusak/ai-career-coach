@@ -8,7 +8,6 @@ import {
   ChevronUp,
   Lightbulb,
   Printer,
-  Sparkles,
   Target,
   X,
   XCircle,
@@ -29,22 +28,22 @@ function scoreTone(score: number): { bg: string; text: string; ring: string; bar
     return {
       bg: 'bg-emerald-50',
       text: 'text-emerald-700',
-      ring: 'ring-emerald-300',
+      ring: 'border-emerald-300 ring-emerald-500/20',
       bar: 'bg-emerald-500',
     };
   }
   if (score >= 60) {
     return {
-      bg: 'bg-orange-50',
-      text: 'text-[#FF7A00]',
-      ring: 'ring-orange-300',
-      bar: 'bg-[#FF7A00]',
+      bg: 'bg-amber-50',
+      text: 'text-amber-700',
+      ring: 'border-amber-300 ring-amber-500/20',
+      bar: 'bg-amber-500',
     };
   }
   return {
     bg: 'bg-rose-50',
     text: 'text-rose-700',
-    ring: 'ring-rose-300',
+    ring: 'border-rose-300 ring-rose-500/20',
     bar: 'bg-rose-500',
   };
 }
@@ -57,11 +56,11 @@ export default function InterviewReportModal({
   company,
   language = 'fr',
 }: InterviewReportModalProps) {
-  const isFrench = language !== 'en';
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(0);
 
   if (!open || !evaluation) return null;
 
+  const isFrench = language !== 'en';
   const tone = scoreTone(evaluation.overallScore);
 
   const starPillars = [
@@ -95,31 +94,30 @@ export default function InterviewReportModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="interview-report-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-md sm:p-6 overflow-y-auto"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200"
     >
-      <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-2xl">
+      <div
+        className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-slate-900 to-slate-800 px-6 py-5 text-white">
-          <div className="flex items-center gap-3.5">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-500/20 text-[#FF7A00] border border-orange-500/30">
-              <Award className="h-6 w-6" />
-            </span>
+        <div className="bg-[#0B0F19] text-white p-5 sm:p-6 flex items-center justify-between border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/20 text-[#FF7A00] border border-orange-500/30">
+              <Award className="h-5 w-5" />
+            </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 id="interview-report-title" className="text-lg sm:text-xl font-black text-white">
-                  {isFrench ? 'Bilan & Diagnostic d’Entretien STAR' : 'STAR Mock Interview Assessment'}
-                </h2>
-                <span className="rounded-full bg-orange-500/20 px-2.5 py-0.5 text-[11px] font-bold text-[#FF7A00] border border-orange-500/30">
-                  {isFrench ? 'Méthode STAR' : 'STAR Method'}
+                <span className="text-xs font-bold uppercase tracking-wider text-[#FF7A00]">
+                  {isFrench ? 'Bilan STAR & Restitution' : 'STAR Evaluation Report'}
                 </span>
+                <span className="text-slate-500">•</span>
+                <span className="text-xs text-slate-400 font-medium">{jobTitle}</span>
+                {company && <span className="text-xs text-slate-400 font-medium">({company})</span>}
               </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                {jobTitle} {company ? `• ${company}` : ''}
-              </p>
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                {isFrench ? 'Score Global & Débriefing d’Entretien' : 'Overall Score & Debrief'}
+              </h2>
             </div>
           </div>
 
@@ -127,50 +125,47 @@ export default function InterviewReportModal({
             <button
               type="button"
               onClick={() => window.print()}
-              aria-label="Imprimer le rapport"
-              className="rounded-xl p-2 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              title="Imprimer le bilan"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              <Printer className="h-4 w-4" />
+              <Printer className="w-4 h-4" />
             </button>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Fermer"
-              className="rounded-xl p-2 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              <X className="h-5 w-5" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable body */}
-        <div className="overflow-y-auto p-6 sm:p-8 space-y-6">
-          {/* Score & Verdict Banner */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-5 sm:p-6">
-            <div className="flex flex-col items-center justify-center text-center p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                {isFrench ? 'Score Global' : 'Overall Score'}
+        {/* Scrollable Content Body */}
+        <div className="p-5 sm:p-7 overflow-y-auto space-y-6">
+          {/* Top Score Banner */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-orange-50/40 border border-slate-200/80">
+            <div className="flex flex-col items-center justify-center text-center p-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                {isFrench ? 'Score Global STAR' : 'Overall STAR Score'}
               </span>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className={`text-4xl sm:text-5xl font-black ${tone.text}`}>
-                  {evaluation.overallScore}
-                </span>
-                <span className="text-base font-semibold text-slate-400">/100</span>
+              <div className="mt-2 text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
+                {evaluation.overallScore}
+                <span className="text-xl font-medium text-slate-400">/100</span>
               </div>
               <span
-                className={`mt-2 inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${tone.bg} ${tone.text} ${tone.ring}`}
+                className={`mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border ${tone.bg} ${tone.text} ${tone.ring}`}
               >
                 {evaluation.overallScore >= 80
-                  ? isFrench ? '🌟 Très convaincant' : '🌟 Highly Convincing'
+                  ? isFrench ? 'Très favorable' : 'Strong Fit'
                   : evaluation.overallScore >= 60
-                  ? isFrench ? '👍 Bon potentiel' : '👍 Good Potential'
-                  : isFrench ? '⚠️ Perfectionnement requis' : '⚠️ Improvement Needed'}
+                  ? isFrench ? 'Bon potentiel' : 'Good Potential'
+                  : isFrench ? 'Perfectionnement requis' : 'Improvement Needed'}
               </span>
             </div>
 
             <div className="md:col-span-2 flex flex-col justify-center space-y-2">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#FF7A00]" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#FF7A00]" />
                 {isFrench ? 'Verdict & Impression du Recruteur' : 'Recruiter Impression'}
               </span>
               <blockquote className="text-xs sm:text-sm text-slate-700 italic border-l-3 border-[#FF7A00] pl-3 py-1 leading-relaxed bg-white/60 rounded-r-xl">
@@ -326,7 +321,7 @@ export default function InterviewReportModal({
                         {/* Ideal STAR phrasing recommendation */}
                         <div className="space-y-1">
                           <span className="text-[11px] font-bold text-[#FF7A00] uppercase flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-[#FF7A00]" />
+                            <Lightbulb className="w-3.5 h-3.5 text-[#FF7A00]" />
                             {isFrench ? 'Formulation STAR Idéale Recommandée :' : 'Recommended Ideal STAR Phrasing:'}
                           </span>
                           <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-3.5 text-xs text-slate-800 font-medium leading-relaxed">

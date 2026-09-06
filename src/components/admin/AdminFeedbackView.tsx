@@ -7,6 +7,7 @@ import {
   Bug,
   CheckCircle2,
   Clock,
+  CreditCard,
   ExternalLink,
   FileText,
   Filter,
@@ -16,8 +17,8 @@ import {
   Loader2,
   MessageSquare,
   Search,
-  Sparkles,
   Star,
+  Trash2,
   Video,
   X,
 } from 'lucide-react';
@@ -49,7 +50,7 @@ const CATEGORY_LABELS: Record<FeedbackCategory, { label: string; icon: typeof Me
   feature: { label: 'Suggestion', icon: Lightbulb, color: 'bg-amber-50 text-amber-700 border-amber-200' },
   interview: { label: 'Entretien', icon: Video, color: 'bg-purple-50 text-purple-700 border-purple-200' },
   cv_ats: { label: 'CV & ATS', icon: FileText, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  pricing: { label: 'Tarification', icon: Sparkles, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  pricing: { label: 'Tarification', icon: CreditCard, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   other: { label: 'Autre', icon: HelpCircle, color: 'bg-slate-100 text-slate-700 border-slate-200' },
 };
 
@@ -274,17 +275,29 @@ export default function AdminFeedbackView({
                       </div>
                     )}
 
-                    {/* Date */}
+                    {/* Date & Auto-Purge Countdown */}
                     <span className="text-[11px] text-slate-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {new Date(item.createdAt).toLocaleDateString('fr-FR', {
                         day: '2-digit',
                         month: 'short',
-                        year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
                     </span>
+
+                    {(() => {
+                      const daysRemaining = Math.max(
+                        0,
+                        7 - Math.floor((Date.now() - new Date(item.createdAt).getTime()) / (24 * 3600 * 1000))
+                      );
+                      return (
+                        <span className="text-[10px] font-medium text-slate-500 bg-slate-100 border border-slate-200/80 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <Trash2 className="w-2.5 h-2.5 text-slate-400" />
+                          Purge auto dans {daysRemaining}j
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Subject & User */}

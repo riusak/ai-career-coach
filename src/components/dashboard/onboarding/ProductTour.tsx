@@ -10,12 +10,12 @@ import {
   FileText,
   LayoutDashboard,
   Settings,
-  Sparkles,
   Target,
   TrendingUp,
   Users,
   Video,
   X,
+  Zap,
 } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
@@ -45,7 +45,7 @@ interface TourStepDef {
  */
 const STEP_DEFS: TourStepDef[] = [
   { targetId: 'nav-dashboard', icon: LayoutDashboard },
-  { targetId: 'quick-actions-section', icon: Sparkles },
+  { targetId: 'quick-actions-section', icon: Zap },
   { targetId: 'career-roadmap-card', icon: TrendingUp },
   { targetId: 'profile-overview-card', icon: Target },
   { targetId: 'cv-section-card', icon: FileText },
@@ -355,7 +355,7 @@ export default function ProductTour({ isActive, onComplete, onSkip }: ProductTou
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FF7A00]/15 ring-1 ring-[#FF7A00]/30">
-                <Sparkles className="h-4 w-4 text-[#FF7A00]" />
+                <Zap className="h-4 w-4 text-[#FF7A00]" />
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#FF7A00]">

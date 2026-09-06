@@ -68,8 +68,42 @@ function mapDbRowToFeedback(row: DbFeedbackRow): UserFeedback {
   };
 }
 
+import { sendFeedbackEmailNotification } from '@/lib/feedback/email';
+
+const RETENTION_DAYS = 7;
+
+/**
+ * Purges feedback entries older than 7 days to keep the database lightweight.
+ */
+export async function purgeExpiredFeedback(retentionDays = RETENTION_DAYS): Promise<number> {
+  try {
+    const supabase = await createClient();
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('user_feedback')
+      .delete()
+      .lt('created_at', cutoff)
+      .select('id');
+
+    if (error) {
+      console.warn('[feedback] purgeExpiredFeedback failed:', error.message);
+      return 0;
+    }
+
+    const count = data?.length ?? 0;
+    if (count > 0) {
+      console.info(`[feedback] Auto-purged ${count} feedback(s) older than ${retentionDays} days.`);
+    }
+    return count;
+  } catch (err) {
+    console.warn('[feedback] purgeExpiredFeedback exception:', err);
+    return 0;
+  }
+}
+
 /**
  * Submits user feedback or a support message from the authenticated user.
+ * Dispatches an immediate email to effoeakolly@gmail.com and enforces 7-day retention.
  * Rate-limited to max 5 submissions per hour per user to prevent flooding.
  */
 export async function submitFeedback(input: CreateFeedbackInput): Promise<{
@@ -123,7 +157,11 @@ export async function submitFeedback(input: CreateFeedbackInput): Promise<{
 
     const userName = (profile as { full_name: string | null } | null)?.full_name ?? null;
 
+    const newFeedbackId = crypto.randomUUID();
+    const nowIso = new Date().toISOString();
+
     const { error: insertError } = await supabase.from('user_feedback').insert({
+      id: newFeedbackId,
       user_id: user.id,
       user_email: user.email ?? null,
       user_name: userName,
@@ -140,7 +178,27 @@ export async function submitFeedback(input: CreateFeedbackInput): Promise<{
       return { success: false, error: 'Impossible d’enregistrer votre retour pour le moment.' };
     }
 
-    // Best-effort audit log
+    // 1. Send direct email to effoeakolly@gmail.com
+    await sendFeedbackEmailNotification({
+      id: newFeedbackId,
+      userId: user.id,
+      userEmail: user.email ?? null,
+      userName,
+      category,
+      rating,
+      subject,
+      message,
+      pageUrl,
+      status: 'new',
+      adminNotes: null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+
+    // 2. Opportunistic auto-purge of messages older than 7 days
+    void purgeExpiredFeedback(RETENTION_DAYS);
+
+    // 3. Best-effort audit log
     await writeAuditLog({
       actorId: user.id,
       action: 'feedback.create',
@@ -165,6 +223,9 @@ export async function listFeedbackForAdmin(
   if (!adminGuard.ok) {
     return null;
   }
+
+  // Enforce 7-day TTL retention
+  await purgeExpiredFeedback(RETENTION_DAYS);
 
   try {
     const supabase = await createClient();

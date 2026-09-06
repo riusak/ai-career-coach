@@ -13,7 +13,7 @@ import {
   Loader2,
   MessageSquare,
   Send,
-  Sparkles,
+  ShieldCheck,
   Star,
   Video,
   X,
@@ -348,11 +348,11 @@ function FeedbackModalContent({
 
         {/* Footer info note */}
         <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-center flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
-          <Sparkles className="w-3 h-3 text-[#FF7A00]" />
+          <ShieldCheck className="w-3.5 h-3.5 text-[#FF7A00]" />
           <span>
             {isFrench
-              ? 'Phase de bêta ouverte : vos retours construisent ForPro AI.'
-              : 'Open beta stage: your feedback builds ForPro AI.'}
+              ? 'Plateforme sécurisée & écoute active : vos retours construisent ForPro AI.'
+              : 'Secure platform & active feedback: your suggestions build ForPro AI.'}
           </span>
         </div>
       </div>
