@@ -9,6 +9,7 @@ interface RecruiterVideoTileProps {
   speaker: InterviewerSpeaker;
   emotion: InterviewEmotion;
   isSpeaking: boolean;
+  avatarSize?: 'sm' | 'md' | 'lg' | 'xl' | 'responsive';
   onReplayAudio?: () => void;
   className?: string;
 }
@@ -17,6 +18,7 @@ export default function RecruiterVideoTile({
   speaker,
   emotion,
   isSpeaking,
+  avatarSize = 'responsive',
   onReplayAudio,
   className = '',
 }: RecruiterVideoTileProps) {
@@ -24,10 +26,10 @@ export default function RecruiterVideoTile({
 
   return (
     <div
-      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border transition-all duration-300 ${
+      className={`relative flex flex-col justify-between overflow-hidden rounded-2xl border transition-all duration-300 min-h-[230px] sm:min-h-[270px] ${
         isSpeaking
-          ? 'border-emerald-400/80 ring-2 ring-emerald-400/50 shadow-xl shadow-emerald-500/10'
-          : 'border-slate-800/80 bg-slate-950'
+          ? 'border-emerald-400/80 ring-2 ring-emerald-400/40 shadow-xl shadow-emerald-500/10'
+          : 'border-slate-800/80 bg-slate-950/90'
       } ${className}`}
       style={{
         background: isLead
@@ -86,13 +88,13 @@ export default function RecruiterVideoTile({
       </div>
 
       {/* Central Area: Animated Vector Recruiter */}
-      <div className="relative z-10 flex-1 flex items-center justify-center py-1 sm:py-2">
+      <div className="relative z-10 flex-1 flex items-center justify-center py-2 px-3">
         <AnimatedRecruiterAvatar
           speakerId={speaker.id}
           avatarSeed={speaker.avatarSeed !== undefined ? String(speaker.avatarSeed) : speaker.id}
           emotion={emotion}
           isSpeaking={isSpeaking}
-          size="md"
+          size={avatarSize}
         />
       </div>
 

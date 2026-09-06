@@ -1,8 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, FileUp, Target, Video, X, Zap } from 'lucide-react';
-import ProfessionalTeamIllustration from './ProfessionalTeamIllustration';
+import { ArrowRight, FileText, Target, Video, X } from 'lucide-react';
 
 interface FirstLoginWelcomeModalProps {
   isOpen: boolean;
@@ -17,11 +16,7 @@ interface FirstLoginWelcomeModalProps {
 
 /**
  * First-connection welcome modal for newly registered users.
- *
- * ✓ Centered, wide modal dialog with responsive adaptation (from smartphones to 4K displays).
- * ✓ Includes modern vector illustrations of professional team.
- * ✓ Personalized welcome greeting using the user's first name.
- * ✓ Clear, high-converting call-to-action to launch the guided tour or explore freely.
+ * Clean, sober, executive aesthetic without cartoonish vector illustrations or bright AI clichés.
  */
 export default function FirstLoginWelcomeModal({
   isOpen,
@@ -47,25 +42,15 @@ export default function FirstLoginWelcomeModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="welcome-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-slate-950/75 backdrop-blur-md transition-all duration-300 animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-all duration-300 animate-in fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-700/60 bg-gradient-to-br from-[#071120] via-[#0D1C34] to-[#122340] text-white shadow-2xl shadow-black/80 flex flex-col scrollbar-thin scrollbar-thumb-slate-700/50"
+        className="relative w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 text-slate-100 shadow-2xl flex flex-col"
         onClick={(event) => event.stopPropagation()}
       >
-        {/* Top vibrant orange accent glow */}
-        <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-[#FF7A00] to-transparent z-10" />
-
-        {/* Ambient background glows */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#FF7A00]/15 blur-3xl"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-[#1E3A8A]/25 blur-3xl"
-        />
+        {/* Subtle accent border on top */}
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-slate-700 via-orange-500/60 to-slate-700" />
 
         {/* Close Button */}
         <button
@@ -73,100 +58,77 @@ export default function FirstLoginWelcomeModal({
           onClick={onClose}
           title={t('welcomeClose')}
           aria-label={t('welcomeClose')}
-          className="absolute right-4 top-4 z-20 cursor-pointer rounded-full p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+          className="absolute right-4 top-4 z-20 cursor-pointer rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
         >
           <X className="h-5 w-5" />
         </button>
 
         {/* Header Section */}
-        <div className="px-6 pt-6 sm:px-10 sm:pt-8 text-center relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#FF7A00]/30 bg-[#FF7A00]/10 px-3.5 py-1 text-xs font-bold tracking-wide text-[#FFA040] shadow-sm mb-3">
-            <Zap className="h-3.5 w-3.5 text-[#FF7A00]" />
+        <div className="p-6 sm:p-8 pb-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-800/60 px-3 py-1 text-xs font-medium text-slate-300 mb-3">
             <span>{t('welcomeBadge')}</span>
           </div>
 
           <h2
             id="welcome-title"
-            className="text-2xl font-black tracking-tight text-white sm:text-3xl md:text-4xl"
+            className="text-2xl sm:text-3xl font-bold tracking-tight text-white"
           >
             {locale === 'fr' ? (
-              <>
-                Bienvenue dans l&apos;aventure,{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A00] via-[#FF9500] to-[#FFB347]">
-                  {firstName}
-                </span>
-              </>
+              <>Bienvenue sur ForPro AI, <span className="text-orange-400">{firstName}</span></>
             ) : locale === 'de' ? (
-              <>
-                Willkommen bei ForPro AI,{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A00] via-[#FF9500] to-[#FFB347]">
-                  {firstName}
-                </span>
-              </>
+              <>Willkommen bei ForPro AI, <span className="text-orange-400">{firstName}</span></>
             ) : (
-              <>
-                Welcome aboard,{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FF7A00] via-[#FF9500] to-[#FFB347]">
-                  {firstName}
-                </span>
-              </>
+              <>Welcome to ForPro AI, <span className="text-orange-400">{firstName}</span></>
             )}
           </h2>
 
-          <p className="mx-auto mt-2 max-w-2xl text-xs sm:text-sm leading-relaxed text-slate-300">
+          <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
             {t('welcomeSubtitle')}
           </p>
         </div>
 
-        {/* Hero Vector Illustration of Professionals */}
-        <div className="px-4 sm:px-8 py-2 relative z-10">
-          <ProfessionalTeamIllustration className="w-full" />
-        </div>
-
-        {/* 3 Key Pillars / Feature Preview */}
-        <div className="px-6 sm:px-10 pb-4 relative z-10">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Feature 1 */}
-            <div className="rounded-2xl border border-slate-700/50 bg-white/[0.03] p-3.5 transition-all hover:border-[#FF7A00]/40 hover:bg-white/[0.05]">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30">
-                  <FileUp className="h-4 w-4" />
-                </div>
-                <h4 className="text-xs font-bold text-white">
-                  {t('welcomeFeature1Title')}
-                </h4>
-              </div>
-              <p className="text-[11px] leading-relaxed text-slate-400">
+        {/* 3 Core Pillars in a clean, structured list */}
+        <div className="px-6 sm:px-8 py-2 space-y-2.5">
+          {/* Pillar 1: ATS Audit */}
+          <div className="flex items-start gap-3.5 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-3.5 transition-colors hover:bg-slate-950/70">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-200 border border-slate-700/60">
+              <FileText className="h-4 w-4 text-orange-400" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-semibold text-white">
+                {t('welcomeFeature1Title')}
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                 {t('welcomeFeature1Desc')}
               </p>
             </div>
+          </div>
 
-            {/* Feature 2 */}
-            <div className="rounded-2xl border border-slate-700/50 bg-white/[0.03] p-3.5 transition-all hover:border-[#FF7A00]/40 hover:bg-white/[0.05]">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FF7A00]/15 text-[#FF7A00] ring-1 ring-[#FF7A00]/30">
-                  <Target className="h-4 w-4" />
-                </div>
-                <h4 className="text-xs font-bold text-white">
-                  {t('welcomeFeature2Title')}
-                </h4>
-              </div>
-              <p className="text-[11px] leading-relaxed text-slate-400">
+          {/* Pillar 2: Job Matching */}
+          <div className="flex items-start gap-3.5 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-3.5 transition-colors hover:bg-slate-950/70">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-200 border border-slate-700/60">
+              <Target className="h-4 w-4 text-orange-400" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-semibold text-white">
+                {t('welcomeFeature2Title')}
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                 {t('welcomeFeature2Desc')}
               </p>
             </div>
+          </div>
 
-            {/* Feature 3 */}
-            <div className="rounded-2xl border border-slate-700/50 bg-white/[0.03] p-3.5 transition-all hover:border-[#FF7A00]/40 hover:bg-white/[0.05]">
-              <div className="flex items-center gap-2.5 mb-1.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-500/15 text-purple-400 ring-1 ring-purple-500/30">
-                  <Video className="h-4 w-4" />
-                </div>
-                <h4 className="text-xs font-bold text-white">
-                  {t('welcomeFeature3Title')}
-                </h4>
-              </div>
-              <p className="text-[11px] leading-relaxed text-slate-400">
+          {/* Pillar 3: Vocal STAR Coach */}
+          <div className="flex items-start gap-3.5 rounded-2xl border border-slate-800/80 bg-slate-950/40 p-3.5 transition-colors hover:bg-slate-950/70">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-200 border border-slate-700/60">
+              <Video className="h-4 w-4 text-orange-400" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-semibold text-white">
+                {t('welcomeFeature3Title')}
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                 {t('welcomeFeature3Desc')}
               </p>
             </div>
@@ -174,10 +136,10 @@ export default function FirstLoginWelcomeModal({
         </div>
 
         {/* Action Footer */}
-        <div className="mt-auto border-t border-slate-800/80 bg-black/20 px-6 py-4 sm:px-10 sm:py-5 relative z-10">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-            {/* Quick shortcuts on the left */}
-            <div className="flex items-center gap-3 text-xs text-slate-400 order-2 sm:order-1 flex-wrap">
+        <div className="mt-4 border-t border-slate-800 bg-slate-950/60 px-6 py-4 sm:px-8 sm:py-5">
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-3 sm:gap-4">
+            {/* Secondary actions */}
+            <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap justify-center sm:justify-start">
               <button
                 type="button"
                 onClick={onClose}
@@ -185,15 +147,15 @@ export default function FirstLoginWelcomeModal({
               >
                 {t('welcomeExplore')}
               </button>
-              <span className="text-slate-600">•</span>
+              <span className="text-slate-700">•</span>
               <button
                 type="button"
                 onClick={onImportProfile}
-                className="cursor-pointer text-[#FFA040] transition-colors hover:text-white font-medium"
+                className="cursor-pointer text-orange-400 transition-colors hover:text-orange-300 font-medium"
               >
                 {t('welcomeImportProfile')}
               </button>
-              <span className="text-slate-600">•</span>
+              <span className="text-slate-700">•</span>
               <button
                 type="button"
                 onClick={onShowHowItWorks}
@@ -203,15 +165,15 @@ export default function FirstLoginWelcomeModal({
               </button>
             </div>
 
-            {/* Primary Action Button on the right */}
+            {/* Primary Action Button */}
             <button
               type="button"
               id="start-tour-from-welcome-btn"
               onClick={onStartTour}
-              className="group flex w-full sm:w-auto cursor-pointer items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-[#FF7A00] to-[#FF9500] px-6 py-3 text-xs sm:text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:from-[#FF8C00] hover:to-[#FFA500] hover:shadow-orange-500/40 active:scale-[0.98] order-1 sm:order-2"
+              className="group flex w-full sm:w-auto cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-600 hover:bg-orange-500 px-5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md transition-all active:scale-[0.98]"
             >
               <span>{t('welcomeStartTour')}</span>
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
           </div>
         </div>

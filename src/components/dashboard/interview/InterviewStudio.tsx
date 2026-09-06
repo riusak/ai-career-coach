@@ -368,15 +368,15 @@ export default function InterviewStudio({
 
       {/* Main Video Call Arena */}
       <div className="flex-1 p-4 sm:p-6 flex flex-col gap-5 overflow-y-auto">
-        {/* Dynamic Recruiter Visio Grid */}
+        {/* Dynamic Recruiter Visio Grid — Automatically adapts layout for 1, 2, 3, 4+ jury members */}
         <div
-          className={`grid gap-4 ${
+          className={`grid gap-4 w-full ${
             panelMembers.length === 1
-              ? 'grid-cols-1 max-w-xl mx-auto w-full'
+              ? 'grid-cols-1 max-w-xl mx-auto'
               : panelMembers.length === 2
-              ? 'grid-cols-1 md:grid-cols-2'
+              ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'
               : panelMembers.length === 3
-              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+              ? 'grid-cols-1 md:grid-cols-3'
               : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
           }`}
         >
@@ -384,12 +384,22 @@ export default function InterviewStudio({
             const isThisSpeaker =
               activeSpeakerId?.toLowerCase() === member.id.toLowerCase() ||
               activeSpeaker.id.toLowerCase() === member.id.toLowerCase();
+            const computedAvatarSize =
+              panelMembers.length === 1
+                ? 'xl'
+                : panelMembers.length === 2
+                ? 'lg'
+                : panelMembers.length === 3
+                ? 'md'
+                : 'sm';
+
             return (
               <RecruiterVideoTile
                 key={member.id}
                 speaker={member}
                 emotion={isThisSpeaker ? currentEmotion : 'smiling'}
                 isSpeaking={isSpeaking && isThisSpeaker}
+                avatarSize={computedAvatarSize}
                 onReplayAudio={() => playTurn(latestRecruiterTurn)}
               />
             );
